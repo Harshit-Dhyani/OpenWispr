@@ -1,0 +1,657 @@
+import type { ReactNode } from 'react';
+import { useState, useCallback } from 'react';
+import { Activity, AlertTriangle, Cpu, FolderOpen, LoaderCircle, Mic2, Play, RefreshCcw, Settings, Square, Upload, Wifi, WifiOff, Download } from 'lucide-react';
+import type { Device, DeviceProbeResult, Health, ModelPreloadStatus } from '../types/api';
+
+type ConnectionStatus = 'sse-connected' | 'sse-reconnecting' | 'polling-fallback';
+type GpuStatus = 'gpu-active' | 'cpu-fallback' | 'gpu-only-failed';
+
+type FormState = {
+  sessionTitle: string;
+  deviceId: string;
+  modelName: string;
+  languageMode: string;
+  liveMode: string;
+  executionMode: string;
+  exportRoot: string;
+};
+
+type SidebarProps = {
+  theme: string;
+  onThemeChange: (theme: string) => void;
+  form: FormState;
+  devices: Device[];
+  models: string[];
+  languages: string[];
+  liveModes: string[];
+  executionModes: string[];
+  backendReady: boolean;
+  sessionStatus: string;
+  health: Health;
+  modelLoading?: boolean;
+  preloadStatus?: ModelPreloadStatus;
+  meterValue: number;
+  statusMessage: string;
+  busy: boolean;
+  connectionStatus?: ConnectionStatus;
+  gpuStatus?: GpuStatus;
+  onFieldChange: (key: keyof FormState, value: string) => void;
+  onRefreshDevices: () => void;
+  onChooseDirectory: () => void;
+  onPreloadModel: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  onAttachPdf: () => void;
+  onOpenSettings?: () => void;
+};
+
+export function Sidebar({
+  theme,
+  onThemeChange,
+  form,
+  devices,
+  models,
+  languages,
+  liveModes,
+  executionModes,
+  backendReady,
+  sessionStatus,
+  health,
+  modelLoading = false,
+  preloadStatus,
+  meterValue,
+  statusMessage,
+  busy,
+  connectionStatus = 'polling-fallback',
+  gpuStatus = 'cpu-fallback',
+  onFieldChange,
+  onRefreshDevices,
+  onChooseDirectory,
+  onPreloadModel,
+  onStart,
+  onStop,
+  onAttachPdf,
+  onOpenSettings,
+}: SidebarProps) {
+  const meterPercent = Math.max(0, Math.min(100, Math.round(meterValue * 220)));
+  const hasError = Boolean(health.last_error);
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeResult, setProbeResult] = useState<DeviceProbeResult | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
+
+  const handleDeviceTest = useCallback(async () => {
+    if (!form.deviceId) return;
+    setProbeLoading(true);
+    setProbeError(null);
+    setProbeResult(null);
+    try {
+      const result = (await window.transcriptaDesktop.fetchJson(
+        `/api/devices/${encodeURIComponent(form.deviceId)}/probe`,
+      )) as DeviceProbeResult;
+      setProbeResult(result);
+    } catch (err) {
+      setProbeError(err instanceof Error ? err.message : 'Probe failed');
+    } finally {
+      setProbeLoading(false);
+    }
+  }, [form.deviceId]);
+
+  const getConnectionBadge = () => {
+    switch (connectionStatus) {
+      case 'sse-connected':
+        return { text: 'SSE Connected', color: 'bg-theme-success text-lawn-bg', icon: Wifi };
+      case 'sse-reconnecting':
+        return { text: 'SSE Reconnecting', color: 'bg-theme-warning text-lawn-bg', icon: WifiOff };
+      case 'polling-fallback':
+      default:
+        return { text: 'Polling Fallback', color: 'bg-theme-info text-lawn-bg', icon: Activity };
+    }
+  };
+
+  const getGpuBadge = () => {
+    switch (gpuStatus) {
+      case 'gpu-active':
+        return { text: 'GPU Active', color: 'bg-theme-success text-lawn-bg', icon: Cpu };
+      case 'gpu-only-failed':
+        return { text: 'GPU-Only Failed', color: 'bg-theme-error text-lawn-bg', icon: AlertTriangle };
+      case 'cpu-fallback':
+      default:
+        return { text: 'CPU Fallback', color: 'bg-theme-warning text-lawn-bg', icon: Cpu };
+    }
+  };
+
+  const getModelLoadTime = (modelName: string): number => {
+    switch (modelName) {
+      case 'tiny':
+        return 5;
+      case 'base':
+        return 10;
+      case 'small':
+        return 20;
+      case 'medium':
+        return 40;
+      case 'large-v3':
+        return 90;
+      default:
+        return 20;
+    }
+  };
+
+  const getLanguageLabel = (code: string): string => {
+    const labels: Record<string, string> = {
+      auto: 'Auto-detect',
+      hi: 'Hindi (हिन्दी)',
+      en: 'English',
+    };
+    return labels[code] || code;
+  };
+
+  const getLiveModeLabel = (mode: string): string => {
+    const labels: Record<string, string> = {
+      realtime: 'Real-time',
+      low_latency: 'Low Latency',
+      balanced: 'Balanced',
+      high_accuracy: 'High Accuracy',
+    };
+    return labels[mode] || mode;
+  };
+
+  const connBadge = getConnectionBadge();
+  const gpuBadge = getGpuBadge();
+  const ConnIcon = connBadge.icon;
+  const GpuIcon = gpuBadge.icon;
+
+  const isPreloading = preloadStatus?.loading ?? false;
+  const preloadProgress = preloadStatus?.progress ?? 0;
+
+  return (
+    <aside className="flex flex-col h-full lg:h-full lg:overflow-hidden border-b-2 lg:border-r-2 lg:border-b-0 border-lawn-border bg-lawn-bg p-4 w-full lg:w-[320px] shrink-0">
+      {/* Header with Settings Button */}
+      <section className="border-2 border-lawn-border bg-lawn-dark p-4 shadow-brutal text-white mb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-lawn-accent">
+              Local Transcription
+            </p>
+            <h1 className="font-display text-2xl uppercase tracking-tighter text-lawn-bg leading-none">
+              Transcripta
+            </h1>
+            <p className="mt-1 text-[10px] leading-4 text-stone-300 font-mono">
+              Local audio capture and transcription
+            </p>
+          </div>
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center justify-center w-10 h-10 border-2 border-lawn-bg/40 bg-lawn-accent text-lawn-border hover:bg-lawn-bg hover:text-lawn-border hover:border-lawn-accent transition-all duration-200 shadow-brutal-sm"
+            title="Open Settings"
+            type="button"
+          >
+            <Settings size={20} strokeWidth={2.5} />
+          </button>
+        </div>
+      </section>
+
+      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-4">
+        {/* Session Setup */}
+        <section className="border-2 border-lawn-border bg-lawn-panel p-4 shadow-brutal flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b-2 border-lawn-border pb-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.1em] text-lawn-border">
+              Session Setup
+            </span>
+            <span
+              className={[
+                'px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border border-lawn-border',
+                hasError
+                  ? 'bg-theme-error text-lawn-bg'
+                  : backendReady
+                    ? 'bg-theme-success text-lawn-bg'
+                    : 'bg-theme-info text-lawn-bg',
+              ].join(' ')}
+            >
+              {hasError ? 'Error' : backendReady ? 'Ready' : 'Connecting'}
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {/* Theme & Model Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Theme"
+                control={
+                  <select
+                    value={theme}
+                    onChange={(e) => onThemeChange(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="cyber">Cyber</option>
+                    <option value="dracula">Dracula</option>
+                  </select>
+                }
+              />
+              <Field
+                label="Model"
+                control={
+                  <select
+                    value={form.modelName}
+                    onChange={(event) => onFieldChange('modelName', event.target.value)}
+                    className={inputClass}
+                  >
+                    {models.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                }
+              />
+            </div>
+
+            {/* Session Title */}
+            <Field
+              label="Session Title"
+              control={
+                <input
+                  type="text"
+                  value={form.sessionTitle}
+                  onChange={(event) => onFieldChange('sessionTitle', event.target.value)}
+                  className={inputClass}
+                  placeholder="Study Session"
+                />
+              }
+            />
+
+            {/* Audio Device */}
+            <Field
+              label="Audio Device"
+              control={
+                <div className="flex gap-2">
+                  <select
+                    value={form.deviceId}
+                    onChange={(event) => onFieldChange('deviceId', event.target.value)}
+                    className={`${inputClass} flex-1`}
+                  >
+                    {devices.map((device) => (
+                      <option key={device.id} value={device.id}>
+                        {device.is_loopback ? `${device.name} [rec]` : device.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button 
+                    type="button" 
+                    onClick={onRefreshDevices} 
+                    className={sideButtonClass}
+                    title="Refresh devices"
+                  >
+                    <RefreshCcw size={16} strokeWidth={3} />
+                  </button>
+                </div>
+              }
+            />
+
+            {/* Model Preload Section */}
+            <div className="border-2 border-lawn-border bg-lawn-bg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.1em] text-lawn-border">
+                  Model Preload
+                </span>
+                {isPreloading && (
+                  <span className="text-[9px] font-black text-theme-warning animate-pulse">
+                    Loading...
+                  </span>
+                )}
+              </div>
+
+              {isPreloading ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <LoaderCircle size={16} strokeWidth={3} className="animate-spin text-theme-warning" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-lawn-border truncate">
+                        {preloadStatus?.message || 'Loading model...'}
+                      </p>
+                      <p className="text-[9px] text-stone-500">
+                        {form.modelName} (~{getModelLoadTime(form.modelName)}s)
+                      </p>
+                    </div>
+                    <span className="text-xs font-black text-theme-warning">{preloadProgress}%</span>
+                  </div>
+                  <div className="h-2 border-[2px] border-lawn-border bg-lawn-bg overflow-hidden">
+                    <div
+                      className="h-full bg-theme-warning transition-all duration-300 ease-out border-r-2 border-lawn-border"
+                      style={{ width: `${preloadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-stone-500">Current:</span>
+                    <span className="font-bold text-lawn-border">{form.modelName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onPreloadModel}
+                    disabled={!backendReady || sessionStatus === 'running' || modelLoading}
+                    className="w-full flex h-9 items-center justify-center gap-1.5 border-2 border-lawn-border bg-lawn-accent px-3 text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border transition hover:-translate-y-[1px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none disabled:cursor-not-allowed disabled:bg-stone-300 disabled:shadow-none disabled:translate-y-0"
+                  >
+                    <Download size={12} strokeWidth={3} />
+                    Preload
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {modelLoading && (
+              <div className="border-2 border-theme-warning bg-theme-warning/10 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <LoaderCircle size={16} strokeWidth={3} className="animate-spin text-theme-warning" />
+                  <span className="text-xs font-black text-theme-warning">Loading Model...</span>
+                </div>
+                <p className="text-[10px] text-theme-warning leading-4">
+                  Loading {form.modelName} model (~{getModelLoadTime(form.modelName)}s)
+                </p>
+              </div>
+            )}
+
+            {/* Language & Live Mode */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Language"
+                control={
+                  <select
+                    value={form.languageMode}
+                    onChange={(event) => onFieldChange('languageMode', event.target.value)}
+                    className={inputClass}
+                  >
+                    {languages.map((language) => (
+                      <option key={language} value={language}>
+                        {getLanguageLabel(language)}
+                      </option>
+                    ))}
+                  </select>
+                }
+              />
+              <Field
+                label="Live Mode"
+                control={
+                  <select
+                    value={form.liveMode}
+                    onChange={(event) => onFieldChange('liveMode', event.target.value)}
+                    className={inputClass}
+                  >
+                    {liveModes.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {getLiveModeLabel(mode)}
+                      </option>
+                    ))}
+                  </select>
+                }
+              />
+            </div>
+
+            {/* Execution Mode */}
+            <Field
+              label="Execution Mode"
+              control={
+                <select
+                  value={form.executionMode}
+                  onChange={(event) => onFieldChange('executionMode', event.target.value)}
+                  className={inputClass}
+                >
+                  {executionModes.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </select>
+              }
+            />
+
+            {/* Export Folder */}
+            <Field
+              label="Export Folder"
+              control={
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.exportRoot}
+                    onChange={(event) => onFieldChange('exportRoot', event.target.value)}
+                    className={`${inputClass} flex-1`}
+                    placeholder="sessions"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={onChooseDirectory} 
+                    className={sideButtonClass}
+                    title="Choose folder"
+                  >
+                    <FolderOpen size={16} strokeWidth={3} />
+                  </button>
+                </div>
+              }
+            />
+
+            {/* Input Level Meter */}
+            <div className="border-2 border-lawn-border bg-lawn-bg p-3">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border">
+                  Input Level
+                </span>
+                <span className="text-xs font-black text-lawn-border">{meterPercent}%</span>
+              </div>
+              <div className="h-3 border-[2px] border-lawn-border bg-white overflow-hidden">
+                <div
+                  className="h-full bg-lawn-accent transition-all duration-100 border-r-2 border-lawn-border"
+                  style={{ width: `${meterPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Start/Stop Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={busy || sessionStatus === 'running' || modelLoading}
+                onClick={onStart}
+                className="flex h-10 items-center justify-center gap-1.5 border-2 border-lawn-border bg-lawn-accent px-3 text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border transition hover:-translate-y-[2px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none disabled:cursor-not-allowed disabled:bg-stone-300 disabled:shadow-none disabled:translate-y-0"
+              >
+                {busy && sessionStatus !== 'running' ? <LoaderCircle size={14} strokeWidth={3} className="animate-spin" /> : <Play size={14} strokeWidth={3} />}
+                Start
+              </button>
+              <button
+                type="button"
+                disabled={busy || sessionStatus !== 'running'}
+                onClick={onStop}
+                className="flex h-10 items-center justify-center gap-1.5 border-2 border-lawn-border bg-lawn-bg px-3 text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border transition hover:-translate-y-[2px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none disabled:cursor-not-allowed disabled:bg-stone-200 disabled:shadow-none disabled:translate-y-0"
+              >
+                <Square size={14} strokeWidth={3} />
+                Stop
+              </button>
+            </div>
+
+            {/* Attach PDF */}
+            <button
+              type="button"
+              onClick={onAttachPdf}
+              className="flex h-10 w-full items-center justify-center gap-1.5 border-2 border-lawn-border bg-lawn-panel px-3 text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border transition hover:-translate-y-[2px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none"
+            >
+              <Upload size={14} strokeWidth={3} />
+              Attach PDF Context
+            </button>
+          </div>
+        </section>
+
+        {/* Runtime Section */}
+        <section className="border-2 border-lawn-border bg-lawn-panel p-4 shadow-brutal flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b-2 border-lawn-border pb-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.1em] text-lawn-border">
+              Runtime
+            </span>
+            <span className="px-2 py-0.5 border border-lawn-border bg-lawn-bg text-[9px] font-black uppercase tracking-widest text-lawn-border">
+              {sessionStatus}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <Metric label="GPU" value={health.gpu_mode || 'unknown'} />
+            <Metric label="Runtime" value={health.model_runtime_device || 'unknown'} />
+            <Metric label="Queue" value={String(health.queue_depth ?? 0)} />
+            <Metric label="Dropped" value={String(health.dropped_stt_chunks ?? 0)} />
+          </div>
+
+          <div className="border-2 border-lawn-border bg-lawn-bg/50 p-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-stone-500">
+              <Mic2 size={11} strokeWidth={3} />
+              Status
+            </div>
+            <p className={`text-[11px] font-bold leading-4 ${hasError ? 'text-theme-error' : 'text-lawn-border'}`}>
+              {statusMessage}
+            </p>
+          </div>
+        </section>
+
+        {/* Diagnostics Section */}
+        <section className="border-2 border-lawn-border bg-lawn-panel p-4 shadow-brutal flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b-2 border-lawn-border pb-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.1em] text-lawn-border">
+              Diagnostics
+            </span>
+            <div className="flex gap-1">
+              <div className={`w-2 h-2 rounded-full ${connBadge.color}`} />
+              <div className={`w-2 h-2 rounded-full ${gpuBadge.color}`} />
+            </div>
+          </div>
+
+          {/* Connection Badge */}
+          <div className="flex items-center gap-2 border-2 border-lawn-border bg-lawn-bg p-2">
+            <div className={`p-1.5 ${connBadge.color}`}>
+              <ConnIcon size={14} strokeWidth={3} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[9px] font-black uppercase tracking-widest text-stone-500">
+                Connection
+              </div>
+              <div className="text-xs font-black text-lawn-border truncate">{connBadge.text}</div>
+            </div>
+          </div>
+
+          {/* GPU Badge */}
+          <div className="flex items-center gap-2 border-2 border-lawn-border bg-lawn-bg p-2">
+            <div className={`p-1.5 ${gpuBadge.color}`}>
+              <GpuIcon size={14} strokeWidth={3} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[9px] font-black uppercase tracking-widest text-stone-500">
+                Compute
+              </div>
+              <div className="text-xs font-black text-lawn-border truncate">{gpuBadge.text}</div>
+            </div>
+          </div>
+
+          {/* Device Test */}
+          <div className="border-2 border-lawn-border bg-lawn-bg p-2">
+            <button
+              type="button"
+              onClick={handleDeviceTest}
+              disabled={probeLoading || !form.deviceId}
+              className="w-full flex h-9 items-center justify-center gap-1.5 border-2 border-lawn-border bg-lawn-panel px-3 text-[10px] font-black uppercase tracking-[0.08em] text-lawn-border transition hover:-translate-y-[1px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none disabled:cursor-not-allowed disabled:bg-stone-300 disabled:shadow-none disabled:translate-y-0"
+            >
+              {probeLoading ? (
+                <LoaderCircle size={14} strokeWidth={3} className="animate-spin" />
+              ) : (
+                <Mic2 size={14} strokeWidth={3} />
+              )}
+              {probeLoading ? 'Testing...' : 'Device Test'}
+            </button>
+
+            {probeResult && (
+              <div className="mt-2 border-2 border-lawn-border bg-lawn-panel p-2 space-y-1.5">
+                <div className="text-[9px] font-black uppercase tracking-widest text-stone-500 border-b border-lawn-border pb-1">
+                  Probe Results
+                </div>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
+                  <div><span className="text-stone-500">RMS:</span> <span className="font-bold">{probeResult.rms_mean.toFixed(4)}</span></div>
+                  <div><span className="text-stone-500">Peak:</span> <span className="font-bold">{probeResult.rms_peak.toFixed(4)}</span></div>
+                  <div><span className="text-stone-500">Signal:</span> <span className={`font-bold ${probeResult.has_signal ? 'text-theme-success' : 'text-theme-error'}`}>{probeResult.has_signal ? 'Yes' : 'No'}</span></div>
+                  <div><span className="text-stone-500">Channels:</span> <span className="font-bold">{probeResult.channels}</span></div>
+                  <div className="col-span-2"><span className="text-stone-500">Sample Rate:</span> <span className="font-bold">{probeResult.sample_rate} Hz</span></div>
+                </div>
+              </div>
+            )}
+
+            {probeError && (
+              <div className="mt-2 border-2 border-theme-error bg-theme-error/10 p-2">
+                <div className="text-[10px] font-bold text-theme-error">{probeError}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Backpressure */}
+          <div className="border-2 border-lawn-border bg-lawn-bg p-2">
+            <div className="text-[9px] font-black uppercase tracking-widest text-stone-500 mb-1.5">
+              Backpressure
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-lawn-border">State</span>
+                <span className={`font-black px-1.5 py-0.5 border text-[9px] ${health.stt_backpressure_state === 'normal'
+                  ? 'bg-theme-success/20 text-theme-success border-theme-success/30'
+                  : health.stt_backpressure_state === 'elevated'
+                    ? 'bg-theme-warning/20 text-theme-warning border-theme-warning/30'
+                    : 'bg-theme-error/20 text-theme-error border-theme-error/30'
+                  }`}>
+                  {health.stt_backpressure_state || 'normal'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-lawn-border">Queue</span>
+                <span className="font-black text-lawn-border">{health.queue_depth ?? 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Warning */}
+          {health.last_warning && (
+            <div className="border-2 border-theme-warning bg-theme-warning/10 p-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <AlertTriangle size={12} strokeWidth={3} className="text-theme-warning" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-theme-warning">Warning</span>
+              </div>
+              <p className="text-[10px] font-bold text-theme-warning leading-4">{health.last_warning}</p>
+            </div>
+          )}
+        </section>
+      </div>
+    </aside>
+  );
+}
+
+function Field({ label, control }: { label: string; control: ReactNode }) {
+  return (
+    <label className="block">
+      <div className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-lawn-border truncate">
+        {label}
+      </div>
+      {control}
+    </label>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-lawn-border bg-lawn-bg p-2 flex flex-col justify-center">
+      <div className="mb-0.5 text-[9px] font-black uppercase tracking-widest text-stone-500">
+        {label}
+      </div>
+      <div className="text-xs font-black text-lawn-border truncate">{value}</div>
+    </div>
+  );
+}
+
+const inputClass =
+  'h-9 w-full border-2 border-lawn-border bg-lawn-bg px-2.5 py-1 text-[11px] font-bold text-lawn-border outline-none transition focus:ring-2 focus:ring-lawn-accent/50 focus:shadow-brutal-sm hover:-translate-y-[1px] hover:shadow-brutal-sm placeholder:text-stone-400 rounded-none cursor-pointer';
+
+const sideButtonClass =
+  'flex h-9 w-9 flex-shrink-0 items-center justify-center border-2 border-lawn-border bg-lawn-panel text-lawn-border transition hover:-translate-y-[1px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none focus-visible:ring-2 focus-visible:ring-lawn-accent/50 rounded-none cursor-pointer';
