@@ -1,0 +1,10 @@
+{
+  "name": "transcripta",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root scripts for the Transcripta Electron shell and local Python backend.",
+  "scripts": {
+    "install:ui": "npm --prefix ui-electron install",
+    "dev": "npm --prefix ui-electron run dev"
+  }
+}
