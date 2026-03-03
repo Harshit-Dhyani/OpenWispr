@@ -1,1 +1,92 @@
 """Core configuration and session lifecycle helpers."""
+
+from app.core.error_handler import (
+    AppError,
+    AudioError,
+    ErrorCategory,
+    ErrorHandler,
+    ErrorReporter,
+    ErrorSeverity,
+    ModelError,
+    NetworkError,
+    RetryConfig,
+    SessionError,
+    TranscriptaError,
+    UserNotifier,
+    get_error_handler,
+    handle_error,
+    notify_user,
+    report_error,
+    with_retry,
+    with_retry_async,
+)
+from app.core.recovery_strategies import RecoveryStatus
+from app.core.recovery_strategies import (
+    AudioDeviceRecoveryStrategy,
+    AudioPermissionRecoveryStrategy,
+    DiskFullRecoveryStrategy,
+    FallbackChain,
+    FallbackOption,
+    ModelDownloadStrategy,
+    ModelFallbackStrategy,
+    ModelOOMRecoveryStrategy,
+    NetworkRetryStrategy,
+    OfflineModeStrategy,
+    RecoveryManager,
+    RecoveryResult,
+    RecoveryStrategy,
+    SessionCorruptionRecoveryStrategy,
+    create_batch_size_fallback_chain,
+    create_compute_fallback_chain,
+    create_default_recovery_manager,
+    create_model_size_fallback_chain,
+    get_recovery_manager,
+)
+
+__all__ = [
+    # Error types
+    "AppError",
+    "AudioError",
+    "ModelError",
+    "NetworkError",
+    "SessionError",
+    "TranscriptaError",
+    # Error handling
+    "ErrorCategory",
+    "ErrorHandler",
+    "ErrorReporter",
+    "ErrorSeverity",
+    "UserNotifier",
+    "RecoveryStatus",
+    "RetryConfig",
+    # Recovery
+    "RecoveryManager",
+    "RecoveryResult",
+    "RecoveryStrategy",
+    "FallbackChain",
+    "FallbackOption",
+    # Strategies
+    "AudioDeviceRecoveryStrategy",
+    "AudioPermissionRecoveryStrategy",
+    "ModelOOMRecoveryStrategy",
+    "ModelDownloadStrategy",
+    "ModelFallbackStrategy",
+    "NetworkRetryStrategy",
+    "OfflineModeStrategy",
+    "DiskFullRecoveryStrategy",
+    "SessionCorruptionRecoveryStrategy",
+    # Factory functions
+    "create_compute_fallback_chain",
+    "create_model_size_fallback_chain",
+    "create_batch_size_fallback_chain",
+    "create_default_recovery_manager",
+    # Singleton accessors
+    "get_error_handler",
+    "get_recovery_manager",
+    # Convenience functions
+    "handle_error",
+    "notify_user",
+    "report_error",
+    "with_retry",
+    "with_retry_async",
+]
