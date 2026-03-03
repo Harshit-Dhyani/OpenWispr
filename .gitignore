@@ -24,8 +24,8 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Electron
-ui-electron/dist/
-ui-electron/out/
+app/desktop/dist/
+app/desktop/out/
 
 # IDE
 .vscode/

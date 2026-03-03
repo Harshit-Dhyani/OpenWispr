@@ -10,7 +10,7 @@ import logging
 import threading
 import time
 import warnings
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from queue import Empty, Full, Queue
@@ -182,8 +182,12 @@ class LanguageOptimizer:
         ),
     }
 
+    # Maximum cache size for LRU eviction
+    MAX_CACHE_SIZE = 500
+
     def __init__(self) -> None:
-        self._lang_cache: dict[str, str] = {}
+        # Use OrderedDict for LRU cache - moves accessed items to end
+        self._lang_cache: OrderedDict[str, str] = OrderedDict()
         self._cache_lock = threading.Lock()
         self._cache_hits = 0
         self._cache_misses = 0
@@ -200,6 +204,8 @@ class LanguageOptimizer:
         with self._cache_lock:
             if fingerprint in self._lang_cache:
                 self._cache_hits += 1
+                # Move to end (most recently used)
+                self._lang_cache.move_to_end(fingerprint)
                 return self._lang_cache[fingerprint]
             self._cache_misses += 1
 
@@ -215,14 +221,16 @@ class LanguageOptimizer:
                 vad_parameters={"threshold": 0.5, "min_silence_duration_ms": 100},
             )
             detected = getattr(info, "language", "auto")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Language detection failed: {e}, falling back to 'auto'")
             detected = "auto"
 
         with self._cache_lock:
             self._lang_cache[fingerprint] = detected
-            # Prune cache if too large
-            if len(self._lang_cache) > 1000:
-                self._lang_cache.clear()
+            # LRU eviction: remove oldest entries when cache exceeds max size
+            while len(self._lang_cache) > self.MAX_CACHE_SIZE:
+                # popitem(False) removes the first inserted (least recently used) item
+                self._lang_cache.popitem(last=False)
 
         return detected
 
@@ -246,6 +254,13 @@ class LanguageOptimizer:
             "size": len(self._lang_cache),
         }
 
+    def clear_cache(self) -> None:
+        """Clear the language detection cache."""
+        with self._cache_lock:
+            self._lang_cache.clear()
+            self._cache_hits = 0
+            self._cache_misses = 0
+
 
 class ModelPool:
     """Thread-safe cache for Whisper models to avoid reload overhead."""
@@ -261,6 +276,9 @@ class ModelPool:
                     cls._instance._initialized = False
         return cls._instance
 
+    # Model TTL in seconds (30 minutes of inactivity)
+    MODEL_TTL_SECONDS = 1800
+
     def __init__(self) -> None:
         if self._initialized:
             return
@@ -269,6 +287,18 @@ class ModelPool:
         self._model_locks: dict[str, threading.Lock] = {}
         self._pool_lock = threading.Lock()
         self._model_metadata: dict[str, dict[str, Any]] = {}
+
+    def _cleanup_expired_models(self) -> None:
+        """Remove models that have exceeded TTL."""
+        now = time.time()
+        expired_keys = [
+            key
+            for key, meta in self._model_metadata.items()
+            if now - meta.get("last_access", 0) > self.MODEL_TTL_SECONDS
+        ]
+        for key in expired_keys:
+            self.release_model(key)
+            logger.debug(f"Expired model removed from pool: {key}")
 
     def get_model(
         self,
@@ -280,8 +310,18 @@ class ModelPool:
         """Get or create a cached model."""
         cache_key = f"{model_name}:{device}:{compute_type}"
 
+        # Cleanup expired models periodically
+        self._cleanup_expired_models()
+
         # Fast path: model already exists
         if cache_key in self._models:
+            # Update access time
+            with self._pool_lock:
+                if cache_key in self._model_metadata:
+                    self._model_metadata[cache_key]["last_access"] = time.time()
+                    self._model_metadata[cache_key]["access_count"] = (
+                        self._model_metadata[cache_key].get("access_count", 0) + 1
+                    )
             return self._models[cache_key]
 
         # Slow path: create model with per-key lock
@@ -304,7 +344,7 @@ class ModelPool:
                     model = WhisperModel(
                         model_name,
                         device=device,
-                        compute_type="int8",  # Use int8 for all devices to save memory
+                        compute_type=compute_type,  # Use provided compute_type from configuration
                         download_root=download_root,
                     )
                     break
@@ -348,7 +388,8 @@ class ModelPool:
             segments, _ = model.transcribe(dummy, beam_size=1, temperature=0.0)
             list(segments)  # Consume generator
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Model warmup failed: {e}")
             return False
 
     def get_pool_stats(self) -> dict[str, Any]:
@@ -390,7 +431,8 @@ class CudaStreamManager:
             self._streams = [torch.cuda.Stream() for _ in range(self.num_streams)]
             self._initialized = True
             return True
-        except Exception:
+        except Exception as exc:
+            logger.debug(f"CUDA stream initialization failed: {exc}")
             return False
 
     def get_stream(self) -> Any:
@@ -443,8 +485,10 @@ class StreamingTranscriber:
         self.streaming_window_ms = streaming_window_ms
         self.streaming_overlap_ms = streaming_overlap_ms
 
-        # Streaming buffer
-        self._buffer: deque[float] = deque()
+        # Streaming buffer with max size to prevent unbounded growth
+        # Max 30 seconds of audio at 16kHz = 480,000 samples
+        max_buffer_samples = int(self.sample_rate * 30)
+        self._buffer: deque[float] = deque(maxlen=max_buffer_samples)
         self._buffer_start_time = 0.0
         self._stream_time = 0.0
         self._lock = threading.Lock()
@@ -489,8 +533,13 @@ class StreamingTranscriber:
                 window_start = self._buffer_start_time
                 self._buffer_start_time += step_samples / self.sample_rate
 
-            # Process window
-            result = self._transcribe_window(window, window_start, language)
+            # Process window with error handling
+            try:
+                result = self._transcribe_window(window, window_start, language)
+            except Exception as exc:
+                logger.error(f"Transcription error in process_stream: {exc}")
+                # Continue to next window on error
+                continue
 
             if result.text.strip():
                 if yield_partial:
@@ -861,17 +910,24 @@ class FastWhisperBackend:
         if not HAS_TORCH or not torch.cuda.is_available():
             return False, "CUDA not available"
 
-        # Memory requirements for int8 quantization (most efficient)
+        # Memory requirements for different compute types (in GB)
+        # Values include model weights + CUDA overhead + workspace
         memory_requirements = {
-            "tiny": 0.5,
-            "base": 0.5,
-            "small": 1.0,
-            "medium": 3.0,
-            "large-v3": 6.0,  # int8 uses ~6GB, not 10GB
+            "tiny": {"int8": 0.5, "float16": 0.6, "float32": 0.8},
+            "base": {"int8": 0.6, "float16": 0.8, "float32": 1.2},
+            "small": {"int8": 1.0, "float16": 1.3, "float32": 2.0},
+            "medium": {"int8": 3.0, "float16": 4.0, "float32": 6.0},
+            "large-v1": {"int8": 5.0, "float16": 6.5, "float32": 10.0},
+            "large-v2": {"int8": 5.0, "float16": 6.5, "float32": 10.0},
+            "large-v3": {"int8": 6.0, "float16": 7.5, "float32": 11.0},
+            "large-v3-turbo": {"int8": 4.0, "float16": 5.0, "float32": 7.5},
         }
 
-        required_gb = memory_requirements.get(self.model_name, 2.0)
-        # Add small buffer for CUDA overhead
+        model_memory = memory_requirements.get(
+            self.model_name, {"int8": 2.0, "float16": 2.5, "float32": 4.0}
+        )
+        required_gb = model_memory.get(self.compute_type, model_memory.get("int8", 2.0))
+        # Add 10% buffer for CUDA overhead and temporary allocations
         required_gb *= 1.1
 
         try:
@@ -1036,8 +1092,14 @@ class FastWhisperBackend:
                 )
 
                 try:
+                    safe_samples = np.nan_to_num(
+                        np.clip(chunk.samples.astype(np.float32, copy=False), -1.0, 1.0),
+                        nan=0.0,
+                        posinf=1.0,
+                        neginf=-1.0,
+                    )
                     # Push audio to streaming transcriber
-                    self._transcriber.push_audio(chunk.samples, chunk.started_at)
+                    self._transcriber.push_audio(safe_samples, chunk.started_at)
 
                     # Process and yield results
                     partial_count = 0
@@ -1144,9 +1206,16 @@ class FastWhisperBackend:
             f"switching_to=cpu/int8, model_name={self.model_name}"
         )
 
-        # Cleanup GPU
+        # Cleanup GPU - synchronize streams first to prevent race conditions
+        if HAS_TORCH and torch.cuda.is_available():
+            # Ensure all CUDA streams are idle before releasing the model
+            self.cuda_manager.synchronize_all()
+            torch.cuda.synchronize()
+
         if self._model is not None:
-            cache_key = f"{self.model_name}:cuda:{self.compute_type}"
+            # Get the actual compute_type used when model was created
+            actual_compute_type = self.compute_type if self._runtime_device == "cuda" else "int8"
+            cache_key = f"{self.model_name}:cuda:{actual_compute_type}"
             self.model_pool.release_model(cache_key)
             self._model = None
 
@@ -1218,6 +1287,8 @@ class FastWhisperBackend:
             cache_key += self.compute_type if self._runtime_device == "cuda" else "int8"
             self.model_pool.release_model(cache_key)
             self._model = None
+        # Clear language optimizer cache
+        self.language_optimizer.clear_cache()
 
 
 # Convenience functions for creating optimized transcriber instances

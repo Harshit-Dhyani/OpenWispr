@@ -19,19 +19,19 @@ Transcripta is a Windows 11 desktop app for privacy-first transcription of live 
 - Electron desktop shell
 - faster-whisper
 - CTranslate2
-- WASAPI loopback capture
+- PyAudioWPatch WASAPI capture with soundcard fallback
 - Electron packaging flow on top of the Python runtime
 
 ## Quick Start
 
-Desktop entrypoint: `ui-electron/`
+Desktop entrypoint: `app/desktop/`
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
 pip install -e .[dev]
-cd ui-electron
+cd app/desktop
 npm install
 npm run dev
 ```
@@ -81,13 +81,97 @@ Each session writes a dedicated folder under `sessions\<session-slug>\`:
 - `session.json`
 - `logs\app.log`
 
+## Model Manager
+
+Transcripta now separates local models into two categories:
+
+- `Speech-to-Text (ASR)`
+- `Transcript Refiner`
+
+Current ASR catalog:
+
+- `whisper-tiny`
+- `whisper-small`
+- `whisper-medium`
+- `whisper-large-v3`
+- `whisper-turbo`
+
+Current refiner catalog:
+
+- `qwen2.5-7b-instruct`
+- `mistral-7b-instruct-v0.3`
+- `phi-3-mini-4k-instruct`
+
+Use `Full Settings > Models` to:
+
+- inspect installed status
+- download models
+- cancel active downloads
+- remove local models
+- choose the default ASR model
+- choose the default refiner model
+- choose `Refinement Mode: Off | Strict | Polished`
+
+The UI is explicit about installation state. If a model is not installed, it is shown as `Not Installed`.
+
+### ASR model guidance
+
+- `whisper-tiny`: fastest option for weak CPUs and quick smoke tests
+- `whisper-small`: strong fast local option for modest GPUs and dictation
+- `whisper-medium`: best default balance for most Windows desktops
+- `whisper-large-v3`: best quality for stronger GPUs and long-form sessions
+- `whisper-turbo`: cataloged fast option, but only selectable when runtime support is available
+
+### Refiner model guidance
+
+- `qwen2.5-7b-instruct`: default balanced local refiner choice
+- `mistral-7b-instruct-v0.3`: stronger quality-oriented cleanup option
+- `phi-3-mini-4k-instruct`: smaller refiner for lower-memory systems
+
+### Refiner runtime status
+
+Refiner selection, download, and persistence are implemented. If the local refiner runtime is not enabled yet, Transcripta will say so explicitly and continue using built-in cleanup only.
+
+## Where Models Are Stored
+
+Downloaded models are stored under the Electron user-data directory, not inside the repo working tree.
+
+Typical Windows location:
+
+```text
+%APPDATA%\Transcripta\models\
+```
+
+Layout:
+
+```text
+models\
+  asr\
+    whisper-medium\
+  refiner\
+    qwen2.5-7b-instruct\
+```
+
+The app verifies downloaded files using a minimum-size check and will use SHA-256 verification when catalog metadata provides it.
+
+## Switching Models
+
+Change the default ASR model in `Full Settings > Models`. The new selection is applied to the next session. Transcripta does not silently hot-swap ASR models in the middle of an active session.
+
+If you want to use the selected model immediately:
+
+1. stop the current session
+2. select the new model
+3. optionally preload it
+4. start a new session
+
 ## Local Run Commands
 
 Development run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-cd ui-electron
+cd app/desktop
 npm install
 npm run dev
 ```
@@ -107,7 +191,7 @@ Recommended lower-memory run:
 .\.venv\Scripts\Activate.ps1
 $env:TRANSCRIPTA_DEFAULT_MODEL='base'
 $env:TRANSCRIPTA_COMPUTE_TYPE='float16'
-cd ui-electron
+cd app/desktop
 npm run dev
 ```
 
@@ -117,7 +201,7 @@ Recommended NVIDIA run:
 .\.venv\Scripts\Activate.ps1
 $env:TRANSCRIPTA_DEFAULT_MODEL='small'
 $env:TRANSCRIPTA_COMPUTE_TYPE='float16'
-cd ui-electron
+cd app/desktop
 npm run dev
 ```
 
@@ -126,14 +210,14 @@ npm run dev
 Current repository support:
 
 - Python backend is package-ready via `pyproject.toml`.
-- Electron shell is ready for local development via `ui-electron/package.json`.
+- Electron shell is ready for local development via `app/desktop/package.json`.
 - Full Windows installer packaging for Electron is the next step and not yet wired to `electron-builder`.
 
 Manual desktop build flow right now:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-cd ui-electron
+cd app/desktop
 npm install
 npm run dev
 ```
@@ -229,7 +313,7 @@ python fix_headphone_capture.py --explain
 ### The packaged app fails to start
 
 - Test the same machine from an activated virtual environment first.
-- Confirm `ui-electron` can spawn `.venv\Scripts\python.exe`.
+- Confirm `app/desktop` can spawn `.venv\Scripts\python.exe`.
 - Run `python -m app.api_main` directly to verify the backend separately from Electron.
 - Check whether port `8765` is already in use.
 

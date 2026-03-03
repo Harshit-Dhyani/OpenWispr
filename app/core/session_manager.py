@@ -246,6 +246,7 @@ class SessionManager:
             channels=self.settings.channels,
             block_size=block_size,
             max_queue_items=self.settings.max_queue_items * 2,
+            audio_backend=self.settings.audio_backend,
         )
         self.audio_source.on_error = self._handle_error
 
@@ -310,6 +311,9 @@ class SessionManager:
 
             self.session.health.execution_mode = execution_mode
             self.session.health.last_warning = self._get_language_warning(language_mode)
+            self.session.health.audio_backend = None
+            self.session.health.audio_backend_fallbacks = []
+            self.session.health.audio_device_error = None
 
             self.logger.debug(
                 "session_components_reset",
@@ -835,6 +839,9 @@ class SessionManager:
         session.health.estimated_backlog_seconds = health.estimated_backlog_seconds
         session.health.last_error = health.last_error
         session.health.last_warning = health.last_warning
+        if self.audio_source:
+            session.health.audio_backend = self.audio_source.backend_name
+            session.health.audio_backend_fallbacks = list(self.audio_source.backend_fallbacks)
         self._emit_health()
 
     def _emit_health(self) -> None:
@@ -844,6 +851,8 @@ class SessionManager:
             return
         if self.audio_source:
             session.health.dropped_frames = self.audio_source.dropped_frames
+            session.health.audio_backend = self.audio_source.backend_name
+            session.health.audio_backend_fallbacks = list(self.audio_source.backend_fallbacks)
             meter_value = self.meter.update(self.audio_source.level_rms)
         else:
             meter_value = 0.0
@@ -870,6 +879,7 @@ class SessionManager:
                         "gpu_mode": session.health.gpu_mode,
                         "audio_active": session.health.audio_stream_active,
                         "dropped_frames": session.health.dropped_frames,
+                        "audio_backend": session.health.audio_backend,
                         "pending_chunks": pending,
                         "total_segments": len(session.segments),
                         "meter_value": round(meter_value, 3),
@@ -915,6 +925,14 @@ class SessionManager:
             self.session.health.last_error = error_message
             self.session.status = "error"
             self.session.health.audio_stream_active = False
+            self.session.health.audio_device_error = (
+                error_message if error_type == "audio_device" else None
+            )
+            if self.audio_source:
+                self.session.health.audio_backend = self.audio_source.backend_name
+                self.session.health.audio_backend_fallbacks = list(
+                    self.audio_source.backend_fallbacks
+                )
 
             if error_type == "audio_device":
                 self.session.health.last_warning = (

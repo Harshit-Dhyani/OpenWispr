@@ -18,6 +18,7 @@ try:
 except ImportError:
     torch = None
 
+from app.core.constants import GPU_FALLBACK_KEYWORDS, ModelConstants, QualityConstants
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.stt.chunker import AudioChunk
 from app.stt.quality import assess_segment_quality
@@ -227,18 +228,9 @@ class WhisperTranscriber:
             if torch is None or not torch.cuda.is_available():
                 return False, "CUDA not available"
 
-            # Memory requirements by model (approximate for float16)
-            memory_requirements = {
-                "tiny": 1.0,
-                "base": 1.0,
-                "small": 2.0,
-                "medium": 5.0,
-                "large-v3": 10.0,
-            }
-
-            required_gb = memory_requirements.get(self.model_name, 2.0)
+            required_gb = ModelConstants.MEMORY_REQUIREMENTS_GB.get(self.model_name, 2.0)
             if self.compute_type == "int8":
-                required_gb *= 0.6  # int8 uses less memory
+                required_gb *= ModelConstants.INT8_MEMORY_MULTIPLIER  # int8 uses less memory
 
             total_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             reserved_memory = torch.cuda.memory_reserved(0) / (1024**3)
@@ -580,24 +572,7 @@ class WhisperTranscriber:
 
 def _should_fallback_to_cpu(exc: RuntimeError) -> bool:
     text = str(exc).lower()
-    fallback_keywords = [
-        "cublas",
-        "cuda",
-        "cudnn",
-        "gpu",
-        "out of memory",
-        "curand",
-        "cusolver",
-        "cusparse",
-        "nccl",
-        "thrust",
-        "device-side assert",
-        "an illegal memory access",
-        "cuda error",
-        "no kernel image",
-        "nvidia",
-    ]
-    return any(kw in text for kw in fallback_keywords)
+    return any(kw in text for kw in GPU_FALLBACK_KEYWORDS)
 
 
 def confidence_proxy(raw_segment: Any) -> float:
@@ -605,11 +580,27 @@ def confidence_proxy(raw_segment: Any) -> float:
     no_speech_prob = getattr(raw_segment, "no_speech_prob", None)
     compression_ratio = getattr(raw_segment, "compression_ratio", None)
 
-    score = 0.65
+    score = QualityConstants.CONFIDENCE_PROXY_BASE
     if avg_logprob is not None:
-        score += max(min((avg_logprob + 1.2) / 1.2, 0.25), -0.35)
+        score += max(
+            min(
+                (avg_logprob + QualityConstants.CONFIDENCE_PROXY_AVG_LOGPROB_OFFSET)
+                / QualityConstants.CONFIDENCE_PROXY_AVG_LOGPROB_SCALE,
+                QualityConstants.CONFIDENCE_PROXY_MAX_BONUS,
+            ),
+            -QualityConstants.CONFIDENCE_PROXY_MAX_PENALTY,
+        )
     if no_speech_prob is not None:
-        score -= min(max(no_speech_prob, 0.0), 1.0) * 0.25
-    if compression_ratio is not None and compression_ratio > 2.2:
-        score -= min((compression_ratio - 2.2) * 0.08, 0.2)
-    return max(0.0, min(score, 0.99))
+        score -= (
+            min(max(no_speech_prob, 0.0), 1.0) * QualityConstants.CONFIDENCE_PROXY_NO_SPEECH_SCALE
+        )
+    if (
+        compression_ratio is not None
+        and compression_ratio > QualityConstants.CONFIDENCE_PROXY_COMPRESSION_THRESHOLD
+    ):
+        score -= min(
+            (compression_ratio - QualityConstants.CONFIDENCE_PROXY_COMPRESSION_THRESHOLD)
+            * QualityConstants.CONFIDENCE_PROXY_COMPRESSION_PENALTY_SCALE,
+            QualityConstants.CONFIDENCE_PROXY_COMPRESSION_MAX_PENALTY,
+        )
+    return max(0.0, min(score, QualityConstants.CONFIDENCE_PROXY_MAX_SCORE))

@@ -19,6 +19,11 @@ class AudioDeviceInfo:
     is_loopback: bool
     channels: int | None = None
     sample_rate: int | None = None
+    backend_candidates: list[str] = field(default_factory=list)
+    is_input: bool = False
+    is_output: bool = False
+    supports_loopback: bool | None = None
+    driver: str | None = None
 
 
 @dataclass(slots=True)
@@ -89,6 +94,9 @@ class SessionHealth:
     estimated_backlog_seconds: float = 0.0
     last_error: str | None = None
     last_warning: str | None = None
+    audio_backend: str | None = None
+    audio_backend_fallbacks: list[str] = field(default_factory=list)
+    audio_device_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -100,6 +108,7 @@ class SessionHealth:
 
 @dataclass(slots=True)
 class DeviceProbeResult:
+    backend: str
     sample_rate: int
     channels: int
     duration: float

@@ -1,0 +1,207 @@
+import { validateSettings, type SettingsState, DEFAULT_SETTINGS } from './settingsSchema';
+import { CURRENT_SETTINGS_VERSION } from '../config/settings';
+
+// ============================================
+// Settings Migration Utility
+// ============================================
+// Re-export for backward compatibility
+export { CURRENT_SETTINGS_VERSION };
+
+// Migration functions for each version
+const migrations: Record<number, (data: unknown) => unknown> = {
+  // Version 1 -> 2: Add missing fields and normalize structure
+  1: (data: unknown) => {
+    const old = data as Record<string, unknown>;
+    return {
+      general: {
+        defaultSessionTitle: (old.general as Record<string, unknown>)?.defaultSessionTitle ?? 'New Session',
+        defaultLanguage: (old.general as Record<string, unknown>)?.defaultLanguage ?? 'auto',
+        exportDirectory: (old.general as Record<string, unknown>)?.exportDirectory ?? '',
+        autoSaveInterval: (old.general as Record<string, unknown>)?.autoSaveInterval ?? 30,
+        showNotifications: (old.general as Record<string, unknown>)?.showNotifications ?? true,
+        minimizeToTray: (old.general as Record<string, unknown>)?.minimizeToTray ?? true,
+        startupWithSystem: (old.general as Record<string, unknown>)?.startupWithSystem ?? false,
+        theme: (old.general as Record<string, unknown>)?.theme ?? 'light',
+      },
+      transcription: {
+        model_name: (old.transcription as Record<string, unknown>)?.model_name ?? 'medium',
+        default_asr_model_id: mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
+        refinement_mode: (old.transcription as Record<string, unknown>)?.refinement_mode ?? 'off',
+        compute_type: (old.transcription as Record<string, unknown>)?.compute_type ?? 'float16',
+        chunk_duration: (old.transcription as Record<string, unknown>)?.chunk_duration ?? 1.6,
+        overlap_ratio: (old.transcription as Record<string, unknown>)?.overlap_ratio ?? 0.2,
+        vad_enabled: (old.transcription as Record<string, unknown>)?.vad_enabled ?? true,
+        vad_threshold_db: (old.transcription as Record<string, unknown>)?.vad_threshold_db ?? -40,
+        confidence_threshold: (old.transcription as Record<string, unknown>)?.confidence_threshold ?? 0.6,
+        enable_filler_filter: (old.transcription as Record<string, unknown>)?.enable_filler_filter ?? true,
+        enable_hallucination_filter: (old.transcription as Record<string, unknown>)?.enable_hallucination_filter ?? true,
+        min_segment_length: (old.transcription as Record<string, unknown>)?.min_segment_length ?? 0.5,
+        max_workers: (old.transcription as Record<string, unknown>)?.max_workers ?? 4,
+        use_parallel_processing: (old.transcription as Record<string, unknown>)?.use_parallel_processing ?? true,
+        preload_model: (old.transcription as Record<string, unknown>)?.preload_model ?? true,
+        hotkey_optimized: (old.transcription as Record<string, unknown>)?.hotkey_optimized ?? false,
+        beam_size: (old.transcription as Record<string, unknown>)?.beam_size ?? 5,
+        best_of: (old.transcription as Record<string, unknown>)?.best_of ?? 5,
+        patience: (old.transcription as Record<string, unknown>)?.patience ?? 1.0,
+        temperature: (old.transcription as Record<string, unknown>)?.temperature ?? 0.0,
+      },
+      refiner: {
+        selected_model_id: (old.refiner as Record<string, unknown>)?.selected_model_id ?? 'qwen2.5-7b-instruct',
+        runtime_enabled: (old.refiner as Record<string, unknown>)?.runtime_enabled ?? false,
+        engine_preference: (old.refiner as Record<string, unknown>)?.engine_preference ?? 'llamacpp',
+      },
+      audio: {
+        captureMode: (old.audio as Record<string, unknown>)?.captureMode ?? 'system',
+        defaultDeviceId: (old.audio as Record<string, unknown>)?.defaultDeviceId ?? 'default',
+        audio_backend: (old.audio as Record<string, unknown>)?.audio_backend ?? (old.audio as Record<string, unknown>)?.backend ?? 'auto',
+        sampleRate: (old.audio as Record<string, unknown>)?.sampleRate ?? 16000,
+        noiseFiltering: (old.audio as Record<string, unknown>)?.noiseFiltering ?? true,
+        echoCancellation: (old.audio as Record<string, unknown>)?.echoCancellation ?? true,
+        autoGainControl: (old.audio as Record<string, unknown>)?.autoGainControl ?? true,
+      },
+      hotkey: {
+        enabled: (old.hotkey as Record<string, unknown>)?.enabled ?? false,
+        key_combination: (old.hotkey as Record<string, unknown>)?.key_combination ?? 'Ctrl+Shift+T',
+        hold_mode: (old.hotkey as Record<string, unknown>)?.hold_mode ?? false,
+        auto_inject: (old.hotkey as Record<string, unknown>)?.auto_inject ?? true,
+        language: (old.hotkey as Record<string, unknown>)?.language ?? 'auto',
+        device_id: (old.hotkey as Record<string, unknown>)?.device_id ?? 'default',
+        finish_mode_default: (old.hotkey as Record<string, unknown>)?.finish_mode_default ?? 'finish_and_paste',
+        show_floating_window: (old.hotkey as Record<string, unknown>)?.show_floating_window ?? true,
+        floating_window_position: (old.hotkey as Record<string, unknown>)?.floating_window_position ?? 'bottom-right',
+        record_on_start: (old.hotkey as Record<string, unknown>)?.record_on_start ?? false,
+        stop_on_release: (old.hotkey as Record<string, unknown>)?.stop_on_release ?? false,
+        copy_to_clipboard: (old.hotkey as Record<string, unknown>)?.copy_to_clipboard ?? true,
+      },
+      advanced: {
+        debugMode: (old.advanced as Record<string, unknown>)?.debugMode ?? false,
+        logLevel: (old.advanced as Record<string, unknown>)?.logLevel ?? 'INFO',
+        enableMetrics: (old.advanced as Record<string, unknown>)?.enableMetrics ?? true,
+        maxLogFiles: (old.advanced as Record<string, unknown>)?.maxLogFiles ?? 10,
+        experimentalStem: (old.advanced as Record<string, unknown>)?.experimentalStem ?? false,
+        experimentalGpuAccel: (old.advanced as Record<string, unknown>)?.experimentalGpuAccel ?? true,
+      },
+      version: 3,
+    };
+  },
+  // Version 3 -> 4: Rename backend to audio_backend, remove duplicate VAD settings from audio
+  3: (data: unknown) => {
+    const old = data as Record<string, unknown>;
+    const oldAudio = old.audio as Record<string, unknown>;
+    return {
+      ...old,
+      audio: {
+        captureMode: oldAudio?.captureMode ?? 'system',
+        defaultDeviceId: oldAudio?.defaultDeviceId ?? 'default',
+        audio_backend: oldAudio?.audio_backend ?? oldAudio?.backend ?? 'auto',
+        sampleRate: oldAudio?.sampleRate ?? 16000,
+        noiseFiltering: oldAudio?.noiseFiltering ?? true,
+        echoCancellation: oldAudio?.echoCancellation ?? true,
+        autoGainControl: oldAudio?.autoGainControl ?? true,
+      },
+      version: 4,
+    };
+  },
+};
+
+/**
+ * Migrate settings from any version to current version
+ */
+export function migrateSettings(data: unknown): { success: true; data: SettingsState } | { success: false; error: string } {
+  // If data is null or undefined, return defaults
+  if (!data || typeof data !== 'object') {
+    return { success: true, data: DEFAULT_SETTINGS };
+  }
+
+  const obj = data as Record<string, unknown>;
+  const currentVersion = (obj.version as number) || 1;
+
+  // If already at current version, just validate
+  if (currentVersion >= CURRENT_SETTINGS_VERSION) {
+    const validation = validateSettings(obj);
+    if (validation.success) {
+      return { success: true, data: validation.data };
+    }
+    // Validation failed but we have data - try to merge with defaults
+    return { success: true, data: mergeWithDefaults(obj) };
+  }
+
+  // Apply migrations sequentially
+  let migrated: Record<string, unknown> = obj;
+  for (let v = currentVersion; v < CURRENT_SETTINGS_VERSION; v++) {
+    const migration = migrations[v];
+    if (migration) {
+      migrated = migration(migrated) as Record<string, unknown>;
+    }
+  }
+
+  // Final validation
+  const validation = validateSettings(migrated);
+  if (validation.success) {
+    return { success: true, data: validation.data };
+  }
+
+  // If validation still fails, merge with defaults as fallback
+  return { success: true, data: mergeWithDefaults(migrated) };
+}
+
+/**
+ * Merge partial settings with defaults
+ */
+function mergeWithDefaults(partial: Record<string, unknown>): SettingsState {
+  const typedPartial = partial as Partial<SettingsState>;
+  return {
+    general: { ...DEFAULT_SETTINGS.general, ...(typedPartial.general || {}) },
+    transcription: { ...DEFAULT_SETTINGS.transcription, ...(typedPartial.transcription || {}) },
+    refiner: { ...DEFAULT_SETTINGS.refiner, ...(typedPartial.refiner || {}) },
+    audio: { ...DEFAULT_SETTINGS.audio, ...(typedPartial.audio || {}) },
+    hotkey: { ...DEFAULT_SETTINGS.hotkey, ...(typedPartial.hotkey || {}) },
+    advanced: { ...DEFAULT_SETTINGS.advanced, ...(typedPartial.advanced || {}) },
+    version: CURRENT_SETTINGS_VERSION,
+  } as SettingsState;
+}
+
+/**
+ * Validate and fix settings on load
+ * Adds missing fields with defaults and removes unknown fields
+ */
+export function sanitizeSettings(data: unknown): SettingsState {
+  const migration = migrateSettings(data);
+  if (migration.success) {
+    return migration.data;
+  }
+  return DEFAULT_SETTINGS;
+}
+
+/**
+ * Check if settings need migration
+ */
+export function needsMigration(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return true;
+  const version = (data as Record<string, unknown>).version as number | undefined;
+  return !version || version < CURRENT_SETTINGS_VERSION;
+}
+
+/**
+ * Get settings version
+ */
+export function getSettingsVersion(data: unknown): number {
+  if (!data || typeof data !== 'object') return 0;
+  return ((data as Record<string, unknown>).version as number) || 1;
+}
+
+function mapRuntimeModelToCatalogId(modelName?: string): string {
+  switch (modelName) {
+    case 'tiny':
+      return 'whisper-tiny';
+    case 'small':
+      return 'whisper-small';
+    case 'large-v3':
+      return 'whisper-large-v3';
+    case 'turbo':
+      return 'whisper-turbo';
+    case 'medium':
+    default:
+      return 'whisper-medium';
+  }
+}

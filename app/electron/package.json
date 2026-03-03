@@ -1,0 +1,49 @@
+{
+  "name": "transcripta-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop shell for Transcripta",
+  "main": "main/main.js",
+  "scripts": {
+    "build:frontend": "node .\\scripts\\build-frontend.js",
+    "dev": "node .\\scripts\\dev.js",
+    "start": "node .\\node_modules\\electron\\cli.js .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable nsis"
+  },
+  "build": {
+    "appId": "local.transcripta.desktop",
+    "productName": "Transcripta",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/main.js",
+      "main/preload.js",
+      "main/preload-floating.js",
+      "main/preload-quick-settings.js",
+      "main/model-download-manager.js",
+      "floating-window.html",
+      "renderer/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    }
+  },
+  "dependencies": {
+    "node-key-sender": "^1.0.11",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "optionalDependencies": {
+    "iohook": "^0.9.3",
+    "robotjs": "^0.6.0"
+  }
+}

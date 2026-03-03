@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transcripta - Recording</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .window-container {
+      width: 420px;
+      height: 140px;
+      background: linear-gradient(145deg, rgba(20, 25, 35, 0.98) 0%, rgba(15, 20, 28, 0.99) 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      animation: fade-in 0.3s ease-out;
+    }
+
+    .window-container.recording {
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(74, 246, 38, 0.2),
+        0 0 30px rgba(74, 246, 38, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .glow-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: radial-gradient(ellipse at center top, rgba(74, 246, 38, 0.1) 0%, transparent 70%);
+    }
+
+    .window-container.recording .glow-overlay {
+      opacity: 1;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 8px;
+      -webkit-app-region: drag;
+    }
+
+    .status-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-indicator {
+      position: relative;
+      width: 10px;
+      height: 10px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #4af626;
+      position: relative;
+      z-index: 2;
+      transition: background-color 0.3s ease;
+    }
+
+    .status-indicator.recording .status-dot {
+      background: #ef4444;
+    }
+
+    .status-indicator.processing .status-dot {
+      background: #f59e0b;
+    }
+
+    .status-indicator.recording .status-ring {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid #ef4444;
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+
+    .status-indicator.recording .status-ring:nth-child(2) {
+      animation-delay: 0.5s;
+    }
+
+    .status-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 0.3px;
+      transition: all 0.3s ease;
+    }
+
+    .timer {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.5);
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    .waveform-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 24px;
+      -webkit-app-region: no-drag;
+      position: relative;
+    }
+
+    .waveform {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: 60px;
+      width: 100%;
+    }
+
+    .waveform-bar {
+      width: 5px;
+      border-radius: 3px;
+      background: linear-gradient(to top, #4af626, rgba(74, 246, 38, 0.6));
+      transition: height 60ms cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 3px;
+      box-shadow: 0 0 8px rgba(74, 246, 38, 0.3);
+    }
+
+    .waveform-bar.inactive {
+      background: linear-gradient(to top, rgba(139, 155, 180, 0.5), rgba(139, 155, 180, 0.2));
+      box-shadow: none;
+    }
+
+    .waveform-bar.processing {
+      background: linear-gradient(to top, #f59e0b, rgba(245, 158, 11, 0.6));
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 20px 16px;
+      gap: 8px;
+    }
+
+    .transcription-text {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      text-align: center;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 400;
+      transition: all 0.3s ease;
+    }
+
+    .transcription-text.placeholder {
+      color: rgba(139, 155, 180, 0.5);
+      font-style: italic;
+    }
+
+    .shortcut-hint {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: rgba(139, 155, 180, 0.6);
+    }
+
+    kbd {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    /* Processing animation */
+    .processing-dots {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      margin-left: 4px;
+    }
+
+    .processing-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #f59e0b;
+      animation: processing-bounce 1.4s ease-in-out infinite both;
+    }
+
+    .processing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .processing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes processing-bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+      /* Button styles */
+    .button-container { display: flex; gap: 10px; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); -webkit-app-region: no-drag; }
+    .btn { flex: 1; padding: 10px 16px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px; -webkit-app-region: no-drag; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-cancel { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.1); }
+    .btn-cancel:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+    .btn-finish { background: linear-gradient(135deg, #4af626 0%, #3dd420 100%); color: #0a0f14; box-shadow: 0 2px 8px rgba(74,246,38,0.3); }
+    .btn-finish:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74,246,38,0.4); }
+    .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; border-radius: 16px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    .countdown-overlay.active { opacity: 1; pointer-events: all; }
+    .countdown-text { font-size: 14px; color: rgba(255,255,255,0.8); text-align: center; }
+    .countdown-timer { font-size: 32px; font-weight: 700; color: #4af626; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="window-container" id="windowContainer">
+    <div class="glow-overlay"></div>
+
+    <div class="header">
+      <div class="status-section">
+        <div class="status-indicator" id="statusIndicator">
+          <div class="status-ring"></div>
+          <div class="status-ring"></div>
+          <div class="status-dot"></div>
+        </div>
+        <span class="status-text" id="statusText">Listening...</span>
+      </div>
+      <div class="timer" id="timer">00:00</div>
+    </div>
+
+    <div class="waveform-container">
+      <div class="waveform" id="waveform">
+        <!-- Bars generated by JS -->
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="transcription-text placeholder" id="transcriptionText">Waiting for speech...</span>
+    </div>
+    <div class="button-container">
+      <button class="btn btn-cancel" id="cancelBtn" onclick="handleCancel()">Cancel</button>
+      <button class="btn btn-finish" id="finishBtn" onclick="handleFinish()">Finish</button>
+      <button class="btn btn-paste" id="finishPasteBtn" onclick="handleFinishAndPaste()">Finish & Paste</button>
+    </div>
+    <div class="countdown-overlay" id="countdownOverlay">
+      <div class="countdown-text">Please wait...<div class="countdown-timer" id="countdownTimer">5.0s</div></div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const BAR_COUNT = 36;
+    const SMOOTHING_FACTOR = 0.25; // Lower = smoother but more lag
+    const REAL_DATA_TIMEOUT_MS = 200; // Stop simulating if real data received within this window
+    const INTERPOLATION_FRAMES = 3; // Frames to interpolate between real data updates
+
+    // DOM elements
+    const windowContainer = document.getElementById('windowContainer');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const timer = document.getElementById('timer');
+    const waveform = document.getElementById('waveform');
+    const transcriptionText = document.getElementById('transcriptionText');
+
+    // State
+    let recordingState = 'idle'; // 'idle', 'listening', 'processing'
+    let recordingStartTime = null;
+    let timerInterval = null;
+    let animationFrameId = null;
+    let audioLevels = new Array(BAR_COUNT).fill(0);
+    let targetLevels = new Array(BAR_COUNT).fill(0);
+    let previousRealLevels = new Array(BAR_COUNT).fill(0);
+    let lastRealAudioDataTime = 0; // Timestamp of last real audio data received
+    let isReceivingRealData = false;
+    let interpolationFrame = 0;
+    let lastFrameTime = 0;
+
+    // Audio context for playing sounds
+    let audioContext = null;
+
+    // Initialize audio context
+    function initAudioContext() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    // Play beep sound
+    function playBeep(frequency = 880, duration = 0.08, type = 'sine') {
+      initAudioContext();
+      if (!audioContext) return;
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = frequency;
+      oscillator.type = type;
+
+      // Smooth envelope
+      const now = audioContext.currentTime;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.05);
+    }
+
+    // Play start recording sound (higher pitch)
+    function playStartSound() {
+      playBeep(1175, 0.1, 'sine'); // D6
+      setTimeout(() => playBeep(1760, 0.12, 'sine'), 80); // A6
+    }
+
+    // Play stop recording sound (lower pitch)
+    function playStopSound() {
+      playBeep(880, 0.1, 'sine'); // A5
+      setTimeout(() => playBeep(587, 0.15, 'sine'), 80); // D5
+    }
+
+    // Create waveform bars
+    function createBars() {
+      waveform.innerHTML = '';
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'waveform-bar';
+        bar.style.height = '3px';
+        waveform.appendChild(bar);
+      }
+    }
+
+    // Update waveform display - called at 60fps via requestAnimationFrame
+    function updateWaveform(timestamp) {
+      const deltaTime = timestamp - lastFrameTime;
+      lastFrameTime = timestamp;
+
+      // Check if we should be using real data or simulation
+      const timeSinceRealData = Date.now() - lastRealAudioDataTime;
+      const wasReceivingRealData = isReceivingRealData;
+      isReceivingRealData = timeSinceRealData < REAL_DATA_TIMEOUT_MS;
+
+      // If we just stopped receiving real data, reset interpolation
+      if (wasReceivingRealData && !isReceivingRealData) {
+        interpolationFrame = 0;
+        previousRealLevels = [...audioLevels];
+      }
+
+      // If receiving real data, interpolate between frames for smoothness
+      if (isReceivingRealData && interpolationFrame < INTERPOLATION_FRAMES) {
+        const t = (interpolationFrame + 1) / INTERPOLATION_FRAMES;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const interpolated = previousRealLevels[i] + (targetLevels[i] - previousRealLevels[i]) * t;
+          audioLevels[i] = interpolated;
+        }
+        interpolationFrame++;
+      } else if (isReceivingRealData) {
+        // Steady state - smooth towards target
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const diff = targetLevels[i] - audioLevels[i];
+          audioLevels[i] += diff * SMOOTHING_FACTOR;
+        }
+      } else {
+        // No real data - run simulation
+        simulateAudioData();
+        // Smooth towards simulated targets
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const diff = targetLevels[i] - audioLevels[i];
+          audioLevels[i] += diff * SMOOTHING_FACTOR;
+        }
+      }
+
+      // Update DOM
+      const bars = waveform.querySelectorAll('.waveform-bar');
+      bars.forEach((bar, index) => {
+        const level = audioLevels[index] || 0;
+        // Non-linear scaling for better visual dynamics
+        const scaledLevel = Math.pow(level, 0.7);
+        const height = Math.max(3, Math.min(60, 3 + scaledLevel * 57));
+        bar.style.height = `${height}px`;
+
+        // Update color based on state and level
+        bar.classList.remove('inactive', 'processing');
+        if (recordingState === 'processing') {
+          bar.classList.add('processing');
+        } else if (level < 0.05) {
+          bar.classList.add('inactive');
+        }
+      });
+
+      // Continue animation loop
+      animationFrameId = requestAnimationFrame(updateWaveform);
+    }
+
+    // Generate simulated audio data when no real data available
+    function simulateAudioData() {
+      if (recordingState !== 'listening') {
+        // Gentle idle animation
+        const time = Date.now() / 1000;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const wave = Math.sin(time * 2 + i * 0.3) * 0.5 + 0.5;
+          targetLevels[i] = wave * 0.08; // Very low level
+        }
+        return;
+      }
+
+      // Active recording but no real data - simulate voice-like patterns
+      const time = Date.now() / 150;
+      const voiceActivity = Math.sin(time * 0.5) * 0.5 + 0.5; // Varies voice activity
+
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Create frequency-like distribution (lower bars = lower frequencies)
+        const freqResponse = Math.exp(-Math.pow((i - BAR_COUNT / 2) / 8, 2) * 0.5);
+        const noise = Math.random() * 0.3;
+        const wave = Math.sin(time + i * 0.4) * 0.5 + 0.5;
+
+        // Combine for realistic looking waveform
+        let level = (wave * 0.4 + noise * 0.6) * freqResponse * voiceActivity;
+
+        // Add occasional peaks
+        if (Math.random() > 0.95) {
+          level *= 1.5;
+        }
+
+        targetLevels[i] = Math.max(0, Math.min(1, level * 1.2));
+      }
+    }
+
+    // Format timer display
+    function updateTimer() {
+      if (!recordingStartTime) {
+        timer.textContent = '00:00';
+        return;
+      }
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+      const seconds = (elapsed % 60).toString().padStart(2, '0');
+      timer.textContent = `${minutes}:${seconds}`;
+    }
+
+    // Update UI state
+    function updateUIState() {
+      // Update window container glow
+      windowContainer.classList.toggle('recording', recordingState === 'listening');
+
+      // Update status indicator
+      statusIndicator.className = 'status-indicator';
+      if (recordingState === 'listening') {
+        statusIndicator.classList.add('recording');
+      } else if (recordingState === 'processing') {
+        statusIndicator.classList.add('processing');
+      }
+
+      // Update status text
+      switch (recordingState) {
+        case 'listening':
+          statusText.textContent = 'Listening...';
+          break;
+        case 'processing':
+          statusText.innerHTML = 'Processing<span class="processing-dots"><span class="processing-dot"></span><span class="processing-dot"></span><span class="processing-dot"></span></span>';
+          break;
+        case 'idle':
+        default:
+          statusText.textContent = 'Ready';
+          break;
+      }
+    }
+
+    function handleCancel() {
+      if (window.transcriptaFloating?.cancelRecording) {
+        window.transcriptaFloating.cancelRecording();
+      }
+    }
+
+    function handleFinish() {
+      if (window.transcriptaFloating?.finishRecording) {
+        window.transcriptaFloating.finishRecording();
+      }
+    }
+
+    function handleFinishAndPaste() {
+      if (window.transcriptaFloating?.finishAndPaste) {
+        window.transcriptaFloating.finishAndPaste();
+      }
+    }
+
+    // Start recording
+    function startRecording() {
+      if (recordingState === 'listening') return;
+
+      recordingState = 'listening';
+      recordingStartTime = Date.now();
+      updateUIState();
+
+      // Start timer
+      timerInterval = setInterval(updateTimer, 1000);
+      updateTimer();
+
+      // Play start sound
+      playStartSound();
+
+      // Reset audio levels
+      audioLevels.fill(0);
+      targetLevels.fill(0);
+    }
+
+    // Stop recording
+    function stopRecording() {
+      if (recordingState !== 'listening') return;
+
+      recordingState = 'processing';
+      updateUIState();
+
+      // Stop timer
+      clearInterval(timerInterval);
+
+      // Play stop sound
+      playStopSound();
+
+      // Reduce waveform to show processing
+      targetLevels.fill(0.1);
+    }
+
+    // Finish processing
+    function finishProcessing() {
+      recordingState = 'idle';
+      recordingStartTime = null;
+      updateUIState();
+      timer.textContent = '00:00';
+
+      // Fade out waveform
+      targetLevels.fill(0);
+    }
+
+    // Update transcription text
+    function updateTranscription(text, isPartial = true) {
+      if (text && text.trim()) {
+        transcriptionText.textContent = text;
+        transcriptionText.classList.remove('placeholder');
+      } else if (!isPartial) {
+        transcriptionText.textContent = 'Waiting for speech...';
+        transcriptionText.classList.add('placeholder');
+      }
+    }
+
+    // Handle real audio level data from backend
+    // Format: {type: "hotkey_audio_level", payload: {audio_level, levels: [...36 bars], peak}}
+    function handleAudioLevelData(data) {
+      if (!data) return;
+
+      // Mark that we received real audio data
+      const now = Date.now();
+      const wasReceivingRealData = isReceivingRealData;
+      lastRealAudioDataTime = now;
+      isReceivingRealData = true;
+
+      // Store current levels as previous for interpolation
+      if (!wasReceivingRealData) {
+        previousRealLevels = [...audioLevels];
+        interpolationFrame = 0;
+      }
+
+      // Handle full levels array from backend (36 bars of frequency distribution)
+      if (data.levels && Array.isArray(data.levels) && data.levels.length > 0) {
+        // Backend sends 36 bars that represent frequency distribution
+        // Use them directly for accurate visualization
+        const incomingLevels = data.levels;
+
+        if (incomingLevels.length === BAR_COUNT) {
+          // Direct mapping - optimal case
+          targetLevels = incomingLevels.map(v => Math.max(0, Math.min(1, v)));
+        } else {
+          // Interpolate to match our bar count
+          const step = incomingLevels.length / BAR_COUNT;
+          for (let i = 0; i < BAR_COUNT; i++) {
+            const sourceIndex = Math.floor(i * step);
+            targetLevels[i] = Math.max(0, Math.min(1, incomingLevels[sourceIndex] || 0));
+          }
+        }
+      }
+      // Fallback: single level value - generate frequency-like distribution
+      else if (typeof data.peak === 'number' || typeof data.audio_level === 'number') {
+        const level = data.peak || data.audio_level || 0;
+        const time = now / 200;
+
+        for (let i = 0; i < BAR_COUNT; i++) {
+          // Create realistic frequency response curve (higher in middle for voice)
+          const freqResponse = Math.exp(-Math.pow((i - BAR_COUNT / 2) / 10, 2));
+          const wave = Math.sin(time + i * 0.5) * 0.3 + 0.7;
+          const noise = (Math.random() - 0.5) * 0.1;
+
+          let barLevel = level * wave * freqResponse + noise * level * 0.2;
+          targetLevels[i] = Math.max(0, Math.min(1, barLevel));
+        }
+      }
+    }
+
+    // Animation loop using requestAnimationFrame for 60fps
+    function startAnimation() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      lastFrameTime = performance.now();
+      animationFrameId = requestAnimationFrame(updateWaveform);
+    }
+
+    // Initialize
+    createBars();
+    updateUIState();
+    startAnimation();
+
+    // Listen for IPC events from main process
+    if (window.transcriptaFloating) {
+      // Recording state changes
+      window.transcriptaFloating.onRecordingState((state) => {
+        if (state.isRecording) {
+          startRecording();
+        } else if (recordingState === 'listening') {
+          stopRecording();
+        } else if (state.finished) {
+          finishProcessing();
+        }
+      });
+
+      // Transcription updates
+      window.transcriptaFloating.onTranscription((data) => {
+        const text = typeof data === 'string' ? data : data.text || '';
+        const isPartial = typeof data === 'string' ? true : data.isPartial !== false;
+        updateTranscription(text, isPartial);
+      });
+
+      // Audio level updates
+      window.transcriptaFloating.onAudioVisualizer((data) => {
+        handleAudioLevelData(data);
+      });
+
+      // Hotkey events for sounds (backup if main process doesn't play them)
+      window.transcriptaFloating.onHotkeyEvent((event) => {
+        if (event.type === 'start') {
+          playStartSound();
+        } else if (event.type === 'stop') {
+          playStopSound();
+        }
+      });
+    }
+
+    // Initial state
+    finishProcessing();
+  </script>
+</body>
+</html>

@@ -6,8 +6,13 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
 
+import logging
+
+from app.api.model_service import ModelService
 from app.audio.capture import LoopbackAudioSource
 from app.core.config import AppSettings
+from app.core.language_profiles import available_language_codes
+from app.core.model_catalog import MODEL_CATALOG, get_model_catalog_entry, runtime_name_for_model
 from app.core.models import (
     AudioDeviceInfo,
     FormulaFinding,
@@ -16,6 +21,9 @@ from app.core.models import (
     TranscriptSegment,
 )
 from app.core.session_manager import SessionManager
+from app.core.settings_manager import get_settings_manager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -74,6 +82,7 @@ class BackendService:
         self._model_cache_lock = Lock()
         self._preload_thread: threading.Thread | None = None
         self._preload_cancelled = threading.Event()
+        self._model_service = ModelService(settings.download_root)
 
     def list_devices(self) -> list[dict[str, Any]]:
         return [serialize_device(device) for device in self.manager.list_devices()]
@@ -97,8 +106,14 @@ class BackendService:
                 needs_review=list(self._needs_review),
                 health=dict(self._health),
                 meter_value=self._meter_value,
-                available_models=["tiny", "base", "small", "medium", "large-v3"],
-                available_languages=["auto", "hi", "en"],
+                available_models=[
+                    entry.runtime_model_name
+                    for entry in MODEL_CATALOG
+                    if entry.category == "asr"
+                    and entry.enabled_runtime
+                    and entry.runtime_model_name
+                ],
+                available_languages=available_language_codes(),
                 available_live_modes=["realtime", "low_latency", "balanced", "high_accuracy"],
                 available_execution_modes=["auto", "gpu_only", "cpu_only"],
                 runtime_revision=self._revision,
@@ -127,6 +142,12 @@ class BackendService:
             "model_cache": snapshot.model_cache,
         }
 
+    def get_model_catalog_payload(self) -> dict[str, Any]:
+        return self._model_service.get_catalog_payload(get_settings_manager().get_settings())
+
+    def get_model_install_state(self) -> list[dict[str, Any]]:
+        return self._model_service.get_installed_state()
+
     def get_cached_model(self, model_name: str) -> ModelCacheEntry | None:
         """Get a cached model if available."""
         with self._model_cache_lock:
@@ -149,12 +170,15 @@ class BackendService:
         """
         import time
 
+        runtime_model_name = runtime_name_for_model(model_name) or model_name
+
         with self._model_cache_lock:
-            if model_name in self._model_cache:
-                entry = self._model_cache[model_name]
+            if runtime_model_name in self._model_cache:
+                entry = self._model_cache[runtime_model_name]
                 return {
                     "status": "cached",
-                    "model_name": model_name,
+                    "model_name": runtime_model_name,
+                    "model_id": model_name if get_model_catalog_entry(model_name) else None,
                     "gpu_mode": entry.gpu_mode,
                     "runtime_device": entry.runtime_device,
                 }
@@ -173,7 +197,8 @@ class BackendService:
                 self._publish_event(
                     "preload_progress",
                     {
-                        "model_name": model_name,
+                        "model_name": runtime_model_name,
+                        "model_id": model_name if get_model_catalog_entry(model_name) else None,
                         "stage": stage,
                         "progress": progress,
                         "message": message,
@@ -213,22 +238,25 @@ class BackendService:
                         gpu_mode = "cpu/int8"
 
                 # Phase 1: Downloading (0-30%)
-                emit_progress(0.0, f"Downloading {model_name} model...", "downloading")
+                emit_progress(0.0, f"Preparing {runtime_model_name} model...", "downloading")
                 for i in range(5):
                     if self._preload_cancelled.is_set():
                         return
                     time.sleep(0.4)
                     progress = 0.05 * (i + 1)
-                    emit_progress(progress, f"Downloading {model_name} model...", "downloading")
+                    emit_progress(
+                        progress, f"Preparing {runtime_model_name} model...", "downloading"
+                    )
 
                 if self._preload_cancelled.is_set():
                     return
 
-                emit_progress(0.30, f"Loading {model_name} into memory...", "loading")
+                emit_progress(0.30, f"Loading {runtime_model_name} into memory...", "loading")
 
                 # Phase 2: Loading (30-70%)
                 # Start model loading in background while emitting progress
                 model_future = None
+                executor = None
                 try:
                     from concurrent.futures import ThreadPoolExecutor
 
@@ -243,7 +271,7 @@ class BackendService:
                         for attempt in range(max_retries):
                             try:
                                 return WhisperModel(
-                                    model_name,
+                                    runtime_model_name,
                                     device=runtime_device,
                                     compute_type=compute_type,
                                     download_root=str(self.settings.download_root),
@@ -259,7 +287,7 @@ class BackendService:
                                     time.sleep(0.5)
                                 else:
                                     raise RuntimeError(
-                                        f"Failed to load model {model_name} after {max_retries} attempts: {last_error}"
+                                        f"Failed to load model {runtime_model_name} after {max_retries} attempts: {last_error}"
                                     ) from last_error
 
                     model_future = executor.submit(load_model_with_retry)
@@ -271,13 +299,17 @@ class BackendService:
                             return
                         time.sleep(0.3)
                         progress = 0.30 + 0.05 * (i + 1)
-                        emit_progress(progress, f"Loading {model_name} into memory...", "loading")
+                        emit_progress(
+                            progress, f"Loading {runtime_model_name} into memory...", "loading"
+                        )
 
                     model = model_future.result(timeout=30)
-                    executor.shutdown()
                 except Exception as load_exc:
-                    emit_progress(0.0, f"Failed to load {model_name}: {load_exc}", "error")
+                    emit_progress(0.0, f"Failed to load {runtime_model_name}: {load_exc}", "error")
                     return
+                finally:
+                    if executor is not None:
+                        executor.shutdown(wait=False)
 
                 if self._preload_cancelled.is_set():
                     del model
@@ -307,8 +339,8 @@ class BackendService:
                     return
 
                 with self._model_cache_lock:
-                    self._model_cache[model_name] = ModelCacheEntry(
-                        model_name=model_name,
+                    self._model_cache[runtime_model_name] = ModelCacheEntry(
+                        model_name=runtime_model_name,
                         model=model,
                         gpu_mode=gpu_mode,
                         runtime_device=runtime_device,
@@ -317,22 +349,23 @@ class BackendService:
 
                 emit_progress(
                     1.0,
-                    f"{model_name} ready",
+                    f"{runtime_model_name} ready",
                     "complete",
                 )
 
             except Exception as exc:
-                emit_progress(0.0, f"Failed to load {model_name}: {exc}", "error")
+                emit_progress(0.0, f"Failed to load {runtime_model_name}: {exc}", "error")
 
         self._preload_thread = threading.Thread(
-            target=_load, name=f"preload-{model_name}", daemon=True
+            target=_load, name=f"preload-{runtime_model_name}", daemon=True
         )
         self._preload_thread.start()
 
         return {
             "status": "loading",
-            "model_name": model_name,
-            "message": f"Loading {model_name} in background...",
+            "model_name": runtime_model_name,
+            "model_id": model_name if get_model_catalog_entry(model_name) else None,
+            "message": f"Loading {runtime_model_name} in background...",
         }
 
     def clear_model_cache(self) -> dict[str, Any]:
@@ -358,16 +391,17 @@ class BackendService:
         execution_mode: str,
         vad_params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        runtime_model_name = runtime_name_for_model(model_name) or model_name
         with self._lock:
             self._loading = True
-            self._loading_message = f"Loading model {model_name}..."
+            self._loading_message = f"Loading model {runtime_model_name}..."
             self._revision += 1
         self._publish_event("loading", {"loading": True, "message": self._loading_message})
         try:
             session = self.manager.start_session(
                 title=title,
                 output_root=Path(output_root),
-                model_name=model_name,
+                model_name=runtime_model_name,
                 language_mode=language_mode,
                 device_id=device_id,
                 live_mode=live_mode,
@@ -393,7 +427,8 @@ class BackendService:
                 self._revision += 1
             self._publish_event("loading", {"loading": False, "message": ""})
             return self._session_state
-        except Exception:
+        except Exception as exc:
+            logger.error(f"Session start failed: {exc}")
             with self._lock:
                 self._loading = False
                 self._loading_message = ""
@@ -418,14 +453,26 @@ class BackendService:
             if self.manager.session is not None
             else Path.cwd() / "sessions" / "_device-probes"
         )
-        result = LoopbackAudioSource.probe_device(
-            device_id=device_id,
-            sample_rate=self.settings.sample_rate,
-            channels=self.settings.channels,
-            duration=duration,
-            output_dir=output_dir,
-        )
-        return result.to_dict()
+        try:
+            result = LoopbackAudioSource.probe_device(
+                device_id=device_id,
+                sample_rate=self.settings.sample_rate,
+                channels=self.settings.channels,
+                duration=duration,
+                output_dir=output_dir,
+                audio_backend=self.settings.audio_backend,
+            )
+            payload = result.to_dict()
+            payload["ok"] = True
+            return payload
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "device_id": device_id or "default",
+                "duration": duration,
+                "backend": self.settings.audio_backend,
+            }
 
     def _on_segment(self, segment: TranscriptSegment) -> None:
         with self._lock:
@@ -499,7 +546,8 @@ class BackendService:
         for callback in callbacks:
             try:
                 callback(event_type, data)
-            except Exception:
+            except Exception as exc:
+                logger.debug(f"Event callback failed for {event_type}: {exc}")
                 continue
 
 
@@ -511,6 +559,11 @@ def serialize_device(device: AudioDeviceInfo) -> dict[str, Any]:
         "is_loopback": device.is_loopback,
         "channels": device.channels,
         "sample_rate": device.sample_rate,
+        "backend_candidates": list(device.backend_candidates),
+        "is_input": device.is_input,
+        "is_output": device.is_output,
+        "supports_loopback": device.supports_loopback,
+        "driver": device.driver,
     }
 
 

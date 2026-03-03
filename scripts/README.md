@@ -84,7 +84,7 @@ pip install -e .[dev]
 python scripts\check_cuda.py
 
 # 6. Start the application
-cd ui-electron
+cd app/desktop
 npm install
 npm run dev
 ```

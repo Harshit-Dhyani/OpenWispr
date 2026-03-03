@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Settings</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10161f;
+      --panel: #151d29;
+      --panel-2: #1d2735;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #eef4fb;
+      --muted: #94a3b8;
+      --accent: #89ff4f;
+      --accent-text: #0b0f14;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(180deg, #0e141c 0%, #111a24 100%);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .card {
+      background: rgba(21, 29, 41, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .row:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .label {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .label strong {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    select,
+    button {
+      font: inherit;
+    }
+
+    select {
+      width: 170px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      outline: none;
+    }
+
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .switch input { display: none; }
+
+    .switch .thumb {
+      position: absolute;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #d8e0ea;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .switch[data-on="true"] {
+      background: rgba(137, 255, 79, 0.18);
+      border-color: rgba(137, 255, 79, 0.45);
+    }
+
+    .switch[data-on="true"] .thumb {
+      transform: translateX(20px);
+      background: var(--accent);
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 11px 14px;
+      border-radius: 11px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: transparent;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card header">
+      <div>
+        <div class="eyebrow">Quick Settings</div>
+        <h1 id="appNameHeading">App</h1>
+        <div class="status" id="statusText">Loading…</div>
+      </div>
+      <button class="btn" id="closeBtn" style="flex:0 0 auto; padding:8px 10px;">Close</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Recording</div>
+      <div class="row">
+        <div class="label">
+          <strong>Global Hotkey</strong>
+          <span class="hint">Enable quick microphone dictation from anywhere.</span>
+        </div>
+        <label class="switch" id="hotkeySwitch" data-on="false"><input type="checkbox" id="hotkeyToggle"><span class="thumb"></span></label>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Paste on Stop</strong>
+          <span class="hint">Use Finish & Paste as the default hotkey stop action.</span>
+        </div>
+        <label class="switch" id="pasteSwitch" data-on="false"><input type="checkbox" id="pasteToggle"><span class="thumb"></span></label>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Dictation Language</strong>
+          <span class="hint">Choose the default language for hotkey dictation.</span>
+        </div>
+        <select id="languageSelect"></select>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Microphone</strong>
+          <span class="hint">Hotkey dictation uses microphone input only.</span>
+        </div>
+        <select id="deviceSelect"></select>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button class="btn" id="openFullBtn">Open Full Settings</button>
+      <button class="btn primary" id="doneBtn">Done</button>
+    </div>
+  </div>
+
+  <script>
+    const state = { settings: null, devices: [], languages: [], dirty: false };
+
+    const statusText = document.getElementById("statusText");
+    const appNameHeading = document.getElementById("appNameHeading");
+    const hotkeyToggle = document.getElementById("hotkeyToggle");
+    const hotkeySwitch = document.getElementById("hotkeySwitch");
+    const pasteToggle = document.getElementById("pasteToggle");
+    const pasteSwitch = document.getElementById("pasteSwitch");
+    const languageSelect = document.getElementById("languageSelect");
+    const deviceSelect = document.getElementById("deviceSelect");
+
+    function setSwitch(node, input, checked) {
+      input.checked = checked;
+      node.dataset.on = checked ? "true" : "false";
+    }
+
+    function microphoneDevices(devices) {
+      return devices.filter((device) => device.is_input && !(device.supports_loopback || device.is_loopback));
+    }
+
+    function render() {
+      if (!state.settings) return;
+      const hotkey = state.settings.hotkey || {};
+      setSwitch(hotkeySwitch, hotkeyToggle, !!hotkey.enabled);
+      setSwitch(pasteSwitch, pasteToggle, (hotkey.finish_mode_default || "finish_and_paste") === "finish_and_paste");
+
+      languageSelect.innerHTML = "";
+      for (const language of state.languages) {
+        const option = document.createElement("option");
+        option.value = language.code;
+        option.textContent = language.label;
+        option.selected = (hotkey.language || "auto") === language.code;
+        languageSelect.appendChild(option);
+      }
+
+      deviceSelect.innerHTML = "";
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "default";
+      defaultOption.textContent = "Default microphone";
+      deviceSelect.appendChild(defaultOption);
+
+      for (const device of microphoneDevices(state.devices)) {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.textContent = device.name;
+        option.selected = (hotkey.device_id || "default") === device.id;
+        deviceSelect.appendChild(option);
+      }
+
+      statusText.textContent = `Hotkey ${hotkey.enabled ? "enabled" : "disabled"} • ${hotkey.key_combination || "Ctrl+Shift+T"}`;
+    }
+
+    async function persist() {
+      if (!state.settings) return;
+      await window.transcriptaQuickSettings.update(state.settings);
+      state.dirty = false;
+      render();
+    }
+
+    function updateHotkey(partial) {
+      state.settings.hotkey = { ...(state.settings.hotkey || {}), ...partial };
+      state.dirty = true;
+      render();
+      void persist();
+    }
+
+    hotkeyToggle.addEventListener("change", () => updateHotkey({ enabled: hotkeyToggle.checked }));
+    pasteToggle.addEventListener("change", () => updateHotkey({ finish_mode_default: pasteToggle.checked ? "finish_and_paste" : "finish" }));
+    languageSelect.addEventListener("change", () => updateHotkey({ language: languageSelect.value }));
+    deviceSelect.addEventListener("change", () => updateHotkey({ device_id: deviceSelect.value }));
+
+    document.getElementById("openFullBtn").addEventListener("click", () => window.transcriptaQuickSettings.openFullSettings());
+    document.getElementById("doneBtn").addEventListener("click", () => window.transcriptaQuickSettings.close());
+    document.getElementById("closeBtn").addEventListener("click", () => window.transcriptaQuickSettings.close());
+
+    (async () => {
+      const data = await window.transcriptaQuickSettings.getData();
+      const appName = data?.appName || "Transcripta";
+      document.title = `${appName} Quick Settings`;
+      appNameHeading.textContent = appName;
+      state.settings = data.settings;
+      state.devices = data.devices || [];
+      state.languages = data.languages || [];
+      render();
+    })().catch((error) => {
+      statusText.textContent = error.message || "Failed to load quick settings.";
+    });
+  </script>
+</body>
+</html>

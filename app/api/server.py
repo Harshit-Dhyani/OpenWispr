@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -23,10 +24,22 @@ from pydantic import BaseModel, Field
 
 from app.api.service import BackendService
 from app.audio.capture import LoopbackAudioSource
+from app.audio.devices import list_audio_devices
 from app.core.config import AppSettings
 from app.core.system_profiler import SystemProfiler
 from app.core.auto_optimizer import AutoOptimizer, get_recommended_settings
-from app.core.settings_manager import SettingsManager, SettingsState, DEFAULT_SETTINGS_STATE, get_settings_manager
+from app.stt.dictation_cleanup import (
+    clean_final_text_from_segments,
+    merge_segment_texts,
+    normalize_dictation_text,
+    stabilize_partial_text,
+)
+from app.core.settings_manager import (
+    SettingsManager,
+    SettingsState,
+    DEFAULT_SETTINGS_STATE,
+    get_settings_manager,
+)
 
 service: BackendService | None = None
 hotkey_service: "HotkeyTranscriptionService | None" = None
@@ -56,6 +69,15 @@ class PreloadModelRequest(BaseModel):
     execution_mode: str = "auto"
 
 
+class ModelSelectionRequest(BaseModel):
+    category: str
+    model_id: str
+
+
+class RefinementModeRequest(BaseModel):
+    mode: str
+
+
 # Hotkey-specific request/response models
 
 
@@ -74,13 +96,18 @@ class HotkeyStartResponse(BaseModel):
 
 class HotkeyStopResponse(BaseModel):
     final_transcription: str
+    raw_transcription: str = ""
     duration_ms: int
     segment_count: int
+    source_backend: str = "unknown"
+    language_used: str = "auto"
 
 
 class HotkeyStatusResponse(BaseModel):
     is_recording: bool
     partial_text: str
+    raw_partial_text: str = ""
+    display_partial_text: str = ""
     audio_level: float
     session_id: str | None = None
     duration_ms: int = 0
@@ -102,8 +129,24 @@ class HotkeyConfig(BaseModel):
     vad_threshold_db: float = -40.0
     vad_min_silence_ms: int = 200
     vad_speech_pad_ms: int = 200
-    confidence_threshold: float = 0.70
+    confidence_threshold: float = 0.50
     enable_filler_filter: bool = True
+
+
+class HotkeyConfigRequest(BaseModel):
+    chunk_seconds: float | None = None
+    overlap_seconds: float | None = None
+    vad_threshold_db: float | None = None
+    vad_min_silence_ms: int | None = None
+    vad_speech_pad_ms: int | None = None
+    confidence_threshold: float | None = None
+    enable_filler_filter: bool | None = None
+
+
+class HotkeyConfigResponse(BaseModel):
+    success: bool
+    config: HotkeyConfig
+    message: str = ""
 
 
 @dataclass
@@ -118,8 +161,12 @@ class HotkeySession:
     transcriber: Any = None
     is_recording: bool = False
     partial_text: str = ""
+    raw_partial_text: str = ""
+    display_partial_text: str = ""
     final_segments: list[dict[str, Any]] = field(default_factory=list)
     audio_level: float = 0.0
+    source_backend: str = "unknown"
+    language_used: str = "auto"
     _callbacks: list[Callable[[str, dict[str, Any]], None]] = field(default_factory=list)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -144,6 +191,7 @@ class HotkeyTranscriptionService:
         self._lock = asyncio.Lock()
         self._callbacks: list[Callable[[str, dict[str, Any]], None]] = []
         self._config = HotkeyConfig()
+        self._event_loop: asyncio.AbstractEventLoop | None = None
 
     async def start_session(
         self,
@@ -154,6 +202,7 @@ class HotkeyTranscriptionService:
     ) -> HotkeyStartResponse:
         """Start a new hotkey transcription session."""
         async with self._lock:
+            self._event_loop = asyncio.get_running_loop()
             if self._session is not None and self._session.is_recording:
                 logger.debug("Hotkey session already active, stopping previous")
                 await self._stop_internal()
@@ -188,6 +237,14 @@ class HotkeyTranscriptionService:
                     execution_mode=execution_mode,
                 )
 
+                # Register callbacks to receive transcription results
+                session.transcriber.add_segment_callback(
+                    lambda segment: self._on_transcription_segment(session, segment)
+                )
+
+                # Start the transcriber
+                session.transcriber.start()
+
                 self._session = session
 
                 # Start audio processing in background
@@ -220,8 +277,11 @@ class HotkeyTranscriptionService:
             if self._session is None or not self._session.is_recording:
                 return HotkeyStopResponse(
                     final_transcription="",
+                    raw_transcription="",
                     duration_ms=0,
                     segment_count=0,
+                    source_backend="unknown",
+                    language_used="auto",
                 )
             return await self._stop_internal()
 
@@ -231,12 +291,23 @@ class HotkeyTranscriptionService:
         if session is None:
             return HotkeyStopResponse(
                 final_transcription="",
+                raw_transcription="",
                 duration_ms=0,
                 segment_count=0,
+                source_backend="unknown",
+                language_used="auto",
             )
 
         session.is_recording = False
         duration_ms = session.duration_ms
+
+        # FIX: Stop transcriber to prevent resource leak
+        if session.transcriber is not None:
+            try:
+                if hasattr(session.transcriber, "stop"):
+                    session.transcriber.stop()
+            except Exception as exc:
+                logger.debug("Error stopping transcriber: %s", exc)
 
         logger.debug(
             "Stopping hotkey session: id=%s, duration=%dms, segments=%d",
@@ -245,18 +316,22 @@ class HotkeyTranscriptionService:
             len(session.final_segments),
         )
 
-        # Build final transcription
-        final_text = " ".join(
-            seg.get("text", "").strip() for seg in session.final_segments if seg.get("text")
-        ).strip()
+        cleaned = clean_final_text_from_segments(
+            [seg.get("raw_text") or seg.get("text", "") for seg in session.final_segments]
+        )
+        final_text = cleaned.clean_final_text
+        raw_text = cleaned.raw_final_text
 
         self._publish_event(
             "hotkey_stopped",
             {
                 "session_id": session.session_id,
                 "duration_ms": duration_ms,
-                "final_text": final_text,
+                "final_transcription": final_text,
+                "raw_transcription": raw_text,
                 "segment_count": len(session.final_segments),
+                "source_backend": session.source_backend,
+                "language_used": session.language_used,
             },
         )
 
@@ -265,8 +340,11 @@ class HotkeyTranscriptionService:
 
         return HotkeyStopResponse(
             final_transcription=final_text,
+            raw_transcription=raw_text,
             duration_ms=duration_ms,
             segment_count=len(session.final_segments),
+            source_backend=session.source_backend,
+            language_used=session.language_used,
         )
 
     async def _cleanup_session(self, session: HotkeySession) -> None:
@@ -290,6 +368,8 @@ class HotkeyTranscriptionService:
             return HotkeyStatusResponse(
                 is_recording=False,
                 partial_text="",
+                raw_partial_text="",
+                display_partial_text="",
                 audio_level=0.0,
                 session_id=None,
                 duration_ms=0,
@@ -302,7 +382,9 @@ class HotkeyTranscriptionService:
 
         return HotkeyStatusResponse(
             is_recording=True,
-            partial_text=self._session.partial_text,
+            partial_text=self._session.display_partial_text,
+            raw_partial_text=self._session.raw_partial_text,
+            display_partial_text=self._session.display_partial_text,
             audio_level=self._session.audio_level,
             session_id=self._session.session_id,
             duration_ms=self._session.duration_ms,
@@ -311,14 +393,35 @@ class HotkeyTranscriptionService:
 
     def _create_audio_source(self, device_id: str | None) -> LoopbackAudioSource:
         """Create audio source with hotkey-optimized settings."""
-        from app.audio.capture import LoopbackAudioSource
+        resolved_device_id = self._resolve_hotkey_input_device(device_id)
+
+        # Convert block_seconds to block_size (samples per block)
+        block_size = int(self.settings.sample_rate * self.settings.capture_block_seconds)
+        max_queue_items = 10  # Allow ~5 seconds of audio buffering
 
         return LoopbackAudioSource(
-            device_id=device_id,
+            device_id=resolved_device_id,
             sample_rate=self.settings.sample_rate,
             channels=self.settings.channels,
-            block_seconds=self.settings.capture_block_seconds,
+            block_size=block_size,
+            max_queue_items=max_queue_items,
+            audio_backend=self.settings.audio_backend,
         )
+
+    def _resolve_hotkey_input_device(self, device_id: str | None) -> str | None:
+        devices = list_audio_devices()
+        microphones = [
+            device
+            for device in devices
+            if device.is_input and not (device.is_loopback or device.supports_loopback)
+        ]
+        if not microphones:
+            return device_id
+        if device_id:
+            selected = next((device for device in microphones if device.id == device_id), None)
+            if selected is not None:
+                return selected.id
+        return microphones[0].id
 
     async def _create_transcriber(
         self,
@@ -328,15 +431,11 @@ class HotkeyTranscriptionService:
     ) -> Any:
         """Create transcriber with hotkey-optimized settings."""
         # Import here to avoid circular dependencies
-        from app.stt.fast_chunker import FastChunker
+        from app.stt.fast_engine import FastTranscriber
         from app.core.config import resolve_live_profile
 
         # Get hotkey-optimized settings
         profile = resolve_live_profile("low_latency", self.settings)
-
-        # Use shorter chunks for hotkey mode
-        chunk_seconds = min(profile.get("chunk_seconds", 0.5), 0.5)  # Max 500ms
-        overlap_seconds = profile.get("overlap_seconds", 0.1)
 
         # Determine device
         device = self.settings.device
@@ -350,16 +449,18 @@ class HotkeyTranscriptionService:
             except ImportError:
                 device = "cpu"
 
-        return FastChunker(
+        return FastTranscriber(
             model_name=model_name,
+            download_root=str(self.settings.download_root),
             device=device,
             compute_type=self.settings.compute_type,
-            language=language_mode if language_mode != "auto" else None,
-            chunk_seconds=chunk_seconds,
-            overlap_seconds=overlap_seconds,
-            vad_threshold_db=self._config.vad_threshold_db,
-            confidence_threshold=self._config.confidence_threshold,
-            enable_filler_filter=self._config.enable_filler_filter,
+            language_mode=language_mode,
+            execution_mode=execution_mode,
+            beam_size=self.settings.beam_size,
+            best_of=self.settings.best_of,
+            temperature=self.settings.temperature,
+            vad_filter=self.settings.vad_filter,
+            max_queue_items=self.settings.max_queue_items,
         )
 
     async def _process_audio_loop(self, session: HotkeySession) -> None:
@@ -370,6 +471,7 @@ class HotkeyTranscriptionService:
 
         try:
             session.audio_source.start()
+            session.source_backend = session.audio_source.backend_name or "unknown"
 
             chunk_samples = int(self._config.chunk_seconds * self.settings.sample_rate)
             audio_buffer = np.array([], dtype=np.float32)
@@ -386,6 +488,9 @@ class HotkeyTranscriptionService:
                         await asyncio.sleep(0.01)
                         continue
 
+                    if session.audio_source.backend_name:
+                        session.source_backend = session.audio_source.backend_name
+
                     # Update audio level for visualizer
                     session.audio_level = self._calculate_audio_level(chunk)
 
@@ -397,19 +502,22 @@ class HotkeyTranscriptionService:
                             "session_id": session.session_id,
                             "audio_level": session.audio_level,
                             "levels": self._calculate_frequency_levels(chunk, num_bars=36),
-                            "peak": float(np.max(np.abs(chunk))) if len(chunk) > 0 else 0.0,
-                        },
-                    )
-
-                    # Publish audio level update for real-time visualization
-                    # Send every 50ms for smooth animation
-                    self._publish_event(
-                        "hotkey_audio_level",
-                        {
-                            "session_id": session.session_id,
-                            "audio_level": session.audio_level,
-                            "levels": self._calculate_frequency_levels(chunk, num_bars=36),
-                            "peak": float(np.max(np.abs(chunk))) if len(chunk) > 0 else 0.0,
+                            "peak": float(
+                                np.max(
+                                    np.abs(
+                                        np.nan_to_num(
+                                            np.clip(
+                                                chunk.astype(np.float32, copy=False), -1.0, 1.0
+                                            ),
+                                            nan=0.0,
+                                            posinf=1.0,
+                                            neginf=-1.0,
+                                        )
+                                    )
+                                )
+                            )
+                            if len(chunk) > 0
+                            else 0.0,
                         },
                     )
 
@@ -431,7 +539,7 @@ class HotkeyTranscriptionService:
                     await asyncio.sleep(0.01)
 
             # Process any remaining audio
-            if len(audio_buffer) > self.settings.sample_rate * 0.1:  # At least 100ms
+            if len(audio_buffer) > self.settings.sample_rate * 0.3:  # At least 300ms
                 await self._transcribe_chunk(session, audio_buffer)
 
         except Exception as exc:
@@ -448,8 +556,15 @@ class HotkeyTranscriptionService:
         if len(audio) == 0:
             return 0.0
 
+        safe_audio = np.nan_to_num(
+            np.clip(audio.astype(np.float32, copy=False), -1.0, 1.0),
+            nan=0.0,
+            posinf=1.0,
+            neginf=-1.0,
+        )
+
         # Calculate RMS
-        rms = np.sqrt(np.mean(audio**2))
+        rms = np.sqrt(np.mean(safe_audio**2))
 
         # Convert to dB and normalize
         db = 20 * np.log10(rms + 1e-10)
@@ -467,8 +582,15 @@ class HotkeyTranscriptionService:
         if len(audio) == 0:
             return [0.0] * num_bars
 
+        safe_audio = np.nan_to_num(
+            np.clip(audio.astype(np.float32, copy=False), -1.0, 1.0),
+            nan=0.0,
+            posinf=1.0,
+            neginf=-1.0,
+        )
+
         # Calculate overall RMS for base level
-        rms = np.sqrt(np.mean(audio**2))
+        rms = np.sqrt(np.mean(safe_audio**2))
         base_level = max(0.0, min(1.0, (20 * np.log10(rms + 1e-10) + 60) / 60))
 
         # Generate frequency-like distribution using FFT-like approach
@@ -477,14 +599,14 @@ class HotkeyTranscriptionService:
 
         # Use audio samples to create varied frequency response
         # Split audio into segments for "frequency" bands
-        segment_size = max(1, len(audio) // num_bars)
+        segment_size = max(1, len(safe_audio) // num_bars)
 
         for i in range(num_bars):
             start = i * segment_size
-            end = min(start + segment_size, len(audio))
+            end = min(start + segment_size, len(safe_audio))
 
-            if start < len(audio):
-                segment = audio[start:end]
+            if start < len(safe_audio):
+                segment = safe_audio[start:end]
                 # Calculate local energy
                 local_rms = np.sqrt(np.mean(segment**2)) if len(segment) > 0 else 0
 
@@ -512,44 +634,74 @@ class HotkeyTranscriptionService:
     async def _transcribe_chunk(self, session: HotkeySession, audio: np.ndarray) -> None:
         """Transcribe an audio chunk and update session state."""
         if session.transcriber is None:
+            logger.debug("No transcriber available")
             return
 
         try:
-            # Run transcription in thread pool
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: session.transcriber.transcribe_chunk(audio)
+            from app.stt.chunker import AudioChunk
+
+            chunk_duration = len(audio) / float(self.settings.sample_rate)
+            ended_at = session.duration_ms / 1000.0
+            started_at = max(0.0, ended_at - chunk_duration)
+            chunk = AudioChunk(
+                started_at=started_at,
+                samples=audio,
+                duration=chunk_duration,
             )
 
-            if result and result.get("text"):
-                text = result["text"].strip()
+            status = session.transcriber.submit(chunk)
 
-                # Update partial text (live transcription)
-                session.partial_text = text
-
-                # Add to final segments if it's a complete utterance
-                if result.get("is_final", False) or result.get("confidence", 0) > 0.7:
-                    segment = {
-                        "text": text,
-                        "confidence": result.get("confidence", 0.0),
-                        "start": result.get("start", 0.0),
-                        "end": result.get("end", 0.0),
-                    }
-                    session.final_segments.append(segment)
-                    session.partial_text = ""  # Reset partial
-
-                # Emit update event
-                self._publish_event(
-                    "hotkey_partial",
-                    {
-                        "session_id": session.session_id,
-                        "partial_text": session.partial_text,
-                        "audio_level": session.audio_level,
-                        "duration_ms": session.duration_ms,
-                    },
+            accepted = status.accepted if hasattr(status, "accepted") else bool(status)
+            if not accepted:
+                queue_depth = getattr(status, "queue_depth", None)
+                backpressure_state = getattr(status, "backpressure_state", "unknown")
+                logger.debug(
+                    "Chunk rejected: queue_depth=%s, state=%s",
+                    queue_depth,
+                    backpressure_state,
                 )
+                return
+
+            queue_depth = getattr(status, "queue_depth", None)
+            logger.debug("Chunk submitted: queue_depth=%s", queue_depth)
 
         except Exception as exc:
-            logger.debug("Transcription error: %s", exc)
+            logger.exception("Transcription error: %s", exc)
+
+    def _on_transcription_segment(self, session: HotkeySession, segment: Any) -> None:
+        """Capture completed hotkey segments for the floating window and stop payload."""
+        raw_text = normalize_dictation_text(getattr(segment, "text", "") or "")
+        display_source = getattr(segment, "display_text", None) or raw_text
+        display_text = stabilize_partial_text(session.display_partial_text, display_source)
+        if not raw_text and not display_text:
+            return
+
+        payload = {
+            "id": getattr(segment, "id", f"hotkey-seg-{len(session.final_segments)}"),
+            "text": display_text,
+            "raw_text": raw_text or display_text,
+            "start": float(getattr(segment, "start", 0.0)),
+            "end": float(getattr(segment, "end", 0.0)),
+            "language": getattr(segment, "language", session.language_mode),
+            "confidence": float(getattr(segment, "confidence", 0.0) or 0.0),
+        }
+
+        session.language_used = payload["language"] or session.language_mode
+        session.raw_partial_text = raw_text or display_text
+        session.display_partial_text = display_text
+        session.partial_text = display_text
+        if not merge_segment_texts(session.final_segments, raw_text or display_text):
+            session.final_segments.append(payload)
+        self._publish_event(
+            "hotkey_partial",
+            {
+                "session_id": session.session_id,
+                "raw_partial_text": session.raw_partial_text,
+                "display_partial_text": session.display_partial_text,
+                "partial_text": session.display_partial_text,
+                "segment": payload,
+            },
+        )
 
     def register_callback(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """Register an event callback for hotkey events."""
@@ -565,7 +717,22 @@ class HotkeyTranscriptionService:
         """Publish event to all registered callbacks."""
         for callback in self._callbacks:
             try:
-                callback(event_type, data)
+                result = callback(event_type, data)
+                if inspect.isawaitable(result):
+                    loop = self._event_loop
+                    if loop is not None and loop.is_running():
+                        asyncio.run_coroutine_threadsafe(result, loop)
+                    else:
+                        try:
+                            running_loop = asyncio.get_running_loop()
+                        except RuntimeError:
+                            running_loop = None
+                        if running_loop is not None and running_loop.is_running():
+                            running_loop.create_task(result)
+                        else:
+                            logger.debug(
+                                "Dropping async hotkey event without active loop: %s", event_type
+                            )
             except Exception:
                 continue
 
@@ -739,18 +906,26 @@ def _get_client_info() -> str:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    logger.debug("Lifespan startup: initializing service")
     global service, hotkey_service
     start_time = time.perf_counter()
 
     try:
         settings = AppSettings()
+
+        # Configure logging based on user settings
+        manager = get_settings_manager()
+        user_settings = manager.get_settings_dict()
+        log_level = "DEBUG" if user_settings.get("advanced", {}).get("debugMode", False) else "INFO"
+        logging.getLogger().setLevel(getattr(logging, log_level))
+        logger.setLevel(getattr(logging, log_level))
+
+        logger.debug("Lifespan startup: initializing service")
         service = BackendService(settings)
         hotkey_service = HotkeyTranscriptionService(settings)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         logger.debug("Lifespan startup complete: service initialized in %.2fms", elapsed_ms)
     except Exception as exc:
-        logger.debug("Lifespan startup failed: %s", str(exc))
+        logger.error("Lifespan startup failed: %s", str(exc))
         raise
 
     yield
@@ -848,10 +1023,11 @@ async def hotkey_stop(
     result = await svc.stop_session()
 
     logger.debug(
-        "Hotkey stop complete: duration=%dms, segments=%d, text_length=%d",
+        "Hotkey stop complete: duration=%dms, segments=%d, text_length=%d, backend=%s",
         result.duration_ms,
         result.segment_count,
         len(result.final_transcription),
+        result.source_backend,
     )
 
     return result
@@ -897,6 +1073,45 @@ def hotkey_inject(
     return HotkeyInjectResponse(
         success=True,
         message="Text ready for injection (handled by Electron)",
+    )
+
+
+@app.post("/api/hotkey/config")
+@log_endpoint
+def update_hotkey_config(
+    request: HotkeyConfigRequest,
+    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
+) -> HotkeyConfigResponse:
+    """Update hotkey transcription configuration.
+
+    Allows runtime adjustment of hotkey-specific settings like
+    chunk duration, VAD thresholds, and filtering options.
+    """
+    update_hotkey_config.__endpoint_path__ = "/api/hotkey/config"
+    update_hotkey_config.__http_method__ = "POST"
+
+    logger.debug("Hotkey config update: %s", request.model_dump(exclude_none=True))
+
+    # Update config with provided values
+    if request.chunk_seconds is not None:
+        svc._config.chunk_seconds = request.chunk_seconds
+    if request.overlap_seconds is not None:
+        svc._config.overlap_seconds = request.overlap_seconds
+    if request.vad_threshold_db is not None:
+        svc._config.vad_threshold_db = request.vad_threshold_db
+    if request.vad_min_silence_ms is not None:
+        svc._config.vad_min_silence_ms = request.vad_min_silence_ms
+    if request.vad_speech_pad_ms is not None:
+        svc._config.vad_speech_pad_ms = request.vad_speech_pad_ms
+    if request.confidence_threshold is not None:
+        svc._config.confidence_threshold = request.confidence_threshold
+    if request.enable_filler_filter is not None:
+        svc._config.enable_filler_filter = request.enable_filler_filter
+
+    return HotkeyConfigResponse(
+        success=True,
+        config=svc._config,
+        message="Hotkey configuration updated",
     )
 
 
@@ -949,6 +1164,8 @@ async def hotkey_websocket(websocket: WebSocket):
                 "payload": {
                     "is_recording": status.is_recording,
                     "partial_text": status.partial_text,
+                    "raw_partial_text": status.raw_partial_text,
+                    "display_partial_text": status.display_partial_text,
                     "audio_level": status.audio_level,
                     "levels": [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36,
                     "session_id": status.session_id,
@@ -1025,7 +1242,7 @@ async def hotkey_events(
         try:
             # Send initial status with full audio level data
             status = svc.get_status()
-            yield f"data: {json.dumps({'type': 'hotkey_status', 'payload': {'is_recording': status.is_recording, 'partial_text': status.partial_text, 'audio_level': status.audio_level, 'levels': [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36}})}\n\n"
+            yield f"data: {json.dumps({'type': 'hotkey_status', 'payload': {'is_recording': status.is_recording, 'partial_text': status.partial_text, 'raw_partial_text': status.raw_partial_text, 'display_partial_text': status.display_partial_text, 'audio_level': status.audio_level, 'levels': [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36}})}\n\n"
 
             while True:
                 if await request.is_disconnected():
@@ -1088,9 +1305,14 @@ def health(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
             "duration_ms": hs.duration_ms,
         }
 
+    # Ensure estimated_backlog_seconds is included in health
+    health_dict = snapshot.health
+    if isinstance(health_dict, dict) and "estimated_backlog_seconds" not in health_dict:
+        health_dict["estimated_backlog_seconds"] = 0.0
+
     response = {
         "ok": True,
-        "health": snapshot.health,
+        "health": health_dict,
         "meter_value": snapshot.meter_value,
         "model_cache": model_cache,
         "hotkey": hotkey_status_data,
@@ -1142,23 +1364,17 @@ def probe_device_endpoint(
         duration,
     )
 
-    try:
-        start_time = time.perf_counter()
-        result = svc.probe_device(actual_device_id, duration=duration)
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
+    start_time = time.perf_counter()
+    result = svc.probe_device(actual_device_id, duration=duration)
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-        logger.debug(
-            "Probe device complete: device_id=%s, success=%s, time=%.2fms",
-            actual_device_id or "default",
-            result.get("ok", False),
-            elapsed_ms,
-        )
-        return result
-    except Exception as exc:
-        logger.debug(
-            "Probe device failed: device_id=%s, error=%s", actual_device_id or "default", str(exc)
-        )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    logger.debug(
+        "Probe device complete: device_id=%s, success=%s, time=%.2fms",
+        actual_device_id or "default",
+        result.get("ok", False),
+        elapsed_ms,
+    )
+    return result
 
 
 @app.post("/api/models/preload")
@@ -1242,6 +1458,59 @@ def clear_model_cache(svc: BackendService = Depends(get_service)) -> dict[str, A
         elapsed_ms,
     )
     return result
+
+
+@app.get("/api/models/catalog")
+@log_endpoint
+def get_model_catalog(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    get_model_catalog.__endpoint_path__ = "/api/models/catalog"
+    get_model_catalog.__http_method__ = "GET"
+    return svc.get_model_catalog_payload()
+
+
+@app.get("/api/models/state")
+@log_endpoint
+def get_model_state(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    get_model_state.__endpoint_path__ = "/api/models/state"
+    get_model_state.__http_method__ = "GET"
+    return {"installed": svc.get_model_install_state()}
+
+
+@app.post("/api/models/select")
+@log_endpoint
+def select_model(request: ModelSelectionRequest) -> dict[str, Any]:
+    select_model.__endpoint_path__ = "/api/models/select"
+    select_model.__http_method__ = "POST"
+    manager = get_settings_manager()
+    settings = manager.get_settings()
+
+    if request.category == "asr":
+        settings.transcription.default_asr_model_id = request.model_id
+    elif request.category == "refiner":
+        settings.refiner.selected_model_id = request.model_id
+    else:
+        raise HTTPException(status_code=400, detail="Unknown model category")
+
+    manager.update_settings(settings)
+    return {
+        "ok": True,
+        "selected_asr_model_id": settings.transcription.default_asr_model_id,
+        "selected_refiner_model_id": settings.refiner.selected_model_id,
+    }
+
+
+@app.post("/api/models/refinement-mode")
+@log_endpoint
+def set_refinement_mode(request: RefinementModeRequest) -> dict[str, Any]:
+    set_refinement_mode.__endpoint_path__ = "/api/models/refinement-mode"
+    set_refinement_mode.__http_method__ = "POST"
+    if request.mode not in {"off", "strict", "polished"}:
+        raise HTTPException(status_code=400, detail="Unsupported refinement mode")
+    manager = get_settings_manager()
+    settings = manager.get_settings()
+    settings.transcription.refinement_mode = request.mode
+    manager.update_settings(settings)
+    return {"ok": True, "refinement_mode": settings.transcription.refinement_mode}
 
 
 @app.get("/api/session")
@@ -1430,6 +1699,12 @@ def save_settings(request: dict[str, Any]) -> dict[str, Any]:
     success = manager.import_settings(request)
 
     if success:
+        # Update logging level if debugMode changed
+        debug_mode = request.get("advanced", {}).get("debugMode", False)
+        log_level = "DEBUG" if debug_mode else "INFO"
+        logging.getLogger().setLevel(getattr(logging, log_level))
+        logger.setLevel(getattr(logging, log_level))
+
         return {"success": True, "message": "Settings saved successfully"}
     else:
         raise HTTPException(status_code=400, detail="Failed to save settings")

@@ -41,7 +41,10 @@ class RollingChunker:
         self.step_size = self.chunk_size - self.overlap_size
         if self.step_size <= 0:
             raise ValueError("overlap_seconds must be smaller than chunk_seconds")
-        self._buffer = deque[float]()
+        # Buffer with max size to prevent unbounded growth
+        # Max 60 seconds of audio at sample_rate (e.g., 960000 samples at 16kHz)
+        max_buffer_samples = int(sample_rate * 60)
+        self._buffer: deque[float] = deque(maxlen=max_buffer_samples)
         self._buffer_start_time = 0.0
         self._next_chunk_start = 0.0
         self._initialized = False
@@ -73,7 +76,9 @@ class RollingChunker:
             )
             chunk_start = self._next_chunk_start
             chunk_end = chunk_start + (self.chunk_size / self.sample_rate)
-            chunks.append(AudioChunk(started_at=chunk_start, ended_at=chunk_end, samples=samples_out))
+            chunks.append(
+                AudioChunk(started_at=chunk_start, ended_at=chunk_end, samples=samples_out)
+            )
             for _ in range(self.step_size):
                 self._buffer.popleft()
             self._buffer_start_time += self.step_size / self.sample_rate

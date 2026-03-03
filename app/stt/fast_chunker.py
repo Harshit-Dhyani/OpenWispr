@@ -12,15 +12,15 @@ Provides real-time audio stream processing with:
 from __future__ import annotations
 
 import enum
+import logging
 import time
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from collections.abc import Iterator
+logger = logging.getLogger(__name__)
 
 
 class VADState(enum.Enum):
@@ -109,14 +109,6 @@ class AudioChunk:
     @property
     def ended_at(self) -> float:
         return self.end_time
-
-    @property
-    def duration(self) -> float:
-        return self.end_time - self.start_time
-
-    @property
-    def has_speech(self) -> bool:
-        return self.vad_state == VADState.SPEECH
 
     @property
     def duration(self) -> float:
@@ -368,7 +360,6 @@ class FastChunker:
         "_next_chunk_time",
         "_adaptive_size",
         "_speech_density_window",
-        "_pending_samples",
         "_initialized",
     )
 
@@ -394,14 +385,18 @@ class FastChunker:
             # Build config from keyword arguments for backward compatibility
             base_chunk_ms = (chunk_duration * 1000) if chunk_duration else 200.0
             overlap_ms = base_chunk_ms * overlap_ratio
+            effective_sample_rate = sample_rate or 16000
+            if effective_sample_rate <= 0:
+                raise ValueError(f"sample_rate must be positive, got {effective_sample_rate}")
             self._config = ChunkConfig(
-                sample_rate=sample_rate or 16000,
+                sample_rate=effective_sample_rate,
                 base_chunk_ms=base_chunk_ms,
                 overlap_ms=overlap_ms,
             )
 
-        # Primary buffer for incoming audio (stores ~2 seconds)
-        buffer_capacity = self._config.sample_rate * 2  # 2 seconds to handle up to 1.6s chunks
+        # Primary buffer for incoming audio
+        # Buffer capacity must be >= max_chunk_samples * 1.5 to prevent deadlock
+        buffer_capacity = int(self._config.max_samples * 1.5)
         self._buffer = ZeroCopyBuffer(buffer_capacity)
 
         # Overlap buffer stores trailing samples from previous chunk
@@ -454,6 +449,12 @@ class FastChunker:
             self._next_chunk_time = 0.0
             self._initialized = True
 
+        # Validate sample rate
+        if self._config.sample_rate <= 0 or self._config.sample_rate > 192000:
+            raise ValueError(
+                f"sample_rate must be between 1 and 192000 Hz, got {self._config.sample_rate}"
+            )
+
         # Push to buffer
         self._buffer.push(samples)
 
@@ -463,6 +464,10 @@ class FastChunker:
     def _process_available(self, timestamp: float) -> list[AudioChunk]:
         """Process available buffered audio into chunks."""
         chunks: list[AudioChunk] = []
+
+        if self._config.sample_rate <= 0:
+            logger.error(f"Invalid sample_rate: {self._config.sample_rate}")
+            return chunks
 
         while self._buffer.available >= self._adaptive_size:
             # Calculate current chunk size based on speech density
@@ -493,6 +498,8 @@ class FastChunker:
 
                 # Calculate timing
                 chunk_start = self._next_chunk_time
+                if self._config.sample_rate <= 0:
+                    raise ValueError(f"Invalid sample_rate: {self._config.sample_rate}")
                 chunk_duration = len(chunk_samples) / self._config.sample_rate
                 chunk_end = chunk_start + chunk_duration
 
@@ -612,6 +619,8 @@ class FastChunker:
     @property
     def buffered_ms(self) -> float:
         """Buffered audio duration in milliseconds."""
+        if self._config.sample_rate == 0:
+            return 0.0
         return self._buffer.available / self._config.sample_rate * 1000
 
     @property
