@@ -11,7 +11,7 @@ function createMainWindow() {
     minHeight: 780,
     backgroundColor: "#0e141b",
     autoHideMenuBar: true,
-    title: "Transcripta",
+    title: state.APP_NAME,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),

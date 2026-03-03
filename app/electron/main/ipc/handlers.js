@@ -6,10 +6,10 @@ const { loadUserSettings, saveUserSettings, loadDevicesForDesktop } = require(".
 const { injectText } = require("../services/textInjector");
 const { showMainWindowAndFocus } = require("../windows/mainWindow");
 const { hideFloatingWindow } = require("../windows/floatingWindow");
-const { createTray } = require("../windows/tray");
+const { createTray, scheduleTrayRefresh } = require("../windows/tray");
 const {
   validateAccelerator, checkHotkeyAvailability, registerHotkey, unregisterHotkey,
-  applyHotkeyConfig, toggleRecording
+  applyHotkeyConfig, toggleRecording, buildHotkeyStatePayload
 } = require("./hotkeyHandlers");
 const { closeHotkeyWebSocket } = require("./hotkeyHandlers");
 
@@ -102,26 +102,7 @@ ipcMain.handle("hotkey:toggle", async (event, enabled) => {
 });
 
 ipcMain.handle("hotkey:get-state", async () => {
-  return {
-    enabled: state.hotkeyEnabled,
-    isRecording: state.isRecording,
-    accelerator: state.currentHotkeyAccelerator || state.DEFAULT_HOTKEY,
-    registered: !!state.currentHotkeyAccelerator,
-    defaultHotkey: state.DEFAULT_HOTKEY,
-    mode: "toggle",
-    audioFeedback: state.audioFeedbackEnabled,
-    config: {
-      ...state.hotkeyConfigState,
-      enabled: state.hotkeyEnabled,
-      key_combination: state.currentHotkeyAccelerator || state.hotkeyConfigState.key_combination || state.DEFAULT_HOTKEY,
-    },
-    is_registered: !!state.currentHotkeyAccelerator,
-    session: {
-      is_active: state.isRecording,
-      total_activations: 0,
-      last_activated_at: null,
-    },
-  };
+  return buildHotkeyStatePayload();
 });
 
 ipcMain.handle("hotkey:get-default", async () => {
@@ -135,7 +116,7 @@ ipcMain.handle("hotkey:get-default", async () => {
 ipcMain.handle("hotkey:update-config", async (event, config) => {
   console.log("[main] IPC: Updating hotkey config", config);
   const result = await applyHotkeyConfig(config);
-  await createTray();
+  await scheduleTrayRefresh();
   return result;
 });
 
@@ -148,7 +129,7 @@ ipcMain.handle("text:inject", async (event, text) => {
 // Tray IPC handler
 ipcMain.handle("tray:update-tooltip", async (event, tooltip) => {
   if (state.tray) {
-    state.tray.setToolTip(tooltip || `Transcripta - ${state.isRecording ? "Recording" : "Ready"}`);
+    state.tray.setToolTip(tooltip || `${state.APP_NAME} - ${state.isRecording ? "Recording" : "Ready"}`);
   }
   return { success: true };
 });
@@ -220,6 +201,7 @@ ipcMain.handle("quick-settings:get-data", async () => {
   const settings = await loadUserSettings();
   const devices = await loadDevicesForDesktop();
   return {
+    appName: state.APP_NAME,
     settings,
     devices,
     languages: state.QUICK_LANGUAGE_OPTIONS,
@@ -236,7 +218,7 @@ ipcMain.handle("quick-settings:update", async (event, nextSettings) => {
   if (nextSettings?.hotkey) {
     await applyHotkeyConfig(nextSettings.hotkey);
   }
-  await createTray();
+  await scheduleTrayRefresh();
   if (state.mainWindow && !state.mainWindow.isDestroyed()) {
     state.mainWindow.webContents.send("settings-updated");
   }
@@ -264,45 +246,31 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
 
   if (action === "cancel") {
     if (state.isRecording) {
-      state.isRecording = false;
-      const { playStopSound } = require("./hotkeyHandlers");
-      const { updateTrayIcon, updateTrayTooltip } = require("../windows/tray");
-      playStopSound();
-      updateTrayIcon();
-
       try {
-        await fetch(`${state.API_ORIGIN}/api/transcription/hotkey/stop`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" }
-        });
+        state.hotkeyPendingAction = "cancel";
+        await toggleRecording(false);
       } catch (error) {
         console.error("[main] Failed to stop:", error);
-      }
-
-      closeHotkeyWebSocket();
-      hideFloatingWindow();
-      updateTrayTooltip();
-      await createTray();
-      if (state.mainWindow && !state.mainWindow.isDestroyed()) {
-        state.mainWindow.webContents.send("hotkey-state-change", {
-          isRecording: false,
-          hotkeyEnabled: state.hotkeyEnabled,
-          accelerator: state.currentHotkeyAccelerator
-        });
+      } finally {
+        state.hotkeyPendingAction = null;
       }
     }
   } else if (action === "finish") {
     if (state.isRecording) {
-      await toggleRecording(false);
-    }
-  } else if (action === "finish-and-paste") {
-    if (state.isRecording) {
-      const previousMode = state.hotkeyConfigState.finish_mode_default;
-      state.hotkeyConfigState.finish_mode_default = "finish_and_paste";
+      state.hotkeyPendingAction = "finish";
       try {
         await toggleRecording(false);
       } finally {
-        state.hotkeyConfigState.finish_mode_default = previousMode;
+        state.hotkeyPendingAction = null;
+      }
+    }
+  } else if (action === "finish-and-paste") {
+    if (state.isRecording) {
+      try {
+        state.hotkeyPendingAction = "finish_and_paste";
+        await toggleRecording(false);
+      } finally {
+        state.hotkeyPendingAction = null;
       }
     }
   }

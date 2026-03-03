@@ -7,8 +7,11 @@ from threading import Lock
 from typing import Any, Callable
 
 import logging
+import time
 
 from app.api.model_service import ModelService
+from app.api.refinement_queue import RefinementQueue
+from app.api.streaming_metrics import StreamingMetrics
 from app.audio.capture import LoopbackAudioSource
 from app.core.config import AppSettings
 from app.core.language_profiles import available_language_codes
@@ -22,6 +25,7 @@ from app.core.models import (
 )
 from app.core.session_manager import SessionManager
 from app.core.settings_manager import get_settings_manager
+from app.stt.stability import PartialStabilizer, build_stream_payload
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +87,19 @@ class BackendService:
         self._preload_thread: threading.Thread | None = None
         self._preload_cancelled = threading.Event()
         self._model_service = ModelService(settings.download_root)
+        self._streaming_metrics = StreamingMetrics()
+        self._stabilizer: PartialStabilizer | None = None
+        self._refinement_queue = RefinementQueue(
+            download_root=settings.download_root,
+            publish_event=self._publish_event,
+            metrics=self._streaming_metrics,
+        )
 
     def list_devices(self) -> list[dict[str, Any]]:
         return [serialize_device(device) for device in self.manager.list_devices()]
+
+    def get_streaming_metrics(self) -> dict[str, object]:
+        return self._streaming_metrics.snapshot()
 
     def get_snapshot(self) -> BackendSnapshot:
         with self._lock:
@@ -425,6 +439,10 @@ class BackendService:
                 self._loading = False
                 self._loading_message = ""
                 self._revision += 1
+            self._stabilizer = PartialStabilizer(
+                session_id=session.session_id,
+                stability_threshold=2 if live_mode in ("realtime", "low_latency") else 3,
+            )
             self._publish_event("loading", {"loading": False, "message": ""})
             return self._session_state
         except Exception as exc:
@@ -438,6 +456,8 @@ class BackendService:
 
     def stop_session(self) -> dict[str, Any] | None:
         self.manager.stop_session()
+        if self._stabilizer is not None:
+            self._stabilizer.reset()
         with self._lock:
             return self._session_state
 
@@ -475,6 +495,7 @@ class BackendService:
             }
 
     def _on_segment(self, segment: TranscriptSegment) -> None:
+        emit_started = time.perf_counter()
         with self._lock:
             target = self._suppressed_transcript if segment.suppressed else self._transcript
             target.append(serialize_segment(segment))
@@ -486,10 +507,50 @@ class BackendService:
                 self._session_state["formula_count"] = len(self._formulas)
                 self._session_state["review_count"] = len(self._needs_review)
             self._revision += 1
+            session_id = self._session_state["session_id"] if self._session_state else "unknown"
         event_type = "suppressed_segment" if segment.suppressed else "segment"
-        self._publish_event(event_type, serialize_segment(segment))
+        serialized = serialize_segment(segment)
+        self._publish_event(event_type, serialized)
+        if self._stabilizer is not None and not segment.suppressed:
+            draft_state = self._stabilizer.consume_final_text(
+                serialized["display_text"] or serialized["text"],
+                start=serialized["start"],
+                end=serialized["end"],
+            )
+            commit_payload = build_stream_payload(
+                session_id=session_id,
+                segment_id=serialized["id"],
+                revision=draft_state.revision,
+                stream_id=draft_state.stream_id,
+                text=serialized["display_text"] or serialized["text"],
+                start=serialized["start"],
+                end=serialized["end"],
+                committed_text=draft_state.committed_text,
+                draft_suffix="",
+                metrics={"emit_ms": round((time.perf_counter() - emit_started) * 1000, 2)},
+            )
+            commit_payload["segment"] = serialized
+            self._publish_event("commit_final", commit_payload)
+            self._streaming_metrics.record_commit(commit_payload["metrics"]["emit_ms"])
+            self._streaming_metrics.log_trace(
+                session_id=session_id,
+                segment_id=serialized["id"],
+                stage="commit",
+                duration_ms=commit_payload["metrics"]["emit_ms"],
+                extra=f"device={self._health.get('model_runtime_device', 'unknown')}",
+            )
+            user_settings = get_settings_manager().get_settings()
+            self._refinement_queue.enqueue(
+                session_id=session_id,
+                segment=serialized,
+                refinement_mode=user_settings.transcription.refinement_mode,
+                model_id=user_settings.refiner.selected_model_id,
+                runtime_enabled=user_settings.refiner.runtime_enabled,
+                language_hint=serialized["language"] or "auto",
+            )
 
     def _on_partial(self, text: str, start: float, end: float) -> None:
+        emit_started = time.perf_counter()
         segment = {
             "id": f"partial-{int(start * 1000)}-{int(end * 1000)}",
             "start": start,
@@ -507,6 +568,25 @@ class BackendService:
             "is_partial": True,
         }
         self._publish_event("segment", segment)
+        if self._stabilizer is None:
+            return
+        session_id = self._session_state["session_id"] if self._session_state else "unknown"
+        draft_state = self._stabilizer.push(text, start=start, end=end)
+        emit_ms = round((time.perf_counter() - emit_started) * 1000, 2)
+        payload = build_stream_payload(
+            session_id=session_id,
+            segment_id=segment["id"],
+            revision=draft_state.revision,
+            stream_id=draft_state.stream_id,
+            text=draft_state.text,
+            start=start,
+            end=end,
+            committed_text=draft_state.committed_text,
+            draft_suffix=draft_state.draft_suffix,
+            metrics={"emit_ms": emit_ms},
+        )
+        self._publish_event("draft_partial", payload)
+        self._streaming_metrics.record_draft(emit_ms)
 
     def _on_health(self, health: SessionHealth, meter_value: float) -> None:
         with self._lock:

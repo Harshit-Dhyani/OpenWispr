@@ -17,6 +17,7 @@ const defaultHealth: Health = {
   queue_depth: 0,
   dropped_stt_chunks: 0,
   stt_backpressure_state: 'normal',
+  estimated_backlog_seconds: 0,
   last_error: null,
   last_warning: null,
 };
