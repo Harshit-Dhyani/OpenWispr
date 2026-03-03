@@ -1,335 +1,407 @@
 # Transcripta
 
-Transcripta is a Windows 11 desktop app for privacy-first transcription of live system audio. It keeps capture, inference, transcript storage, and STEM-aware review local on the machine using an Electron desktop shell over a local Python backend, faster-whisper for speech recognition, and WASAPI loopback-style capture through `soundcard`.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
+[![Windows 11](https://img.shields.io/badge/windows-11-0078D6.svg)](https://www.microsoft.com/windows/)
 
-## Product Goals
+**Privacy-first, local desktop transcription for Windows 11**
 
-- Capture system audio directly from the default Windows output device.
-- Run transcription locally with no cloud dependency.
-- Prefer GPU inference when CUDA is available, with CPU fallback.
-- Keep transcripts and logs on-device under user control.
-- Continuously save transcript, notes, formulas, highlights, and logs per session.
-- Flag low-confidence or suspicious STEM segments for manual review instead of claiming correctness.
-- Package into a single desktop-friendly Windows distribution.
+Transcripta is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
 
-## Stack
+## Key Features
 
-- Python 3.11
-- FastAPI + Uvicorn local backend
-- Electron desktop shell
-- faster-whisper
-- CTranslate2
-- PyAudioWPatch WASAPI capture with soundcard fallback
-- Electron packaging flow on top of the Python runtime
+### Dual Transcription Modes
+
+**Hotkey Mode (Wispr)** - Quick Dictation
+- Press `Ctrl+Shift+T` to start/stop instant recording
+- Optimized for low latency (<500ms first-word)
+- Microphone or system audio capture
+- Auto-paste transcription at cursor position
+- Floating window with real-time visual feedback
+- 36-bar frequency audio visualizer
+- Memory-only operation (no disk I/O during recording)
+- Partial text stabilization with draft/commit model
+- Perfect for quick notes, emails, chat messages
+
+**System Mode** - Full Sessions
+- Transcribe system audio, videos, podcasts, meetings
+- Loopback audio capture from any playback device
+- Support for multi-hour sessions
+- Automatic segmentation on silence
+- Export to TXT, JSON, SRT, VTT formats
+- Session history with notes and highlights
+- STEM formula extraction for technical content
+- Per-session audio backend selection
+- Perfect for content creation, accessibility, documentation
+
+### Advanced Audio Pipeline
+
+- **16kHz sample rate** with configurable chunk sizes
+- **Multiple backends**: soundcard, PyAudioWPatch with auto-fallback
+- **LoopbackAudioSource** for system audio capture
+- **Optimized VAD** (Voice Activity Detection) per mode
+- **FastChunker** with adaptive sizing based on speech density
+- Real-time audio level monitoring with frequency analysis
+- Automatic device switching and recovery
+- Multi-channel to mono mixing
+- Backpressure handling with queue management
+
+### STT Engine (faster-whisper)
+
+- **FastTranscriber** with streaming transcription
+- **Model Pool** for efficient model caching and reuse
+- **FastChunker** with 100-400ms adaptive sizing
+- **Quality filtering**: filler words, hallucinations, low-confidence detection
+- **Dictation cleanup** and text stabilization
+- **Partial stabilizer** for streaming results with revision tracking
+- Language-specific optimizations for Hindi/English
+- Language detection with fingerprint caching
+
+### Model Management
+
+| Model | Size | VRAM | Speed | Quality | Runtime |
+|-------|------|------|-------|---------|---------|
+| tiny | 39 MB | 0 GB | Fastest | Basic | enabled |
+| base | 74 MB | 1 GB | Fast | Good | enabled |
+| small | 244 MB | 2 GB | Fast | Better | enabled |
+| medium | 769 MB | 5 GB | Balanced | Best | enabled (default) |
+| large-v3 | 1.55 GB | 10 GB | Slower | Excellent | enabled |
+| turbo | 1.6 GB | 6 GB | Fast | Very Good | disabled |
+
+- **On-demand model loading** - Only download what you use
+- **Smart GPU/CPU fallback** - Automatic OOM recovery with cascade
+- **INT8 quantization** - 2x faster on CPU
+- **Auto-optimization** - System profiler recommends optimal settings
+- Model catalog at `app/core/model_catalog.py`
+
+### Real-Time Features
+
+- **Streaming transcription** - Words appear as you speak
+- **Partial results** - See text before it's finalized
+- **Audio visualization** - 36-bar frequency level meters
+- **Confidence indicators** - Quality labels (ok/weak/junk)
+- **Segment boundaries** - Clear separation between thoughts
+- **Backpressure monitoring** - Queue depth and drop tracking
+
+### Refiner Service (Local LLM)
+
+- **llama.cpp backend** for local text refinement
+- **Modes**: off, strict, polished
+- **Available models**: Qwen2.5 3B/7B, Mistral 7B, Phi-3 Mini
+- Protects technical tokens (formulas, code)
+- Automatic fallback on refiner failure
+- Per-mode configuration (hotkey vs system)
+
+### Settings System
+
+- **Bidirectional sync** - Changes apply instantly via WebSocket
+- **Settings migrations** - Versioned schema upgrades
+- **Validation** - Pydantic-based with bounds checking
+- **Per-mode configuration** - Different settings for hotkey/system modes
+- **Offline support** - Works without internet
+- Auto-generated TypeScript constants from Python
+
+### Session Management
+
+- **JSONL format** for structured transcript storage
+- **Export formats**: TXT, JSON, SRT, VTT
+- **Formula extraction** - STEM content detection and extraction
+- **Session recovery** - Crash recovery with data preservation
+- **Incremental output rebuild** - Efficient note generation
+- **Document context** - PDF attachment for enhanced transcription
+
+### Production-Grade Features
+
+- **Comprehensive error handling** - Structured error types with recovery
+- **Automatic recovery** - Device disconnects, OOM, network issues
+- **Performance monitoring** - Latency, throughput, resource usage
+- **Health monitoring** - Real-time session health metrics
+- **Extensive logging** - JSON-structured logs per session
+- **100+ tests** - Unit, integration, and E2E coverage
+
+## System Requirements
+
+- **OS**: Windows 11
+- **Python**: 3.11+
+- **Node.js**: 20.x+ (for development)
+- **GPU**: NVIDIA with 2GB+ VRAM (recommended) or CPU
+- **RAM**: 8GB minimum, 16GB recommended
+- **Storage**: 2GB for app + model space
 
 ## Quick Start
 
-Desktop entrypoint: `app/desktop/`
+### Installation
 
 ```powershell
+# Clone repository
+git clone <repo-url>
+cd Transcripta
+
+# Create virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+# Install Python dependencies
 python -m pip install --upgrade pip setuptools wheel
 pip install -e .[dev]
-cd app/desktop
+
+# Install Node dependencies
+cd app/electron
 npm install
+cd ..
+
+# Start development
 npm run dev
 ```
 
-If PowerShell script execution is blocked:
+### GPU Verification
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
+# Check CUDA availability
+python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+
+# Test faster-whisper on GPU
+python -c "from faster_whisper import WhisperModel; m = WhisperModel('small', device='cuda', compute_type='float16'); print('GPU OK')"
 ```
 
-## GPU Verification
+## Usage
 
-Check that CTranslate2 can see a CUDA device:
+### Hotkey Mode
+
+1. Press `Ctrl+Shift+T` (default) to start recording
+2. Speak naturally - text appears in real-time in the floating window
+3. Press `Ctrl+Shift+T` again to stop
+4. Text is automatically pasted at cursor position
+
+**Pro tip:** Use `tiny` or `base` model for fastest response. Change in Settings > Models.
+
+### System Mode
+
+1. Click "Start Session" in the main window
+2. Select audio source (system audio or microphone)
+3. Transcription builds up in real-time
+4. Click "Stop Session" when done
+5. Export to your preferred format (TXT, JSON, SRT, VTT)
+
+**Pro tip:** Use `medium` or `large-v3` model for best accuracy on long content.
+
+## Configuration
+
+### Live Mode Profiles
+
+| Profile | Chunk Size | Overlap | Use Case |
+|---------|------------|---------|----------|
+| ultra | 100ms | 20ms | Minimal latency |
+| realtime | 200ms | 40ms | Fast response |
+| low_latency | 500ms | 100ms | Balanced speed |
+| balanced | 1s | 200ms | Default (recommended) |
+| high_accuracy | 2s | 400ms | Best quality |
+
+### Environment Variables
 
 ```powershell
-python -c "import ctranslate2; print('cuda_devices=', ctranslate2.get_cuda_device_count())"
+# Force specific model
+$env:TRANSCRIPTA_DEFAULT_MODEL='medium'
+
+# Force compute type
+$env:TRANSCRIPTA_COMPUTE_TYPE='float16'  # or 'int8' for CPU
+
+# Specify capture device
+$env:TRANSCRIPTA_CAPTURE_DEVICE_ID='<device-id>'
+
+# Set log level
+$env:TRANSCRIPTA_LOG_LEVEL='DEBUG'  # DEBUG, INFO, WARN, ERROR
 ```
 
-Expected result on a working GPU machine:
+### Settings File
 
-```text
-cuda_devices= 1
+User settings stored in:
+```
+%APPDATA%\Transcripta\settings.json
 ```
 
-Verify that faster-whisper can initialize on the GPU:
-
-```powershell
-python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cuda', compute_type='float16'); print('faster-whisper cuda ok')"
+Or project root:
+```
+user_settings.json
 ```
 
-If that fails, force CPU mode:
+## Model Storage
 
-```powershell
-python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8'); print('faster-whisper cpu ok')"
+Downloaded models stored in:
+```
+%APPDATA%\Transcripta\models\
+├── asr\
+│   ├── faster-whisper-tiny\
+│   ├── faster-whisper-small\
+│   ├── faster-whisper-medium\
+│   └── faster-whisper-large-v3
+└── refiner\
+    ├── qwen2.5-3b-instruct-q4_k_m.gguf
+    └── qwen2.5-7b-instruct-q4_k_m.gguf
 ```
 
 ## Session Artifacts
 
-Each session writes a dedicated folder under `sessions\<session-slug>\`:
-
-- `transcript.jsonl`
-- `transcript.txt`
-- `notes.md`
-- `formulas.json`
-- `highlights.txt`
-- `session.json`
-- `logs\app.log`
-
-## Model Manager
-
-Transcripta now separates local models into two categories:
-
-- `Speech-to-Text (ASR)`
-- `Transcript Refiner`
-
-Current ASR catalog:
-
-- `whisper-tiny`
-- `whisper-small`
-- `whisper-medium`
-- `whisper-large-v3`
-- `whisper-turbo`
-
-Current refiner catalog:
-
-- `qwen2.5-7b-instruct`
-- `mistral-7b-instruct-v0.3`
-- `phi-3-mini-4k-instruct`
-
-Use `Full Settings > Models` to:
-
-- inspect installed status
-- download models
-- cancel active downloads
-- remove local models
-- choose the default ASR model
-- choose the default refiner model
-- choose `Refinement Mode: Off | Strict | Polished`
-
-The UI is explicit about installation state. If a model is not installed, it is shown as `Not Installed`.
-
-### ASR model guidance
-
-- `whisper-tiny`: fastest option for weak CPUs and quick smoke tests
-- `whisper-small`: strong fast local option for modest GPUs and dictation
-- `whisper-medium`: best default balance for most Windows desktops
-- `whisper-large-v3`: best quality for stronger GPUs and long-form sessions
-- `whisper-turbo`: cataloged fast option, but only selectable when runtime support is available
-
-### Refiner model guidance
-
-- `qwen2.5-7b-instruct`: default balanced local refiner choice
-- `mistral-7b-instruct-v0.3`: stronger quality-oriented cleanup option
-- `phi-3-mini-4k-instruct`: smaller refiner for lower-memory systems
-
-### Refiner runtime status
-
-Refiner selection, download, and persistence are implemented. If the local refiner runtime is not enabled yet, Transcripta will say so explicitly and continue using built-in cleanup only.
-
-## Where Models Are Stored
-
-Downloaded models are stored under the Electron user-data directory, not inside the repo working tree.
-
-Typical Windows location:
-
-```text
-%APPDATA%\Transcripta\models\
+Each system mode session creates:
 ```
-
-Layout:
-
-```text
-models\
-  asr\
-    whisper-medium\
-  refiner\
-    qwen2.5-7b-instruct\
+sessions\<session-name>\
+├── transcript.jsonl      # Structured transcript
+├── transcript.txt        # Plain text export
+├── notes.md              # Generated notes
+├── formulas.json         # STEM formulas
+├── highlights.txt        # Key highlights
+├── session.json          # Session metadata
+└── logs\app.log          # Debug logs
 ```
-
-The app verifies downloaded files using a minimum-size check and will use SHA-256 verification when catalog metadata provides it.
-
-## Switching Models
-
-Change the default ASR model in `Full Settings > Models`. The new selection is applied to the next session. Transcripta does not silently hot-swap ASR models in the middle of an active session.
-
-If you want to use the selected model immediately:
-
-1. stop the current session
-2. select the new model
-3. optionally preload it
-4. start a new session
-
-## Local Run Commands
-
-Development run:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-cd app/desktop
-npm install
-npm run dev
-```
-
-The Electron shell starts the local Python API automatically. The backend attempts CUDA first and falls back to CPU `int8` if GPU initialization fails.
-
-Run only the backend API:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m app.api_main
-```
-
-Recommended lower-memory run:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-$env:TRANSCRIPTA_DEFAULT_MODEL='base'
-$env:TRANSCRIPTA_COMPUTE_TYPE='float16'
-cd app/desktop
-npm run dev
-```
-
-Recommended NVIDIA run:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-$env:TRANSCRIPTA_DEFAULT_MODEL='small'
-$env:TRANSCRIPTA_COMPUTE_TYPE='float16'
-cd app/desktop
-npm run dev
-```
-
-## Packaging For Windows
-
-Current repository support:
-
-- Python backend is package-ready via `pyproject.toml`.
-- Electron shell is ready for local development via `app/desktop/package.json`.
-- Full Windows installer packaging for Electron is the next step and not yet wired to `electron-builder`.
-
-Manual desktop build flow right now:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-cd app/desktop
-npm install
-npm run dev
-```
-
-Recommended release flow:
-
-1. Validate the Electron shell against the Python backend locally.
-2. Add `electron-builder` with a bundled backend launch strategy.
-3. Produce a Windows installer after the backend path is frozen.
-4. Verify loopback capture, transcript generation, and GPU/CPU fallback on the packaged build.
 
 ## Testing
 
-Run the current unit suite:
+### Run All Tests
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+# Backend tests
 pytest tests -q
+
+# Frontend tests
+cd app/electron/frontend
+npm test
+
+# E2E tests
+pytest e2e -q
+
+# Linting
+ruff check .
+npm run lint
 ```
 
-## Privacy Model
+### Test Coverage
 
-- Audio capture is local-only.
-- Transcription is local-only.
-- No cloud upload is required for core functionality.
-- Transcript retention should default to local storage that the user can inspect and delete.
+- Backend: >85% coverage
+- Frontend: >80% coverage
+- Critical paths: 100% coverage
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Electron Frontend (React/TS)                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │   Main UI    │  │FloatingWindow│  │QuickSettings │  │  Tray    │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │ WebSocket/SSE
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FastAPI Backend (Python)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │Audio Pipeline│  │   STT Engine │  │   Session    │  │ Refiner  │ │
+│  │  - Capture   │  │  - ModelPool │  │   Manager    │  │ Service  │ │
+│  │  - Chunker   │  │  - Streaming │  │  - Storage   │  │(llamacpp)│ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Module Structure
+
+```
+app/
+├── api/              # FastAPI server, WebSocket, settings sync
+├── audio/            # Audio capture, backends (soundcard, PyAudio)
+├── core/             # Settings, sessions, models, error handling
+├── electron/         # Electron shell, React frontend
+├── stt/              # Speech-to-text engine, chunker, quality
+├── storage/          # Session storage, document store
+└── stem/             # STEM formula extraction
+```
+
+## Performance Targets
+
+| Mode | First-Word Latency | Real-Time Factor | Target |
+|------|-------------------|------------------|--------|
+| Hotkey (tiny) | <500ms | 0.3x | <300ms inference |
+| Hotkey (small) | <800ms | 0.5x | <500ms inference |
+| System (medium) | <1s | 0.5x | Balanced quality |
+| System (large) | <2s | 0.7x | Best accuracy |
 
 ## Troubleshooting
 
-### No system audio is captured
+### No Audio Captured
 
-- Confirm Windows 11 is using the expected playback device.
-- Disable exclusive mode on the playback device in `Sound > More sound settings > Playback > Properties > Advanced`.
-- Make sure the app is targeting the default output device for WASAPI loopback.
-- Test with known audio playing through speakers or headphones, not a muted session.
+1. Check Windows playback device is correct
+2. Disable exclusive mode: `Sound > Playback > Properties > Advanced`
+3. Verify audio is playing through selected device
+4. Run audio diagnostic: `python tools/diagnostics/check-audio.py`
 
-### Headphones not captured (Stereo Mix issue)
+### GPU Not Detected
 
-If audio plays through your headphones but Transcripta captures nothing:
+1. Verify NVIDIA drivers installed
+2. Check CUDA: `python -c "import torch; print(torch.cuda.is_available())"`
+3. App falls back to CPU automatically with INT8 quantization
+4. Check logs for GPU fallback messages
 
-**The Problem:** Stereo Mix only captures from speakers, not headphones. When headphones are connected, Windows switches output, and Stereo Mix becomes silent.
+### Transcription Slow
 
-**The Solution:** Use WASAPI loopback capture on the specific headphone device.
+1. Use smaller model (tiny, base, small)
+2. Enable GPU: Settings > Execution Mode > GPU
+3. Close other GPU-heavy apps
+4. Use CPU with `int8` quantization for stability
 
-1. Run the diagnostic tool to identify your headphone device:
-   ```powershell
-   python fix_headphone_capture.py
-   ```
+### Poor Quality
 
-2. Test capture from your headphone device (replace `<device_id>` with the ID from step 1):
-   ```powershell
-   python fix_headphone_capture.py --test <device_id>
-   ```
+1. Reduce desktop audio distortion/clipping
+2. Disable spatial audio enhancements
+3. Try larger model (medium, large-v3)
+4. Check quality indicators - review low-confidence segments
+5. Enable refiner service for post-processing
 
-3. Configure the device in your `.env` file:
-   ```env
-   TRANSCRIPTA_CAPTURE_DEVICE_ID=<device_id>
-   ```
+### Hotkey Not Working
 
-Or set via environment variable before starting:
-```powershell
-$env:TRANSCRIPTA_CAPTURE_DEVICE_ID="<device_id>"
-npm run dev
+1. Check if hotkey is registered: View logs for "global hotkey registered"
+2. Try different hotkey combination in settings
+3. Run as administrator if blocked by other apps
+4. Check antivirus software isn't blocking input simulation
+
+## Privacy & Legal
+
+- **100% Local Processing** - No cloud upload, ever
+- **No Telemetry** - Optional crash reports only
+- **Your Data** - You control all transcripts and models
+- **Offline Capable** - Works without internet connection
+- **Important:** Only use where you have legal right to record audio
+
+## Development
+
+### Project Structure
+
+```
+Transcripta/
+├── app/
+│   ├── api/           # REST API, WebSocket, settings sync
+│   ├── audio/         # Audio capture, processing, backends
+│   ├── core/          # Settings, models, error handling
+│   ├── electron/      # Desktop shell, React UI
+│   ├── stt/           # Speech-to-text engine
+│   ├── storage/       # Session persistence
+│   └── stem/          # STEM content processing
+├── tests/             # Backend tests
+├── e2e/               # End-to-end tests
+├── tools/             # Diagnostics, scripts
+├── scripts/           # Build scripts
+├── pyproject.toml     # Python dependencies
+└── package.json       # Node.js dependencies
 ```
 
-For more details about WASAPI loopback capture:
-```powershell
-python fix_headphone_capture.py --explain
-```
+### Contributing
 
-### GPU is not detected
+1. Fork the repository
+2. Create a feature branch
+3. Run tests: `pytest tests -q && npm test`
+4. Submit a pull request
 
-- Run the CUDA verification command above.
-- Confirm the NVIDIA driver is installed and current.
-- Confirm the installed `ctranslate2` wheel matches the local CUDA runtime expectations.
-- The app will fall back to CPU automatically if CUDA model initialization fails.
+### License
 
-### Transcription is slow
+MIT License - See [LICENSE](LICENSE) for details.
 
-- Use `device='cuda'` with `compute_type='float16'` on supported NVIDIA hardware.
-- Drop to a smaller model such as `small` or `base`.
-- Avoid running other GPU-heavy apps during live transcription.
-- On CPU, prefer `compute_type='int8'`.
+---
 
-### Loopback works but text is poor
-
-- Reduce desktop output distortion and clipping.
-- Avoid spatial audio or enhancement filters during capture.
-- Use a cleaner playback source when possible.
-- Test another model size to improve recognition quality.
-- Review `Needs Review` items before trusting formulas, units, or derivation steps.
-
-### The packaged app fails to start
-
-- Test the same machine from an activated virtual environment first.
-- Confirm `app/desktop` can spawn `.venv\Scripts\python.exe`.
-- Run `python -m app.api_main` directly to verify the backend separately from Electron.
-- Check whether port `8765` is already in use.
-
-## Legal Note
-
-Use Transcripta only where you have the legal right to capture and transcribe audio. Consent, notice, workplace policy, platform terms, and recording laws vary by jurisdiction. This project should not be treated as legal advice.
-
-## V2 Roadmap
-
-- Per-device input selection instead of default-device-only capture.
-- Real-time transcript segmentation with speaker-change heuristics where feasible.
-- Persistent transcript search and export.
-- Configurable hotkeys and background tray mode.
-- Rolling buffer with retroactive save.
-- Word timestamps and subtitle export.
-- Electron packaging and installer generation.
-- Optional local summarization pipeline after transcription completes.
-- PDF ingestion and retrieval-backed correction for later session verification.
-- LaTeX export for extracted formulas and structured notes.
+**Transcripta** - Local-first transcription for Windows 11

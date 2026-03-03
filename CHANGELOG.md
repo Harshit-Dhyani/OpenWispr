@@ -7,52 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Project root structure reorganization for better maintainability
-- Centralized configuration package (`config/`)
-- Documentation organization into `docs/architecture/`, `docs/deployment/`, `docs/operations/`
-- Electron main process files organized under `app/desktop/main/` (moved from `ui-electron/`)
-
 ### Changed
 
-- Moved `docs/ARCHITECTURE_PLAN.md` → `docs/architecture/ARCHITECTURE_PLAN.md`
-- Moved `docs/DEPLOYMENT.md` → `docs/deployment/DEPLOYMENT.md`
-- Moved `docs/OPERATIONS.md` → `docs/operations/OPERATIONS.md`
-- Moved `ui-electron/` → `app/desktop/` for better project organization
+- Project root structure reorganization for better maintainability
+- Moved documentation to organized structure (`docs/architecture/`, `docs/deployment/`, `docs/operations/`)
+- Moved Electron main process files to `app/electron/main/` (from `ui-electron/`)
 
 ## [0.1.0] - 2026-03-01
 
 ### Added
 
-- Initial release with core transcription functionality
-- Real-time speech-to-text using faster-whisper
-- System audio capture via WASAPI loopback
-- Electron desktop shell
-- Session-based transcript management
-- STEM formula detection and review
-- Quality filtering (filler words, hallucinations)
+#### Core Transcription
+- Dual transcription modes (Hotkey/Wispr and System)
+- faster-whisper backend with multiple model support
+- Real-time streaming transcription with partial results
+- Local audio capture (microphone + system loopback via WASAPI)
+- Voice Activity Detection (VAD) for speech segmentation
+- Audio visualization with frequency-based levels
+- Model pool for efficient GPU memory management
+- Auto-optimization based on system profiling
+
+#### Quality Features
+- Filler word filtering (um, uh, like, etc.)
+- Hallucination detection and filtering
+- Text stabilization for partial results
+- Dictation cleanup and normalization
+- Confidence thresholds for transcription quality
+
+#### Refiner Features
+- Local LLM text refinement via llama.cpp
+- Multiple refinement modes (off, strict, polished)
+- Technical token preservation during refinement
+
+#### Settings & Configuration
+- Per-mode settings (Hotkey vs System modes)
+- Bidirectional settings sync between frontend and backend
+- Settings migrations for version upgrades
+- Validation with pydantic models
+
+#### API & Communication
+- FastAPI REST API for backend operations
+- WebSocket for real-time bidirectional updates
+- SSE (Server-Sent Events) for transcription events
+- Health monitoring endpoints
+
+#### Frontend
+- Electron + React + TypeScript application
+- Multiple window types (main, floating, quick settings)
 - Global hotkey support (Ctrl+Shift+T)
-- Floating transcription window
+- System tray integration
+- Settings UI with validation
+
+#### Session Management
+- JSONL-based session storage
+- Export to multiple formats (TXT, JSON, SRT, VTT)
+- STEM formula extraction and review
+- Session recovery mechanisms
+
+#### Performance
+- GPU/CPU auto-fallback for hardware compatibility
+- Backpressure handling for audio streaming
+- Fast chunker with adaptive sizing
+- Real-time performance metrics
+
+#### Infrastructure
+- Python 3.11 backend
+- CTranslate2 for model inference
+- PyAudioWPatch for Windows audio capture
 - Model download manager
-- Auto-optimization based on PC specs
-- GPU/CPU execution modes
-- Export to multiple formats (JSON, TXT, Markdown)
-
-### Features
-
-- **Live Transcription**: Real-time transcription with configurable latency modes
-- **Privacy-First**: All processing local, no cloud dependencies
-- **STEM-Aware**: Detects and flags mathematical/scientific content for review
-- **Quality Controls**: Confidence thresholds, filler word filtering
-- **Session Management**: Automatic saving and organization of transcripts
-- **Hardware Optimization**: Automatic GPU detection and optimization
-
-### Technical
-
-- Python 3.11 backend with FastAPI
-- Electron frontend with React
-- faster-whisper for STT
-- CTranslate2 for inference
-- PyAudioWPatch for audio capture
-- Windows 11 primary support

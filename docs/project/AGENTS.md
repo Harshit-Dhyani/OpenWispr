@@ -169,7 +169,7 @@ When modifying audio processing code, verify these invariants or the pipeline wi
 #### Symptom: SSE disconnect storms
 **Root Cause**: Missing error handling in EventSource reconnection
 **Fix**: Add 1s delay and max retry limit
-**Location**: `app/desktop/frontend/src/hooks/useEventSource.ts`
+**Location**: `app/electron/frontend/src/hooks/useEventSource.ts`
 
 ### Debugging Workflow
 

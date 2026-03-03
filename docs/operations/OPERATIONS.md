@@ -9,9 +9,8 @@ Production operations guide for running and maintaining the Transcripta desktop 
 3. [Performance Monitoring](#3-performance-monitoring)
 4. [Common Issues and Solutions](#4-common-issues-and-solutions)
 5. [Backup and Recovery](#5-backup-and-recovery)
-6. [Updating the Application](#6-updating-the-application)
-7. [Health Check Endpoints](#7-health-check-endpoints)
-8. [Emergency Procedures](#8-emergency-procedures)
+6. [Health Check Endpoints](#6-health-check-endpoints)
+7. [Emergency Procedures](#7-emergency-procedures)
 
 ---
 
@@ -29,7 +28,7 @@ Start the application from source:
 python -m app.api_main
 
 # Start the Electron shell (starts backend automatically)
-cd app/desktop
+cd app/electron
 npm run dev
 ```
 
@@ -47,7 +46,16 @@ After packaging with electron-builder:
 
 ### Environment Variables
 
-Configure before starting:
+Configure before starting (from `app/core/config.py`):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TRANSCRIPTA_DEVICE` | Execution device | `cuda` or `cpu` |
+| `TRANSCRIPTA_COMPUTE_TYPE` | GPU compute precision | `float16` or `int8` |
+| `TRANSCRIPTA_DEFAULT_MODEL` | Default ASR model | `small` |
+| `TRANSCRIPTA_LOG_LEVEL` | Logging verbosity | `INFO` |
+| `TRANSCRIPTA_API_HOST` | API bind address | `127.0.0.1` |
+| `TRANSCRIPTA_API_PORT` | API port | `8765` |
 
 ```powershell
 # GPU/CPU configuration
@@ -59,9 +67,6 @@ $env:TRANSCRIPTA_DEFAULT_MODEL="small"  # tiny, base, small, medium, large-v3
 
 # Logging
 $env:TRANSCRIPTA_LOG_LEVEL="INFO"       # DEBUG, INFO, WARNING, ERROR
-
-# Storage location
-$env:TRANSCRIPTA_EXPORT_ROOT="D:\\TranscriptaSessions"
 ```
 
 ### Graceful Shutdown
@@ -95,17 +100,25 @@ Get-Process | Where-Object {$_.ProcessName -in @("python","electron","Transcript
 
 | Location | Description |
 |----------|-------------|
-| `sessions/<session-slug>/logs/app.log` | Per-session structured logs (JSON) |
-| `app/desktop/` | Electron console output (dev mode) |
+| `sessions/<session-slug>/logs/app.log` | Per-session structured logs (JSON Lines format) |
+| `sessions/<session-slug>/logs/app.log.1` ... `app.log.5` | Rotated log files (1MB per file, 5 backups) |
 | Console | Real-time backend API output |
 
 ### Log Format
 
-Logs are structured JSON (JSON Lines format):
+Logs are structured JSON (JSON Lines format) from `app/core/logging_utils.py`:
 
 ```json
-{"time": "2024-01-15T09:23:45", "level": "INFO", "logger": "transcripta", "message": "Session started", "session_id": "abc123"}
+{"time": "2024-01-15T09:23:45", "level": "INFO", "logger": "transcripta", "message": "Session started"}
 ```
+
+### Log Levels (from `app/core/logging_utils.py`)
+
+- `DEBUG` - Detailed diagnostic information
+- `INFO` - General operational information
+- `WARNING` - Warning messages
+- `ERROR` - Error messages
+- `CRITICAL` - Critical errors
 
 ### Viewing Logs
 
@@ -122,7 +135,7 @@ Get-Content sessions\<session-name>\logs\app.log |
 Get-ChildItem sessions -Recurse -Filter "app.log" | 
     ForEach-Object { Get-Content $_.FullName | ConvertFrom-Json } |
     Where-Object { $_.level -in @("ERROR", "WARNING") } |
-    Select-Object time, level, message, session_id
+    Select-Object time, level, message
 
 # Export logs for analysis
 Get-ChildItem sessions -Recurse -Filter "app.log" |
@@ -132,17 +145,6 @@ Get-ChildItem sessions -Recurse -Filter "app.log" |
 # Tail with filtering
 Get-Content sessions\study-session\logs\app.log -Wait -Tail 50 | 
     Where-Object { $_ -match '"level":"(ERROR|WARNING)"' }
-```
-
-### Log Rotation
-
-Logs rotate at 1MB per file with 5 backups (`app.log.1` through `app.log.5`).
-
-### Electron Logs
-
-```powershell
-# View Electron console (DevTools)
-# In running app: Ctrl+Shift+I or F12
 ```
 
 ---
@@ -161,38 +163,37 @@ while ($true) {
     Start-Sleep -Seconds 5
 }
 
-# Check CUDA device availability
-python -c "import ctranslate2; print('CUDA devices:', ctranslate2.get_cuda_device_count())"
-
 # One-time GPU check
 & "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe" --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu --format=csv
 ```
 
-### Latency Metrics
+### Health Endpoint Metrics
 
-Query via health endpoint:
+Query via health endpoint from `app/api/server.py`:
 
 ```powershell
 # Get current health metrics
 $response = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 $response.health
-
-# Key metrics to monitor:
-# - queue_depth: Pending transcription chunks
-# - dropped_stt_chunks: Lost audio due to backlog
-# - stt_backpressure_state: "normal", "warning", or "critical"
-# - estimated_backlog_seconds: Processing delay
-# - dropped_frames: Audio capture issues
 ```
 
-**Expected Response:**
+**Health Response Fields** (from `app/stt/fast_engine.py` lines 719-726):
+
+| Field | Description |
+|-------|-------------|
+| `gpu_mode` | Device/compute type (e.g., `cuda/float16`, `cpu/int8`) |
+| `queue_depth` | Pending transcription chunks in queue |
+| `dropped_stt_chunks` | Lost audio chunks due to backlog |
+| `stt_backpressure_state` | `"normal"`, `"elevated"`, or `"critical"` |
+| `estimated_backlog_seconds` | Estimated processing delay in seconds |
+
+**Actual Response Format** (from `app/api/server.py` lines 1873-1879):
+
 ```json
 {
   "ok": true,
   "health": {
-    "audio_stream_active": true,
     "gpu_mode": "cuda/float16",
-    "execution_mode": "auto",
     "queue_depth": 2,
     "dropped_stt_chunks": 0,
     "stt_backpressure_state": "normal",
@@ -205,11 +206,16 @@ $response.health
       "runtime_device": "cuda",
       "loaded_at": 1699999999.0
     }
+  },
+  "hotkey": {
+    "is_recording": false,
+    "session_id": null,
+    "duration_ms": 0
   }
 }
 ```
 
-### Model Cache Status
+### Model Cache Management
 
 ```powershell
 # Check cached models
@@ -226,7 +232,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/preload" -Method POST -
 
 ```powershell
 # CPU and memory usage
-Get-Process | Where-Object { $_.ProcessName -match "transcripta|python|electron" } |
+Get-Process | Where-Object { $_.ProcessName -match "python|electron" } |
     Select-Object Name, CPU, WorkingSet, PagedMemorySize
 
 # Disk usage for sessions
@@ -238,28 +244,6 @@ Get-ChildItem sessions |
 
 # Check available disk space
 Get-Volume | Where-Object { $_.DriveLetter -eq 'C' } | Select-Object DriveLetter, SizeRemaining, Size
-```
-
-### Session Snapshot
-
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/session" -Method GET | ConvertTo-Json -Depth 10
-```
-
-### Event Stream (SSE) Monitoring
-
-```powershell
-# Connect to SSE endpoint for real-time events
-$client = New-Object System.Net.WebClient
-$stream = $client.OpenRead("http://127.0.0.1:8765/api/events")
-$reader = New-Object System.IO.StreamReader($stream)
-
-while ($null -ne ($line = $reader.ReadLine())) {
-    if ($line -match "^data:") {
-        $data = $line.Substring(5) | ConvertFrom-Json
-        Write-Host "[$($data.type)] $($data.payload)"
-    }
-}
 ```
 
 ### Automated Health Monitoring Script
@@ -297,12 +281,9 @@ while ($true) {
 **Symptoms:** Falls back to CPU mode, slow transcription.
 
 ```powershell
-# Verify CUDA installation
+# Check CUDA device availability
 python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 python -c "import ctranslate2; print('CUDA devices:', ctranslate2.get_cuda_device_count())"
-
-# Reinstall GPU dependencies
-pip install --force-reinstall ctranslate2 faster-whisper
 
 # Check NVIDIA driver
 nvidia-smi
@@ -347,21 +328,18 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/devices/default/probe?duration
 
 ### High Latency / Backpressure
 
-**Symptoms:** `stt_backpressure_state` shows "warning" or "critical".
+**Symptoms:** `stt_backpressure_state` shows "elevated" or "critical".
 
 ```powershell
-# Check current performance mode
-(Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/session").session.live_mode
-
-# Check queue depth
-(Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health").health.queue_depth
+# Check current health metrics
+(Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health").health
 ```
 
 **Solutions:**
 - Reduce model size (tiny/base for CPU, small for GPU)
-- Switch to lower latency mode: `live_mode="realtime"` or `"low_latency"`
+- Switch to lower latency profile via settings
 - Close other GPU-intensive applications
-- Verify GPU is being used: `(Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health").health.gpu_mode`
+- Clear model cache: `Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/cache" -Method DELETE`
 
 ### Out of Memory (OOM)
 
@@ -416,7 +394,16 @@ Get-Content sessions\<session-name>\transcript.jsonl |
 
 ## 5. Backup and Recovery
 
-### Critical Files to Backup
+### Settings Storage Location
+
+Settings are stored in `user_settings.json` (from `app/core/settings_manager.py`):
+
+| Location | Description |
+|----------|-------------|
+| `%APPDATA%/Transcripta/settings.json` | Windows app data directory |
+| `user_settings.json` | Application root directory (fallback) |
+
+### Session Files to Backup
 
 | File | Purpose |
 |------|---------|
@@ -450,15 +437,6 @@ Get-ChildItem $backupRoot |
 Write-Host "Backup completed: $backupDir"
 ```
 
-### Scheduled Backup with Task Scheduler
-
-```powershell
-# Register daily backup
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File $PWD\backup-transcripta.ps1"
-$trigger = New-ScheduledTaskTrigger -Daily -At "02:00"
-Register-ScheduledTask -TaskName "TranscriptaBackup" -Action $action -Trigger $trigger
-```
-
 ### Robocopy Backup (Recommended)
 
 ```powershell
@@ -479,7 +457,7 @@ Get-ChildItem "D:\Backups\Transcripta" |
     Remove-Item -Recurse -Force
 ```
 
-### Recovery Procedures
+### Session Recovery Procedures (from `app/storage/session_store.py`)
 
 #### Recover from Partial Session
 
@@ -489,7 +467,7 @@ $lines = Get-Content sessions\<session>\transcript.jsonl
 $segments = $lines | ConvertFrom-Json
 
 # Rebuild transcript
-$segments | ForEach-Object { "$($_.start): $($_.text)" } | Out-File recovered.txt
+$segments | ForEach-Object { "[$($_.start) - $($_.end)] $($_.text)" } | Out-File recovered.txt
 
 # Regenerate session metadata
 if ($segments) {
@@ -500,7 +478,6 @@ if ($segments) {
         title = "Recovered Session"
         created_at = $first.timestamp
         updated_at = $last.timestamp
-        duration_seconds = $last.end
         is_active = $false
     }
     $metadata | ConvertTo-Json | Set-Content sessions\<session>\session.json
@@ -531,76 +508,7 @@ Get-ChildItem sessions | ForEach-Object {
 
 ---
 
-## 6. Updating the Application
-
-### Update Process
-
-```powershell
-# 1. Stop all running sessions
-Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/session/stop" -Method POST
-
-# 2. Backup current installation
-$version = (Get-Content package.json | ConvertFrom-Json).version
-Compress-Archive -Path . -DestinationPath "..\transcripta-backup-$version.zip"
-
-# 3. Pull latest code
-git pull origin main
-
-# 4. Update Python dependencies
-.\venv\Scripts\Activate.ps1
-pip install -e .[dev] --upgrade
-
-# 5. Update Electron dependencies
-cd app/desktop
-npm install
-
-# 6. Run tests
-pytest tests\ -q
-
-# 7. Restart application
-npm run dev
-```
-
-### Version Verification
-
-```powershell
-# Python backend version
-python -c "import app; print(app.__version__)"
-
-# Electron version
-node -e "console.log(require('./package.json').version)"
-
-# Check all component versions
-Write-Host "Python packages:"
-pip list | Select-String -Pattern "faster-whisper|ctranslate2|fastapi|uvicorn"
-
-Write-Host "Node packages:"
-npm list electron electron-builder
-```
-
-### Model Updates
-
-Models are cached in `models/` directory. To refresh:
-
-```powershell
-# Clear model cache via API
-Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/cache" -Method DELETE
-
-# Remove model files (forces re-download)
-Remove-Item -Path models -Recurse -Force
-New-Item -ItemType Directory -Path models
-
-# Preload updated model
-Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/preload" -Method POST -Body '{"model_name":"small","execution_mode":"auto"}' -ContentType "application/json"
-
-# Check model download progress
-# Monitor via SSE events on /api/events or check logs
-Get-Content sessions\*\logs\app.log -Tail 20 | Select-String -Pattern "model|download"
-```
-
----
-
-## 7. Health Check Endpoints
+## 6. Health Check Endpoints
 
 ### API Health Endpoint
 
@@ -609,14 +517,13 @@ Get-Content sessions\*\logs\app.log -Tail 20 | Select-String -Pattern "model|dow
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 ```
 
-**Expected Response:**
+**Actual Response** (from `app/api/server.py` lines 1873-1879):
+
 ```json
 {
   "ok": true,
   "health": {
-    "audio_stream_active": true,
     "gpu_mode": "cuda/float16",
-    "execution_mode": "auto",
     "queue_depth": 2,
     "dropped_stt_chunks": 0,
     "stt_backpressure_state": "normal",
@@ -629,6 +536,11 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
       "runtime_device": "cuda",
       "loaded_at": 1699999999.0
     }
+  },
+  "hotkey": {
+    "is_recording": false,
+    "session_id": null,
+    "duration_ms": 0
   }
 }
 ```
@@ -644,18 +556,14 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 | `/api/models/cache` | GET/DELETE | Model cache status/clear |
 | `/api/models/preload` | POST | Preload model into cache |
 | `/api/events` | GET | SSE event stream |
+| `/api/system/profile` | GET | Hardware profile |
+| `/api/system/optimize` | GET | Auto-optimized settings |
 
 ### Session Status
 
 ```powershell
 # Get full session snapshot
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/session"
-
-# Key fields:
-# - session.status: "idle", "running", "stopped", "error"
-# - health.audio_stream_active: Boolean
-# - health.last_error: Last error message
-# - runtime_revision: Incrementing counter for changes
 ```
 
 ### Expected Health States
@@ -664,7 +572,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/session"
 |-------|---------|--------|
 | `ok: true` | All systems operational | None |
 | `stt_backpressure_state: normal` | Processing keeping up | None |
-| `stt_backpressure_state: warning` | Queue building | Monitor closely |
+| `stt_backpressure_state: elevated` | Queue building | Monitor closely |
 | `stt_backpressure_state: critical` | Falling behind | Reduce load or restart |
 | `ok: false` | API unreachable | Check if app is running |
 
@@ -676,7 +584,6 @@ $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health" -Method GET 
 
 if ($null -eq $health -or $health.ok -ne $true) {
     Write-Error "Health check failed"
-    # Restart logic here
     exit 1
 }
 
@@ -690,19 +597,33 @@ if ($health.health.dropped_stt_chunks -gt 0) {
 }
 
 Write-Host "System healthy - meter: $($health.meter_value), queue: $($health.health.queue_depth)"
+```
 
 ---
 
-## 8. Emergency Procedures
+## 7. Emergency Procedures
+
+### Error Categories and Recovery (from `app/core/error_handler.py`)
+
+| Category | Error Type | User Action |
+|----------|-----------|-------------|
+| `AUDIO_DEVICE_DISCONNECTED` | Device unplugged | Reconnect device or switch to default |
+| `AUDIO_PERMISSION_DENIED` | No mic access | Grant permission in Windows Settings |
+| `AUDIO_BACKEND_FAILURE` | Driver issue | Restart Windows Audio service |
+| `MODEL_OOM` | Out of GPU memory | Switch to CPU mode or smaller model |
+| `MODEL_NOT_FOUND` | Missing model | Wait for automatic download |
+| `SESSION_DISK_FULL` | No disk space | Free up disk space |
+| `SESSION_WRITE_PERMISSION` | Access denied | Check folder permissions |
+| `SESSION_CORRUPTED` | Data corruption | Restore from backup |
 
 ### Application Freeze
 
 ```powershell
 # Kill all Transcripta processes
-Get-Process | Where-Object { $_.ProcessName -match "transcripta|electron|python" } | Stop-Process -Force
+Get-Process | Where-Object { $_.ProcessName -match "python|electron|Transcripta" } | Stop-Process -Force
 
 # Verify cleanup
-Get-Process | Where-Object { $_.ProcessName -match "transcripta|electron" }
+Get-Process | Where-Object { $_.ProcessName -match "python|electron|Transcripta" }
 ```
 
 ### Session Recovery After Crash
@@ -716,7 +637,7 @@ Get-ChildItem sessions | ForEach-Object {
         [PSCustomObject]@{
             Name = $_.Name
             Status = $session.status
-            Started = $session.started_at
+            Started = $session.created_at
             Segments = (Get-Content "$($_.FullName)\transcript.jsonl" | Measure-Object).Count
         }
     }
@@ -732,17 +653,6 @@ if (Test-Path "$crashedSession\transcript.jsonl") {
 }
 ```
 
-### GPU Recovery
-
-```powershell
-# Reset NVIDIA GPU (requires admin)
-nvidia-smi --gpu-reset -i 0
-
-# Or restart display driver
-# WARNING: Will cause screen flicker
-# devcon restart "PCI\VEN_10DE*"
-```
-
 ### Audio System Reset
 
 ```powershell
@@ -751,9 +661,6 @@ Stop-Service audiosrv -Force
 Stop-Service AudioEndpointBuilder -Force
 Start-Service AudioEndpointBuilder
 Start-Service audiosrv
-
-# Clear audio device cache
-Remove-Item -Path "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\counters.dat" -Force -ErrorAction SilentlyContinue
 ```
 
 ### Emergency Data Export
@@ -807,7 +714,7 @@ Get-ChildItem sessions -Directory | ForEach-Object {
 
 # 5. Restart application
 .\venv\Scripts\Activate.ps1
-cd app/desktop
+cd app/electron
 npm run dev
 ```
 
@@ -827,7 +734,7 @@ npm run dev
 
 ```powershell
 # Start application
-.\venv\Scripts\Activate.ps1; cd app/desktop; npm run dev
+.\venv\Scripts\Activate.ps1; cd app/electron; npm run dev
 
 # Check health
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
@@ -856,7 +763,7 @@ robocopy sessions backups\$(Get-Date -Format yyyyMMdd) /MIR
 
 | Task | Command |
 |------|---------|
-| Start dev mode | `npm run dev` (in app/desktop) |
+| Start dev mode | `npm run dev` (in app/electron) |
 | Start backend only | `python -m app.api_main` |
 | Check health | `Invoke-RestMethod http://127.0.0.1:8765/api/health` |
 | View logs | `Get-Content sessions\<slug>\logs\app.log -Wait -Tail 50` |
