@@ -7,6 +7,61 @@ import { CURRENT_SETTINGS_VERSION } from '../config/settings';
 // Re-export for backward compatibility
 export { CURRENT_SETTINGS_VERSION };
 
+function mapRuntimeModelToCatalogId(modelName?: string): string {
+  switch (modelName) {
+    case 'tiny':
+      return 'whisper-tiny';
+    case 'small':
+      return 'whisper-small';
+    case 'large-v3':
+      return 'whisper-large-v3';
+    case 'turbo':
+      return 'whisper-turbo';
+    case 'medium':
+    default:
+      return 'whisper-medium';
+  }
+}
+
+function normalizeSourceAwareSettings(data: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...data };
+  const transcription = { ...((normalized.transcription as Record<string, unknown>) ?? {}) };
+  const audio = { ...((normalized.audio as Record<string, unknown>) ?? {}) };
+  const hotkey = { ...((normalized.hotkey as Record<string, unknown>) ?? {}) };
+
+  const fallbackModel = (
+    transcription.default_asr_model_id ??
+    mapRuntimeModelToCatalogId(transcription.model_name as string | undefined)
+  ) as string;
+  const legacyHotkeyModel = hotkey.model_name
+    ? mapRuntimeModelToCatalogId(hotkey.model_name as string)
+    : undefined;
+
+  transcription.default_asr_model_id = fallbackModel;
+  transcription.microphone_asr_model_id =
+    (transcription.microphone_asr_model_id as string | undefined) ??
+    legacyHotkeyModel ??
+    fallbackModel;
+  transcription.system_asr_model_id =
+    (transcription.system_asr_model_id as string | undefined) ??
+    fallbackModel;
+
+  const captureSource = ((audio.default_capture_source as string | undefined) ??
+    (audio.captureMode as string | undefined) ??
+    'microphone') as 'microphone' | 'system';
+  audio.default_capture_source = captureSource;
+  audio.captureMode = captureSource;
+
+  if ('model_name' in hotkey) {
+    delete hotkey.model_name;
+  }
+
+  normalized.transcription = transcription;
+  normalized.audio = audio;
+  normalized.hotkey = hotkey;
+  return normalized;
+}
+
 // Migration functions for each version
 const migrations: Record<number, (data: unknown) => unknown> = {
   // Version 1 -> 2: Add missing fields and normalize structure
@@ -26,6 +81,10 @@ const migrations: Record<number, (data: unknown) => unknown> = {
       transcription: {
         model_name: (old.transcription as Record<string, unknown>)?.model_name ?? 'medium',
         default_asr_model_id: mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
+        microphone_asr_model_id:
+          mapRuntimeModelToCatalogId((old.hotkey as Record<string, unknown>)?.model_name as string | undefined) ??
+          mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
+        system_asr_model_id: mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
         refinement_mode: (old.transcription as Record<string, unknown>)?.refinement_mode ?? 'off',
         compute_type: (old.transcription as Record<string, unknown>)?.compute_type ?? 'float16',
         chunk_duration: (old.transcription as Record<string, unknown>)?.chunk_duration ?? 1.6,
@@ -46,12 +105,17 @@ const migrations: Record<number, (data: unknown) => unknown> = {
         temperature: (old.transcription as Record<string, unknown>)?.temperature ?? 0.0,
       },
       refiner: {
-        selected_model_id: (old.refiner as Record<string, unknown>)?.selected_model_id ?? 'qwen2.5-7b-instruct',
+        selected_model_id: (old.refiner as Record<string, unknown>)?.selected_model_id ?? 'qwen2.5-3b-instruct',
         runtime_enabled: (old.refiner as Record<string, unknown>)?.runtime_enabled ?? false,
+        cleanup_instructions: (old.refiner as Record<string, unknown>)?.cleanup_instructions ?? '',
         engine_preference: (old.refiner as Record<string, unknown>)?.engine_preference ?? 'llamacpp',
       },
       audio: {
-        captureMode: (old.audio as Record<string, unknown>)?.captureMode ?? 'system',
+        captureMode: (old.audio as Record<string, unknown>)?.captureMode ?? 'microphone',
+        default_capture_source:
+          (old.audio as Record<string, unknown>)?.default_capture_source ??
+          (old.audio as Record<string, unknown>)?.captureMode ??
+          'microphone',
         defaultDeviceId: (old.audio as Record<string, unknown>)?.defaultDeviceId ?? 'default',
         audio_backend: (old.audio as Record<string, unknown>)?.audio_backend ?? (old.audio as Record<string, unknown>)?.backend ?? 'auto',
         sampleRate: (old.audio as Record<string, unknown>)?.sampleRate ?? 16000,
@@ -91,7 +155,8 @@ const migrations: Record<number, (data: unknown) => unknown> = {
     return {
       ...old,
       audio: {
-        captureMode: oldAudio?.captureMode ?? 'system',
+        captureMode: oldAudio?.captureMode ?? 'microphone',
+        default_capture_source: oldAudio?.default_capture_source ?? oldAudio?.captureMode ?? 'microphone',
         defaultDeviceId: oldAudio?.defaultDeviceId ?? 'default',
         audio_backend: oldAudio?.audio_backend ?? oldAudio?.backend ?? 'auto',
         sampleRate: oldAudio?.sampleRate ?? 16000,
@@ -115,25 +180,27 @@ export function migrateSettings(data: unknown): { success: true; data: SettingsS
 
   const obj = data as Record<string, unknown>;
   const currentVersion = (obj.version as number) || 1;
+  const normalizedCurrent = normalizeSourceAwareSettings(obj);
 
   // If already at current version, just validate
   if (currentVersion >= CURRENT_SETTINGS_VERSION) {
-    const validation = validateSettings(obj);
+    const validation = validateSettings(normalizedCurrent);
     if (validation.success) {
       return { success: true, data: validation.data };
     }
     // Validation failed but we have data - try to merge with defaults
-    return { success: true, data: mergeWithDefaults(obj) };
+    return { success: true, data: mergeWithDefaults(normalizedCurrent) };
   }
 
   // Apply migrations sequentially
-  let migrated: Record<string, unknown> = obj;
+  let migrated: Record<string, unknown> = normalizedCurrent;
   for (let v = currentVersion; v < CURRENT_SETTINGS_VERSION; v++) {
     const migration = migrations[v];
     if (migration) {
       migrated = migration(migrated) as Record<string, unknown>;
     }
   }
+  migrated = normalizeSourceAwareSettings(migrated);
 
   // Final validation
   const validation = validateSettings(migrated);
@@ -188,20 +255,4 @@ export function needsMigration(data: unknown): boolean {
 export function getSettingsVersion(data: unknown): number {
   if (!data || typeof data !== 'object') return 0;
   return ((data as Record<string, unknown>).version as number) || 1;
-}
-
-function mapRuntimeModelToCatalogId(modelName?: string): string {
-  switch (modelName) {
-    case 'tiny':
-      return 'whisper-tiny';
-    case 'small':
-      return 'whisper-small';
-    case 'large-v3':
-      return 'whisper-large-v3';
-    case 'turbo':
-      return 'whisper-turbo';
-    case 'medium':
-    default:
-      return 'whisper-medium';
-  }
 }

@@ -62,13 +62,13 @@ class ModelService:
         profile = self._profiler.profile_system()
         recommendations: list[str] = []
         if not profile.gpu.available:
-            recommendations.extend(["whisper-small", "whisper-medium", "phi-3-mini-4k-instruct"])
+            recommendations.extend(["whisper-small", "whisper-medium", "qwen2.5-3b-instruct"])
         elif profile.gpu.vram_gb >= 10:
-            recommendations.extend(["whisper-large-v3", "whisper-medium", "qwen2.5-7b-instruct"])
+            recommendations.extend(["whisper-large-v3", "whisper-medium", "qwen2.5-7b-instruct", "qwen2.5-3b-instruct"])
         elif profile.gpu.vram_gb >= 5:
-            recommendations.extend(["whisper-medium", "whisper-small", "qwen2.5-7b-instruct"])
+            recommendations.extend(["whisper-medium", "whisper-small", "qwen2.5-3b-instruct"])
         else:
-            recommendations.extend(["whisper-small", "whisper-medium", "phi-3-mini-4k-instruct"])
+            recommendations.extend(["whisper-small", "whisper-medium", "qwen2.5-3b-instruct", "phi-3-mini-4k-instruct"])
         return recommendations
 
     def resolve_fallback_selection(self, category: str) -> str:

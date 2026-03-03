@@ -96,3 +96,65 @@ def test_settings_manager_persists_model_selections_and_refinement_mode(tmp_path
     assert settings.transcription.refinement_mode == "strict"
     assert settings.refiner.selected_model_id == "phi-3-mini-4k-instruct"
     assert settings.refiner.engine_preference == "llamacpp"
+
+
+def test_settings_manager_migrates_legacy_hotkey_model_name_into_source_specific_asr_fields(tmp_path):
+    settings_path = tmp_path / "user_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "general": {},
+                "transcription": {
+                    "default_asr_model_id": "whisper-large-v3",
+                },
+                "audio": {
+                    "captureMode": "system",
+                },
+                "hotkey": {
+                    "model_name": "small",
+                },
+                "advanced": {},
+                "version": 4,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manager = SettingsManager(settings_dir=tmp_path)
+    settings = manager.get_settings()
+
+    assert settings.audio.captureMode == "system"
+    assert settings.audio.default_capture_source == "system"
+    assert settings.transcription.microphone_asr_model_id == "whisper-small"
+    assert settings.transcription.system_asr_model_id == "whisper-large-v3"
+
+
+def test_settings_manager_import_persists_source_specific_asr_models_and_default_capture_source(tmp_path):
+    manager = SettingsManager(settings_dir=tmp_path)
+
+    success = manager.import_settings(
+        {
+            "general": {},
+            "transcription": {
+                "default_asr_model_id": "whisper-medium",
+                "microphone_asr_model_id": "whisper-small",
+                "system_asr_model_id": "whisper-large-v3",
+            },
+            "audio": {
+                "default_capture_source": "microphone",
+            },
+            "hotkey": {},
+            "advanced": {},
+            "version": 4,
+        }
+    )
+
+    assert success is True
+
+    reloaded_manager = SettingsManager(settings_dir=tmp_path)
+    settings = reloaded_manager.get_settings()
+
+    assert settings.audio.captureMode == "microphone"
+    assert settings.audio.default_capture_source == "microphone"
+    assert settings.transcription.microphone_asr_model_id == "whisper-small"
+    assert settings.transcription.system_asr_model_id == "whisper-large-v3"

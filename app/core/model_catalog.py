@@ -178,9 +178,27 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
             _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "model.bin", 1_000_000_000),
             _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "config.json", 512),
             _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "tokenizer.json", 1_000),
-            _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "vocabulary.txt", 1_000),
         ),
         default_runtime_config={"computeType": "float16", "threads": 8},
+    ),
+    ModelCatalogEntry(
+        id="qwen2.5-3b-instruct",
+        display_name="Qwen2.5 3B Instruct",
+        category="refiner",
+        family="qwen",
+        engine="llamacpp",
+        size_gb_estimate=1.93,
+        recommended_vram_gb=4,
+        speed_tier="fast",
+        license_note="Use under the upstream Qwen model license.",
+        description_short="Compact local refiner with better quality than ultra-small models and much lower VRAM than 7B.",
+        why_choose_this="Best small local refiner when you want strong cleanup quality on a 4-6GB GPU or CPU-first setup.",
+        runtime_model_name=None,
+        enabled_runtime=False,
+        download_artifacts=(
+            _hf_file("Qwen/Qwen2.5-3B-Instruct-GGUF", "qwen2.5-3b-instruct-q4_k_m.gguf", 1_700_000_000),
+        ),
+        default_runtime_config={"threads": 6, "gpuLayers": 24},
     ),
     ModelCatalogEntry(
         id="qwen2.5-7b-instruct",
@@ -256,7 +274,7 @@ def get_model_catalog_entry(model_id: str) -> ModelCatalogEntry | None:
 def get_default_model_id(category: ModelCategory) -> str:
     if category == "asr":
         return "whisper-medium"
-    return "qwen2.5-7b-instruct"
+    return "qwen2.5-3b-instruct"
 
 
 def runtime_name_for_model(model_id: str) -> str | None:

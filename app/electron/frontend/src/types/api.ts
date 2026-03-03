@@ -50,6 +50,9 @@ export type Segment = {
   end: number;
   text: string;
   display_text: string;
+  raw_text?: string;
+  refined_text?: string;
+  was_refined?: boolean;
   language: string;
   avg_logprob?: number | null;
   no_speech_prob?: number | null;
@@ -64,6 +67,33 @@ export type Segment = {
   words?: Word[];
   latency_ms?: number;
   is_partial?: boolean;
+};
+
+export type DraftPartialPayload = {
+  session_id: string;
+  segment_id: string;
+  revision: number;
+  stream_id: string;
+  text: string;
+  start: number;
+  end: number;
+  committed_text: string;
+  draft_suffix: string;
+  metrics?: Record<string, number | null>;
+};
+
+export type CommitFinalPayload = DraftPartialPayload & {
+  segment: Segment;
+};
+
+export type RefineFinalPayload = {
+  session_id: string;
+  segment_id: string;
+  base_revision: number;
+  refinement_mode: 'off' | 'strict' | 'polished';
+  refiner_model_id?: string | null;
+  used_runtime: boolean;
+  segment: Segment;
 };
 
 export type Formula = {
@@ -150,9 +180,14 @@ export type ModelInstallState = {
 
 export type ModelDownloadState = {
   model_id: string;
-  status: 'idle' | 'downloading' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+  download_id?: string;
+  correlation_id?: string;
+  attempt?: number;
+  current_artifact?: string | null;
+  status: 'idle' | 'downloading' | 'retrying' | 'verifying' | 'completed' | 'failed' | 'cancelled';
   bytes_downloaded: number;
   total_bytes: number;
+  total_bytes_known?: boolean;
   progress: number;
   speed_bytes_per_sec: number;
   error?: string | null;
@@ -241,6 +276,7 @@ export type HotkeyState = {
 // ============================================
 
 export type HotkeyStartRequest = {
+  capture_source?: 'microphone' | 'system' | null;
   device_id?: string | null;
   model_name?: string;
   language_mode?: string;
@@ -256,10 +292,13 @@ export type HotkeyStartResponse = {
 export type HotkeyStopResponse = {
   final_transcription: string;
   raw_transcription?: string;
+  refined_transcription?: string | null;
   duration_ms: number;
   segment_count: number;
   source_backend?: string;
   language_used?: string;
+  refinement_mode?: 'off' | 'strict' | 'polished';
+  refiner_model_id?: string | null;
 };
 
 export type HotkeyStatusResponse = {
@@ -329,6 +368,7 @@ export type StartSessionRequest = {
   output_root: string;
   model_name: string;
   language_mode: string;
+  capture_source?: 'system' | 'microphone' | null;
   device_id?: string | null;
   live_mode?: string;
   execution_mode?: string;

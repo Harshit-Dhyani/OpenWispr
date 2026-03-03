@@ -79,6 +79,8 @@ export type GeneralSettings = z.infer<typeof generalSettingsSchema>;
 export const transcriptionSettingsSchema = z.object({
   model_name: z.enum(VALID_MODEL_NAMES).default(ModelConstants.DEFAULT_MODEL_NAME),
   default_asr_model_id: z.string().default('whisper-medium'),
+  microphone_asr_model_id: z.string().default('whisper-medium'),
+  system_asr_model_id: z.string().default('whisper-medium'),
   refinement_mode: z.enum(VALID_REFINEMENT_MODES).default(RefinerConstants.DEFAULT_REFINEMENT_MODE),
   compute_type: z.enum(VALID_COMPUTE_TYPES).default(ModelConstants.DEFAULT_COMPUTE_TYPE),
   chunk_duration: z.number()
@@ -142,6 +144,7 @@ export type TranscriptionSettings = z.infer<typeof transcriptionSettingsSchema>;
 export const refinerSettingsSchema = z.object({
   selected_model_id: z.string().default(RefinerConstants.DEFAULT_MODEL_ID),
   runtime_enabled: z.boolean().default(false),
+  cleanup_instructions: z.string().default(''),
   engine_preference: z.enum(VALID_REFINER_ENGINES).default(RefinerConstants.DEFAULT_ENGINE_PREFERENCE),
 });
 
@@ -151,7 +154,8 @@ export type RefinerSettings = z.infer<typeof refinerSettingsSchema>;
 // Audio Settings Schema
 // ============================================
 export const audioSettingsSchema = z.object({
-  captureMode: z.enum(['system', 'microphone']).default(AudioConstants.DEFAULT_CAPTURE_MODE),
+  captureMode: z.enum(['system', 'microphone']).default('microphone'),
+  default_capture_source: z.enum(['system', 'microphone']).default('microphone'),
   defaultDeviceId: z.string().default(AudioConstants.DEFAULT_CAPTURE_DEVICE_ID),
   audio_backend: z.enum(['auto', 'pyaudio', 'soundcard']).default(AudioConstants.DEFAULT_BACKEND),
   sampleRate: z.coerce.number().refine(
@@ -234,6 +238,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   transcription: {
     model_name: ModelConstants.DEFAULT_MODEL_NAME,
     default_asr_model_id: 'whisper-medium',
+    microphone_asr_model_id: 'whisper-medium',
+    system_asr_model_id: 'whisper-medium',
     refinement_mode: RefinerConstants.DEFAULT_REFINEMENT_MODE,
     compute_type: ModelConstants.DEFAULT_COMPUTE_TYPE,
     chunk_duration: AudioConstants.DEFAULT_CHUNK_SECONDS,
@@ -258,10 +264,12 @@ export const DEFAULT_SETTINGS: SettingsState = {
   refiner: {
     selected_model_id: RefinerConstants.DEFAULT_MODEL_ID,
     runtime_enabled: false,
+    cleanup_instructions: '',
     engine_preference: RefinerConstants.DEFAULT_ENGINE_PREFERENCE,
   },
   audio: {
-    captureMode: AudioConstants.DEFAULT_CAPTURE_MODE,
+    captureMode: 'microphone',
+    default_capture_source: 'microphone',
     defaultDeviceId: AudioConstants.DEFAULT_CAPTURE_DEVICE_ID,
     audio_backend: AudioConstants.DEFAULT_BACKEND,
     sampleRate: AudioConstants.DEFAULT_SAMPLE_RATE,
@@ -368,6 +376,9 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
     { value: 'medium', label: MODEL_NAMES_SHORT.medium },
     { value: 'large-v3', label: MODEL_NAMES_SHORT['large-v3'] },
   ]},
+  { key: 'default_asr_model_id', type: 'string', label: 'Fallback ASR Model', description: 'Used when a source-specific ASR model is not set.', category: 'transcription' },
+  { key: 'microphone_asr_model_id', type: 'string', label: 'Microphone ASR Model', description: 'Default speech-to-text model when recording from the microphone.', category: 'transcription' },
+  { key: 'system_asr_model_id', type: 'string', label: 'System Audio ASR Model', description: 'Default speech-to-text model when transcribing system audio.', category: 'transcription' },
   { key: 'compute_type', type: 'enum', label: SETTING_LABELS.compute_type, description: SETTING_DESCRIPTIONS.compute_type, category: 'transcription', options: [
     { value: 'float16', label: COMPUTE_TYPE_LABELS.float16 },
     { value: 'int8', label: COMPUTE_TYPE_LABELS.int8 },
@@ -394,6 +405,10 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
 
   // Audio
   { key: 'captureMode', type: 'enum', label: SETTING_LABELS.captureMode, description: SETTING_DESCRIPTIONS.captureMode, category: 'audio', options: [
+    { value: 'system', label: CAPTURE_MODE_LABELS.system },
+    { value: 'microphone', label: CAPTURE_MODE_LABELS.microphone },
+  ]},
+  { key: 'default_capture_source', type: 'enum', label: 'Default Capture Source', description: 'Source Transcripta should preselect for the next session.', category: 'audio', options: [
     { value: 'system', label: CAPTURE_MODE_LABELS.system },
     { value: 'microphone', label: CAPTURE_MODE_LABELS.microphone },
   ]},

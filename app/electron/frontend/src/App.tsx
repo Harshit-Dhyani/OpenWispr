@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityFeed } from './components/ActivityFeed';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MainContent } from './components/MainContent';
@@ -12,11 +12,21 @@ import {
 import {
   applyFormulaEvent,
   applyHealthEvent,
+  applyRefinedSegmentEvent,
   applySegmentEvent,
   applySnapshot,
   applySuppressedSegmentEvent,
   buildInitialSnapshot,
 } from './lib/sessionReducer';
+import {
+  buildStructuredLiveDraft,
+  clearLiveDraftForCommit,
+  isEventForActiveSession,
+  shouldIgnoreLegacyPartial,
+  type LiveDraftState,
+} from './lib/liveTranscript';
+import { resolveSourceModelId, syncInheritedAsrModelIds } from './lib/asrRouting';
+import { getEligibleDevices, resolveRequestedDeviceId } from './lib/sessionStart';
 import { DEFAULT_SETTINGS, isFakeSetting } from './lib/settingsSchema';
 import type { SettingsState } from './lib/settingsSchema';
 import { sanitizeSettings } from './lib/settingsMigration';
@@ -24,8 +34,11 @@ import type {
   Device,
   Formula,
   Health,
+  DraftPartialPayload,
+  CommitFinalPayload,
   ModelCatalogPayload,
   ModelPreloadStatus,
+  RefineFinalPayload,
   Segment,
   SnapshotPayload,
   SystemProfile,
@@ -48,11 +61,21 @@ type FormState = {
   hotkeyAutoInject: boolean;
 };
 
+type TranscriptDebugEvent = {
+  id: number;
+  type: string;
+  sessionId: string | null;
+  segmentId: string | null;
+  correlationId?: string | null;
+  detail?: string | null;
+  textLength: number;
+};
+
 const DEFAULT_FORM: FormState = {
   sessionTitle: 'Study Session',
-  captureMode: 'system',
+  captureMode: 'microphone',
   deviceId: '',
-  modelName: 'small',
+  modelName: 'whisper-medium',
   languageMode: 'auto',
   liveMode: 'balanced',
   executionMode: 'auto',
@@ -84,15 +107,18 @@ function App() {
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [hardwareProfile, setHardwareProfile] = useState<SystemProfile | undefined>(undefined);
   const [modelManager, setModelManager] = useState(EMPTY_MODEL_MANAGER_STATE);
+  const [liveDraft, setLiveDraft] = useState<LiveDraftState | null>(null);
+  const [transcriptDebugEvents, setTranscriptDebugEvents] = useState<TranscriptDebugEvent[]>([]);
   const initializedRef = useRef(false);
   const revisionRef = useRef(0);
   const pollTimerRef = useRef<number | null>(null);
   const startInFlightRef = useRef(false);
-  const processedEventIds = useRef<Set<string>>(new Set());
   const sseEnabledRef = useRef(false);
   const partialSegmentRef = useRef<Segment | null>(null);
   const dirtyFieldsRef = useRef<Set<keyof FormState>>(new Set());
   const loadSettingsInFlightRef = useRef(false);
+  const preloadedModelKeysRef = useRef<Set<string>>(new Set());
+  const activeSessionIdRef = useRef<string | null>(null);
 
   const updateFormField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -117,30 +143,122 @@ function App() {
     });
   }, []);
 
-  const handleEvent = useCallback((event: EventSourceEvent) => {
-    const eventId = `${event.type}-${event.timestamp}`;
-    if (processedEventIds.current.has(eventId)) {
-      return;
-    }
-    processedEventIds.current.add(eventId);
-
-    // Fix unbounded growth - clear half the set when limit exceeded
-    if (processedEventIds.current.size > 1000) {
-      const iterator = processedEventIds.current.values();
-      const itemsToDelete = Math.floor(processedEventIds.current.size / 2);
-      for (let i = 0; i < itemsToDelete; i++) {
-        const value = iterator.next().value;
-        if (value) {
-          processedEventIds.current.delete(value);
-        }
+  const pushDebugEvent = useCallback(
+    (
+      type: string,
+      payload: {
+        session_id?: string | null;
+        segment_id?: string | null;
+        correlation_id?: string | null;
+        detail?: string | null;
+        text?: string | null;
+        committed_text?: string | null;
+        draft_suffix?: string | null;
+      },
+    ) => {
+      if (!settings.advanced.debugMode) {
+        return;
       }
-    }
+      const textLength = (payload.text ?? payload.committed_text ?? payload.draft_suffix ?? '').length;
+      setTranscriptDebugEvents((current) => [
+        ...current.slice(-11),
+        {
+          id: Date.now() + current.length,
+          type,
+          sessionId: payload.session_id ?? null,
+          segmentId: payload.segment_id ?? null,
+          correlationId: payload.correlation_id ?? null,
+          detail: payload.detail ?? null,
+          textLength,
+        },
+      ]);
+    },
+    [settings.advanced.debugMode],
+  );
 
+  const pushTranscriptDebugEvent = useCallback(
+    (
+      type: string,
+      payload: {
+        session_id?: string | null;
+        segment_id?: string | null;
+        correlation_id?: string | null;
+        text?: string | null;
+        committed_text?: string | null;
+        draft_suffix?: string | null;
+      },
+    ) => {
+      pushDebugEvent(type, payload);
+    },
+    [pushDebugEvent],
+  );
+
+  const handleEvent = useCallback((event: EventSourceEvent) => {
     switch (event.type) {
+      case 'draft_partial': {
+        const payload = event.payload as DraftPartialPayload;
+        if (!isEventForActiveSession(activeSessionIdRef.current, payload.session_id)) {
+          break;
+        }
+        pushTranscriptDebugEvent(event.type, payload);
+        setLiveDraft(buildStructuredLiveDraft(payload));
+        break;
+      }
+      case 'commit_final': {
+        const payload = event.payload as CommitFinalPayload;
+        if (!isEventForActiveSession(activeSessionIdRef.current, payload.session_id)) {
+          break;
+        }
+        pushTranscriptDebugEvent(event.type, {
+          session_id: payload.session_id,
+          segment_id: payload.segment_id,
+          text: payload.segment?.display_text || payload.segment?.text || payload.text,
+        });
+        setLiveDraft((current) =>
+          clearLiveDraftForCommit(current, activeSessionIdRef.current, payload),
+        );
+        setSnapshot((current) => applySegmentEvent(current, payload.segment));
+        break;
+      }
+      case 'refine_final': {
+        const payload = event.payload as RefineFinalPayload;
+        if (!isEventForActiveSession(activeSessionIdRef.current, payload.session_id)) {
+          break;
+        }
+        setSnapshot((current) => applyRefinedSegmentEvent(current, payload.segment));
+        break;
+      }
       case 'segment': {
         const segment = event.payload as Segment;
-        partialSegmentRef.current = segment.is_partial ? segment : null;
-        setSnapshot((current) => applySegmentEvent(current, segment));
+        if (segment.is_partial) {
+          pushTranscriptDebugEvent(event.type, {
+            session_id: activeSessionIdRef.current,
+            segment_id: segment.id,
+            text: segment.display_text || segment.text,
+          });
+          partialSegmentRef.current = segment;
+          setLiveDraft((current) => {
+            if (shouldIgnoreLegacyPartial(current, activeSessionIdRef.current)) {
+              return current;
+            }
+            return {
+              sessionId: activeSessionIdRef.current,
+              committedText: '',
+              draftSuffix: segment.display_text || segment.text,
+              revision: revisionRef.current,
+              source: 'legacy',
+            };
+          });
+        } else {
+          pushTranscriptDebugEvent(event.type, {
+            session_id: activeSessionIdRef.current,
+            segment_id: segment.id,
+            text: segment.display_text || segment.text,
+          });
+          partialSegmentRef.current = null;
+          setLiveDraft(null);
+          setSnapshot((current) => applySegmentEvent(current, segment));
+        }
         if (segment.latency_ms !== undefined && segment.latency_ms !== null) {
           setLiveLatency(segment.latency_ms);
         }
@@ -162,7 +280,11 @@ function App() {
       case 'state': {
         const payload = event.payload as SnapshotPayload;
         revisionRef.current = payload.runtime_revision;
+        activeSessionIdRef.current = payload.session?.session_id ?? null;
         setSnapshot((current) => applySnapshot(current, payload));
+        if (payload.session?.status !== 'running') {
+          setLiveDraft(null);
+        }
         break;
       }
       case 'formulas': {
@@ -190,7 +312,11 @@ function App() {
         break;
       }
     }
-  }, []);
+  }, [pushTranscriptDebugEvent]);
+
+  useEffect(() => {
+    activeSessionIdRef.current = snapshot.session?.session_id ?? null;
+  }, [snapshot.session?.session_id]);
 
   const handleSseError = useCallback((error: Error) => {
     console.warn('SSE error:', error);
@@ -200,12 +326,29 @@ function App() {
     console.log('SSE connected');
   }, []);
 
+  const hasActiveModelDownload = useMemo(
+    () =>
+      Object.values(modelManager.downloads).some((download) =>
+        ['downloading', 'verifying'].includes(download.status),
+      ),
+    [modelManager.downloads],
+  );
+
+  const isSessionRunning = snapshot.session?.status === 'running';
+
+  const livePollInterval = useMemo(() => {
+    if (hasActiveModelDownload || isSessionRunning) {
+      return 1000;
+    }
+    return 4000;
+  }, [hasActiveModelDownload, isSessionRunning]);
+
   const { status: sseStatus, connect, disconnect } = useEventSource({
     url: '/api/events',
     maxReconnectAttempts: 3,
     baseReconnectDelay: 1000,
     maxReconnectDelay: 10000,
-    pollInterval: 300,
+    pollInterval: livePollInterval,
     onMessage: handleEvent,
     onError: handleSseError,
     onOpen: handleSseOpen,
@@ -237,11 +380,15 @@ function App() {
       }
 
       // Apply settings to form state
+      const defaultCaptureSource =
+        (migrated.audio.default_capture_source as FormState['captureMode'] | undefined) ||
+        (migrated.audio.captureMode as FormState['captureMode'] | undefined) ||
+        'microphone';
       mergeFormDefaults({
         sessionTitle: migrated.general.defaultSessionTitle || undefined,
-        captureMode: (migrated.audio.captureMode as FormState['captureMode']) || undefined,
+        captureMode: defaultCaptureSource,
         deviceId: migrated.audio.defaultDeviceId || undefined,
-        modelName: migrated.transcription.default_asr_model_id || migrated.transcription.model_name || undefined,
+        modelName: resolveSourceModelId(migrated, defaultCaptureSource) || undefined,
         languageMode: migrated.general.defaultLanguage || undefined,
         exportRoot: migrated.general.exportDirectory || undefined,
         hotkeyEnabled: migrated.hotkey.enabled,
@@ -259,14 +406,25 @@ function App() {
           hold_mode: migrated.hotkey.hold_mode,
           auto_inject: migrated.hotkey.auto_inject,
           language: migrated.hotkey.language,
+          capture_source: defaultCaptureSource,
           device_id: migrated.hotkey.device_id,
+          default_asr_model_id: migrated.transcription.default_asr_model_id,
+          microphone_asr_model_id: migrated.transcription.microphone_asr_model_id,
+          system_asr_model_id: migrated.transcription.system_asr_model_id,
           finish_mode_default: migrated.hotkey.finish_mode_default,
           show_floating_window: migrated.hotkey.show_floating_window,
           floating_window_position: migrated.hotkey.floating_window_position,
           record_on_start: migrated.hotkey.record_on_start,
           stop_on_release: migrated.hotkey.stop_on_release,
           copy_to_clipboard: migrated.hotkey.copy_to_clipboard,
-        });
+        } as any);
+      }
+
+      if (migrated.transcription.preload_model) {
+        void preloadPreferredModel(
+          resolveSourceModelId(migrated, defaultCaptureSource),
+          migrated.advanced.experimentalGpuAccel ? 'auto' : 'cpu_only',
+        );
       }
 
       console.log('Settings loaded successfully');
@@ -281,72 +439,108 @@ function App() {
   // Save settings to backend
   const saveSettings = useCallback(async (newSettings: SettingsState) => {
     try {
+      const normalizedCaptureSource =
+        (newSettings.audio.default_capture_source as FormState['captureMode'] | undefined) ||
+        (newSettings.audio.captureMode as FormState['captureMode'] | undefined) ||
+        'microphone';
+      const normalizedSettings = syncInheritedAsrModelIds(settings, {
+        ...newSettings,
+        audio: {
+          ...newSettings.audio,
+          captureMode: normalizedCaptureSource,
+          default_capture_source: normalizedCaptureSource,
+        },
+      });
       // Filter out fake settings before sending to backend
       const cleanedSettings: SettingsState = {
         general: Object.fromEntries(
-          Object.entries(newSettings.general).filter(([key]) => !isFakeSetting('general', key))
+          Object.entries(normalizedSettings.general).filter(([key]) => !isFakeSetting('general', key))
         ) as SettingsState['general'],
         transcription: Object.fromEntries(
-          Object.entries(newSettings.transcription).filter(([key]) => !isFakeSetting('transcription', key))
+          Object.entries(normalizedSettings.transcription).filter(([key]) => !isFakeSetting('transcription', key))
         ) as SettingsState['transcription'],
-        refiner: newSettings.refiner,
+        refiner: normalizedSettings.refiner,
         audio: Object.fromEntries(
-          Object.entries(newSettings.audio).filter(([key]) => !isFakeSetting('audio', key))
+          Object.entries(normalizedSettings.audio).filter(([key]) => !isFakeSetting('audio', key))
         ) as SettingsState['audio'],
         hotkey: Object.fromEntries(
-          Object.entries(newSettings.hotkey).filter(([key]) => !isFakeSetting('hotkey', key))
+          Object.entries(normalizedSettings.hotkey).filter(
+            ([key]) => key !== 'model_name' && !isFakeSetting('hotkey', key),
+          )
         ) as SettingsState['hotkey'],
         advanced: Object.fromEntries(
-          Object.entries(newSettings.advanced).filter(([key]) => !isFakeSetting('advanced', key))
+          Object.entries(normalizedSettings.advanced).filter(([key]) => !isFakeSetting('advanced', key))
         ) as SettingsState['advanced'],
-        version: newSettings.version,
+        version: normalizedSettings.version,
       };
+      cleanedSettings.audio.captureMode = normalizedCaptureSource;
+      cleanedSettings.audio.default_capture_source = normalizedCaptureSource;
 
       await backendRequest('/api/settings', {
         method: 'POST',
         body: JSON.stringify(cleanedSettings),
       });
-      setSettings(newSettings);
+      const persistedSettings = sanitizeSettings({
+        ...normalizedSettings,
+        hotkey: cleanedSettings.hotkey,
+        audio: {
+          ...normalizedSettings.audio,
+          captureMode: normalizedCaptureSource,
+          default_capture_source: normalizedCaptureSource,
+        },
+      } as SettingsState);
+      setSettings(persistedSettings);
 
       // Apply theme from settings
       setTheme((currentTheme) => {
-        if (newSettings.general.theme !== currentTheme) {
-          return newSettings.general.theme;
+        if (persistedSettings.general.theme !== currentTheme) {
+          return persistedSettings.general.theme;
         }
         return currentTheme;
       });
 
       // Apply settings to form state
       mergeFormDefaults({
-        sessionTitle: newSettings.general.defaultSessionTitle,
-        captureMode: newSettings.audio.captureMode as FormState['captureMode'],
-        deviceId: newSettings.audio.defaultDeviceId,
-        modelName: newSettings.transcription.default_asr_model_id,
-        languageMode: newSettings.general.defaultLanguage,
-        exportRoot: newSettings.general.exportDirectory,
-        hotkeyEnabled: newSettings.hotkey.enabled,
-        hotkeyCombination: newSettings.hotkey.key_combination,
-        hotkeyHoldMode: newSettings.hotkey.hold_mode,
-        hotkeyAutoInject: newSettings.hotkey.auto_inject,
+        sessionTitle: persistedSettings.general.defaultSessionTitle,
+        captureMode: normalizedCaptureSource,
+        deviceId: persistedSettings.audio.defaultDeviceId,
+        modelName: resolveSourceModelId(persistedSettings, normalizedCaptureSource),
+        languageMode: persistedSettings.general.defaultLanguage,
+        exportRoot: persistedSettings.general.exportDirectory,
+        hotkeyEnabled: persistedSettings.hotkey.enabled,
+        hotkeyCombination: persistedSettings.hotkey.key_combination,
+        hotkeyHoldMode: persistedSettings.hotkey.hold_mode,
+        hotkeyAutoInject: persistedSettings.hotkey.auto_inject,
       });
 
       // Apply hotkey config to Electron main process
       const hotkeyApi = window.transcriptaDesktop.hotkey;
       if (hotkeyApi) {
         await hotkeyApi.updateConfig({
-          enabled: newSettings.hotkey.enabled,
-          key_combination: newSettings.hotkey.key_combination,
-          hold_mode: newSettings.hotkey.hold_mode,
-          auto_inject: newSettings.hotkey.auto_inject,
-          language: newSettings.hotkey.language,
-          device_id: newSettings.hotkey.device_id,
-          finish_mode_default: newSettings.hotkey.finish_mode_default,
-          show_floating_window: newSettings.hotkey.show_floating_window,
-          floating_window_position: newSettings.hotkey.floating_window_position,
-          record_on_start: newSettings.hotkey.record_on_start,
-          stop_on_release: newSettings.hotkey.stop_on_release,
-          copy_to_clipboard: newSettings.hotkey.copy_to_clipboard,
-        });
+          enabled: persistedSettings.hotkey.enabled,
+          key_combination: persistedSettings.hotkey.key_combination,
+          hold_mode: persistedSettings.hotkey.hold_mode,
+          auto_inject: persistedSettings.hotkey.auto_inject,
+          language: persistedSettings.hotkey.language,
+          capture_source: normalizedCaptureSource,
+          device_id: persistedSettings.hotkey.device_id,
+          default_asr_model_id: persistedSettings.transcription.default_asr_model_id,
+          microphone_asr_model_id: persistedSettings.transcription.microphone_asr_model_id,
+          system_asr_model_id: persistedSettings.transcription.system_asr_model_id,
+          finish_mode_default: persistedSettings.hotkey.finish_mode_default,
+          show_floating_window: persistedSettings.hotkey.show_floating_window,
+          floating_window_position: persistedSettings.hotkey.floating_window_position,
+          record_on_start: persistedSettings.hotkey.record_on_start,
+          stop_on_release: persistedSettings.hotkey.stop_on_release,
+          copy_to_clipboard: persistedSettings.hotkey.copy_to_clipboard,
+        } as any);
+      }
+
+      if (persistedSettings.transcription.preload_model) {
+        void preloadPreferredModel(
+          resolveSourceModelId(persistedSettings, normalizedCaptureSource),
+          persistedSettings.advanced.experimentalGpuAccel ? 'auto' : 'cpu_only',
+        );
       }
 
       console.log('Settings saved successfully');
@@ -355,7 +549,7 @@ function App() {
       console.error('Failed to save settings:', error);
       return false;
     }
-  }, [mergeFormDefaults]);
+  }, [mergeFormDefaults, settings]);
 
   const loadModelCatalog = useCallback(async () => {
     try {
@@ -365,6 +559,23 @@ function App() {
       console.error('Failed to load model catalog:', error);
     }
   }, []);
+
+  const handleSidebarFieldChange = useCallback(
+    <K extends keyof FormState>(key: K, value: FormState[K]) => {
+      if (key === 'captureMode') {
+        const nextCaptureMode = value as FormState['captureMode'];
+        dirtyFieldsRef.current.add('captureMode');
+        setForm((current) => ({
+          ...current,
+          captureMode: nextCaptureMode,
+          modelName: resolveSourceModelId(settings, nextCaptureMode),
+        }));
+        return;
+      }
+      updateFormField(key, value);
+    },
+    [settings, updateFormField],
+  );
 
   // Load hardware profile from backend
   const loadHardwareProfile = useCallback(async () => {
@@ -386,9 +597,24 @@ function App() {
     void loadHardwareProfile();
     void loadModelCatalog();
     const disposeModelDownloads = window.transcriptaDesktop.models.onDownloadEvent((eventPayload) => {
+      const downloadPayload = eventPayload.payload as import('./types/api').ModelDownloadState & {
+        model_id?: string;
+      };
       setModelManager((current) =>
         applyModelDownloadEvent(current, eventPayload.event, eventPayload.payload),
       );
+      pushDebugEvent(eventPayload.event, {
+        correlation_id: downloadPayload.correlation_id ?? downloadPayload.download_id ?? null,
+        segment_id: downloadPayload.model_id ?? null,
+        detail:
+          [
+            downloadPayload.status,
+            downloadPayload.current_artifact ?? downloadPayload.model_id,
+          ]
+            .filter(Boolean)
+            .join(':') || null,
+        text: downloadPayload.error ?? null,
+      });
       if (eventPayload.event === 'model-download-completed') {
         void loadModelCatalog();
       }
@@ -410,7 +636,7 @@ function App() {
       disposeModelDownloads?.();
       disconnect();
     };
-  }, []);
+  }, [pushDebugEvent]);
 
   useEffect(() => {
     if (isStarting) {
@@ -488,16 +714,46 @@ function App() {
     return window.transcriptaDesktop.fetchJson(path, options) as Promise<T>;
   }
 
+  async function preloadPreferredModel(modelName?: string, executionMode?: string) {
+    if (!modelName) {
+      return;
+    }
+
+    const normalizedExecutionMode = executionMode || 'auto';
+    const preloadKey = `${modelName}:${normalizedExecutionMode}`;
+    if (preloadedModelKeysRef.current.has(preloadKey)) {
+      return;
+    }
+
+    preloadedModelKeysRef.current.add(preloadKey);
+    setPreloadStatus({
+      loading: true,
+      progress: 0,
+      message: `Preloading ${modelName}...`,
+      model_name: modelName,
+    });
+
+    try {
+      await backendRequest('/api/models/preload', {
+        method: 'POST',
+        body: JSON.stringify({
+          model_name: modelName,
+          execution_mode: normalizedExecutionMode,
+        }),
+      });
+    } catch (error) {
+      preloadedModelKeysRef.current.delete(preloadKey);
+      setPreloadStatus({ loading: false, progress: 0, message: '' });
+      console.warn('Background model preload failed:', error);
+    }
+  }
+
   async function loadDevices() {
     try {
       const payload = await backendRequest<{ devices: Device[] }>('/api/devices');
       setDevices(payload.devices);
       setForm((current) => {
-        const eligibleDevices = payload.devices.filter((device) =>
-          current.captureMode === 'system'
-            ? Boolean(device.is_loopback || device.supports_loopback)
-            : !Boolean(device.is_loopback || device.supports_loopback),
-        );
+        const eligibleDevices = getEligibleDevices(payload.devices, current.captureMode);
         const currentExists = payload.devices.some((device) => device.id === current.deviceId);
         const preferred =
           eligibleDevices[0]?.id ??
@@ -519,11 +775,7 @@ function App() {
       return;
     }
     setForm((current) => {
-      const eligibleDevices = devices.filter((device) =>
-        current.captureMode === 'system'
-          ? Boolean(device.is_loopback || device.supports_loopback)
-          : !Boolean(device.is_loopback || device.supports_loopback),
-      );
+      const eligibleDevices = getEligibleDevices(devices, current.captureMode);
       if (!eligibleDevices.length) {
         return current;
       }
@@ -575,7 +827,11 @@ function App() {
     try {
       const payload = await backendRequest<SnapshotPayload>('/api/session');
       revisionRef.current = payload.runtime_revision;
+      activeSessionIdRef.current = payload.session?.session_id ?? null;
       setSnapshot((current) => applySnapshot(current, payload));
+      if (payload.session?.status !== 'running') {
+        setLiveDraft(null);
+      }
       setModelLoading(payload.loading ?? false);
       setBackendReady(true);
       initializedRef.current = true;
@@ -631,6 +887,7 @@ function App() {
         return;
       }
       revisionRef.current = payload.runtime_revision;
+      activeSessionIdRef.current = payload.session?.session_id ?? null;
       setSnapshot((current) => applySnapshot(current, payload));
       setModelLoading(payload.loading ?? false);
       setBackendReady(true);
@@ -673,12 +930,13 @@ function App() {
   }
 
   async function preloadModel() {
+    const resolvedModelName = resolveSourceModelId(settings, form.captureMode) || form.modelName;
     setPreloadStatus({ loading: true, progress: 0, message: 'Starting preload...' });
     try {
       await backendRequest('/api/models/preload', {
         method: 'POST',
         body: JSON.stringify({
-          model_name: form.modelName,
+          model_name: resolvedModelName,
           execution_mode: form.executionMode,
         }),
       });
@@ -695,20 +953,26 @@ function App() {
     startInFlightRef.current = true;
     setIsStarting(true);
     setStatusMessage('Starting session...');
+    activeSessionIdRef.current = null;
+    setLiveDraft(null);
+    setTranscriptDebugEvents([]);
     if (pollTimerRef.current !== null) {
       window.clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
     }
     disconnect();
     try {
+      const requestedDeviceId = resolveRequestedDeviceId(devices, form.captureMode, form.deviceId);
+      const resolvedModelName = resolveSourceModelId(settings, form.captureMode) || form.modelName;
       const requestBody: StartSessionRequest = {
         title: form.sessionTitle.trim() || 'Study Session',
         output_root: form.exportRoot.trim() || 'sessions',
-        model_name: form.modelName,
+        model_name: resolvedModelName,
         language_mode: form.languageMode,
+        capture_source: form.captureMode,
         live_mode: form.liveMode,
         execution_mode: form.executionMode,
-        device_id: form.deviceId || null,
+        device_id: requestedDeviceId,
         // VAD parameters from settings
         vad_threshold: settings.transcription.vad_threshold_db,
         vad_min_silence_ms: settings.transcription.vad_min_silence_ms,
@@ -730,6 +994,7 @@ function App() {
   async function stopSession() {
     setIsStopping(true);
     setStatusMessage('Stopping session...');
+    setLiveDraft(null);
     try {
       await backendRequest('/api/session/stop', { method: 'POST' });
       await loadSnapshot(false);
@@ -799,7 +1064,7 @@ function App() {
           preloadStatus={preloadStatus}
           connectionStatus={connectionStatus}
           gpuStatus={gpuStatus}
-          onFieldChange={(key, value) => updateFormField(key, value)}
+          onFieldChange={(key, value) => handleSidebarFieldChange(key, value)}
           onRefreshDevices={() => void loadDevices()}
           onChooseDirectory={() => void chooseDirectory()}
           onPreloadModel={() => void preloadModel()}
@@ -811,7 +1076,13 @@ function App() {
         
         {activityFeedNode}
 
-        <MainContent snapshot={snapshot} liveLatency={liveLatency} activityFeed={activityFeedNode} />
+        <MainContent
+          snapshot={snapshot}
+          liveLatency={liveLatency}
+          liveDraft={liveDraft}
+          transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
+          activityFeed={activityFeedNode}
+        />
       </div>
 
       {showSettings && (

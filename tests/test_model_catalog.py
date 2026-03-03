@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.model_catalog import MODEL_CATALOG, get_default_model_id, runtime_name_for_model
+from app.core.model_catalog import MODEL_CATALOG, get_default_model_id, get_model_catalog_entry, runtime_name_for_model
 
 
 def test_model_catalog_entries_have_required_runtime_fields() -> None:
@@ -39,6 +39,19 @@ def test_asr_catalog_entries_have_runtime_mapping() -> None:
 
 def test_model_catalog_default_and_runtime_mapping() -> None:
     assert get_default_model_id("asr") == "whisper-medium"
-    assert get_default_model_id("refiner") == "qwen2.5-7b-instruct"
+    assert get_default_model_id("refiner") == "qwen2.5-3b-instruct"
+    assert any(entry.id == "qwen2.5-3b-instruct" for entry in MODEL_CATALOG)
     assert runtime_name_for_model("whisper-medium") == "medium"
     assert runtime_name_for_model("qwen2.5-7b-instruct") is None
+    assert runtime_name_for_model("qwen2.5-3b-instruct") is None
+
+
+def test_whisper_turbo_catalog_only_requests_existing_repo_artifacts() -> None:
+    entry = get_model_catalog_entry("whisper-turbo")
+
+    assert entry is not None
+    assert [artifact.filename for artifact in entry.download_artifacts] == [
+        "model.bin",
+        "config.json",
+        "tokenizer.json",
+    ]
