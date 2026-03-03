@@ -41,8 +41,10 @@ function Write-Warn {
 }
 
 # Get script directory and project root
+# Script is at: tools/setup/install-pytorch-cuda.ps1
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ToolsDir = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent $ToolsDir
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan

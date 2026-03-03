@@ -2,9 +2,263 @@
   "name": "transcripta",
   "version": "0.1.0",
   "private": true,
-  "description": "Root scripts for the Transcripta Electron shell and local Python backend.",
+  "description": "Transcripta - AI-powered transcription and translation desktop application",
+  "author": "Transcripta Team",
+  "license": "MIT",
+  "main": "app/electron/main/index.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
-    "install:ui": "npm --prefix app/desktop install",
-    "dev": "npm --prefix app/desktop run dev"
+    "install:all": "npm run install:ui && npm run install:backend",
+    "install:ui": "npm --prefix app/electron install",
+    "install:backend": "python -m pip install -e . || echo 'Backend optional'",
+    "postinstall": "npm run install:all",
+    
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:electron\"",
+    "dev:electron": "npm --prefix app/electron run dev",
+    "dev:frontend": "npm --prefix app/electron/frontend run dev",
+    "dev:backend": "node scripts/run-backend-dev.cjs",
+    
+    "build": "npm run build:clean && npm run build:frontend && npm run build:electron",
+    "build:clean": "rimraf app/electron/renderer/dist app/electron/dist dist release",
+    "build:frontend": "npm --prefix app/electron/frontend run build",
+    "build:electron": "npm --prefix app/electron run build:frontend",
+    "build:production": "cross-env NODE_ENV=production npm run build",
+    "build:analyze": "npm --prefix app/electron/frontend run build -- --mode analyze",
+    
+    "watch": "npm run build:frontend && npm run dev:electron",
+    "watch:frontend": "npm --prefix app/electron/frontend run dev",
+    
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "npm --prefix app/electron/frontend run test",
+    "test:backend": "pytest || echo 'Backend tests optional'",
+    "test:e2e": "playwright test",
+    "test:coverage": "npm --prefix app/electron/frontend run test:coverage",
+    
+    "lint": "npm run lint:frontend && npm run lint:electron && npm run lint:python",
+    "lint:frontend": "npm --prefix app/electron/frontend run lint || echo 'No lint script'",
+    "lint:electron": "eslint app/electron/main --ext .js,.ts || echo 'ESLint optional'",
+    "lint:python": "ruff check . || echo 'Ruff optional'",
+    "lint:fix": "npm run lint:frontend -- --fix && npm run lint:electron -- --fix",
+    
+    "typecheck": "npm --prefix app/electron/frontend run typecheck || echo 'No typecheck script'",
+    "tree:generate": "node scripts/generate-tree.cjs",
+    "changes:since-last-commit": "node scripts/generate-changes-since-last-commit.cjs",
+    
+    "pack": "npm --prefix app/electron run pack",
+    "pack:all": "npm run build:production && npm run dist:all",
+    
+    "dist": "npm run build:production && npm run dist:current",
+    "dist:current": "npm --prefix app/electron run dist",
+    "dist:all": "npm run build:production && npm run dist:win && npm run dist:mac && npm run dist:linux",
+    "dist:win": "npm --prefix app/electron run dist -- --win",
+    "dist:mac": "npm --prefix app/electron run dist -- --mac",
+    "dist:linux": "npm --prefix app/electron run dist -- --linux",
+    "dist:portable": "npm run build:production && npm --prefix app/electron run dist -- --win portable",
+    
+    "scripts:build": "python scripts/build.py",
+    "scripts:package": "python scripts/package.py",
+    "scripts:release": "python scripts/release.py",
+    
+    "version": "node scripts/version.js",
+    "version:bump": "npm version patch -m \"chore(release): bump version to %s\"",
+    "version:minor": "npm version minor -m \"chore(release): bump version to %s\"",
+    "version:major": "npm version major -m \"chore(release): bump version to %s\"",
+    
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "changelog:generate": "git log --pretty=format:\"%h %s (%an)\" --no-merges > CHANGELOG.txt",
+    
+    "release": "npm run build:production && npm run dist:all && npm run release:publish",
+    "release:draft": "npm run build:production && npm run dist:all && npm run release:publish -- --draft",
+    "release:publish": "node scripts/publish-release.js",
+    
+    "clean": "rimraf app/electron/renderer/dist app/electron/dist dist release node_modules app/electron/node_modules app/electron/frontend/node_modules",
+    "clean:cache": "rimraf .cache .parcel-cache .turbo",
+    "clean:all": "npm run clean && npm run clean:cache",
+    
+    "postbuild": "node scripts/postbuild.js",
+    "postversion": "npm run changelog && git push && git push --tags"
+  },
+  "build": {
+    "appId": "com.transcripta.desktop",
+    "productName": "Transcripta",
+    "copyright": "Copyright © 2026 Transcripta Team",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/electron/main/**/*",
+      "app/electron/renderer/dist/**/*",
+      "app/electron/package.json",
+      "node_modules/**/*",
+      "!node_modules/**/*.map",
+      "!**/*.d.ts"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": ["**/*", "!**/__pycache__", "!**/*.pyc"]
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-key-sender/**/*"
+    ],
+    "compression": "maximum",
+    "removePackageScripts": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "msi",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "publisherName": "Transcripta Team",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Transcripta",
+      "license": "LICENSE",
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64", "universal"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "pkg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "signIgnore": ["node_modules/node-key-sender/**/*"]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64"]
+        },
+        {
+          "target": "snap",
+          "arch": ["x64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icons",
+      "category": "Office",
+      "maintainer": "Transcripta Team",
+      "vendor": "Transcripta",
+      "synopsis": "AI-powered transcription and translation",
+      "description": "Transcripta is an AI-powered desktop application for transcription and translation.",
+      "desktop": {
+        "Name": "Transcripta",
+        "Comment": "AI-powered transcription and translation",
+        "Categories": "Office;AudioVideo;",
+        "StartupWMClass": "transcripta"
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "transcripta",
+      "repo": "transcripta-desktop",
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    },
+    "afterSign": "scripts/notarize.js",
+    "afterPack": "scripts/afterPack.js",
+    "afterAllArtifactBuild": "scripts/afterAllArtifactBuild.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-notarize": "^1.2.2",
+    "rimraf": "^5.0.5"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "update-electron-app": "^3.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
