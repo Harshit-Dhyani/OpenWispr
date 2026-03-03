@@ -43,7 +43,7 @@ class LoopbackAudioSource:
         self._thread: threading.Thread | None = None
         self._thread_lock = threading.Lock()
         logger.debug(
-            "LoopbackAudioSource initialized",
+            "AudioSource initialized",
             extra={
                 "device_id": device_id,
                 "sample_rate": sample_rate,

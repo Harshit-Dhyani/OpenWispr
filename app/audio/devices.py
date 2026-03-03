@@ -4,7 +4,10 @@ import logging
 from collections.abc import Iterable
 from typing import Any
 
-import soundcard as sc
+try:
+    import soundcard as sc
+except ModuleNotFoundError:  # pragma: no cover - depends on local Python environment
+    sc = None
 
 from app.core.models import AudioDeviceInfo
 
@@ -57,6 +60,8 @@ def _is_loopback_microphone(device: Any) -> bool:
 
 
 def _iter_speakers() -> list[Any]:
+    if sc is None:
+        return []
     try:
         return list(sc.all_speakers())
     except Exception as exc:
@@ -65,6 +70,8 @@ def _iter_speakers() -> list[Any]:
 
 
 def _iter_microphones() -> list[Any]:
+    if sc is None:
+        return []
     try:
         return list(sc.all_microphones(include_loopback=True))
     except Exception as exc:
@@ -208,7 +215,7 @@ def resolve_capture_device_candidates(device_id: str | None) -> list[tuple[Any, 
         )
         if ranked:
             return [(microphone, _device_name(microphone)) for microphone in ranked]
-        default_mic = sc.default_microphone()
+        default_mic = sc.default_microphone() if sc is not None else None
         if default_mic:
             return [(default_mic, _device_name(default_mic))]
         raise RuntimeError("No audio devices found")

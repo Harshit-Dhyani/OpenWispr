@@ -4,8 +4,12 @@ from dataclasses import dataclass, field
 
 from app.audio.backends.base import AudioBackend, AudioBackendError
 from app.audio.backends.pyaudio_wasapi import PyAudioWasapiBackend
-from app.audio.backends.soundcard_backend import SoundcardBackend
 from app.audio.devices import resolve_capture_name_hints
+
+try:
+    from app.audio.backends.soundcard_backend import SoundcardBackend
+except ModuleNotFoundError:  # pragma: no cover - depends on local Python environment
+    SoundcardBackend = None
 
 
 @dataclass(slots=True)
@@ -20,8 +24,11 @@ def _backend_classes(preferred_backend: str) -> list[type[AudioBackend]]:
     if normalized == "pyaudio":
         return [PyAudioWasapiBackend]
     if normalized == "soundcard":
-        return [SoundcardBackend]
-    return [PyAudioWasapiBackend, SoundcardBackend]
+        return [SoundcardBackend] if SoundcardBackend is not None else []
+    backends: list[type[AudioBackend]] = [PyAudioWasapiBackend]
+    if SoundcardBackend is not None:
+        backends.append(SoundcardBackend)
+    return backends
 
 
 def open_audio_backend(
@@ -36,8 +43,15 @@ def open_audio_backend(
     failed_details: list[str] = []
     last_error: Exception | None = None
     name_hints = resolve_capture_name_hints(device_id)
+    backend_classes = _backend_classes(preferred_backend)
 
-    for backend_class in _backend_classes(preferred_backend):
+    if not backend_classes:
+        raise RuntimeError(
+            "Requested audio backend is unavailable. The optional 'soundcard' dependency "
+            "is not installed in this Python environment."
+        )
+
+    for backend_class in backend_classes:
         backend = backend_class(
             device_id=device_id,
             sample_rate=sample_rate,
