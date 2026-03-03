@@ -5,10 +5,9 @@ import path from 'path';
 export default defineConfig({
     plugins: [react()],
     base: './', // Important for electron
-resolve: {
+    resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
-            '@config': path.resolve(__dirname, '../../config/typescript'),
         },
     },
     build: {

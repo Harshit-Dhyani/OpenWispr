@@ -11,7 +11,7 @@ from app.ui.main_window import MainWindow
 def main() -> int:
     settings = AppSettings()
     app = QApplication(sys.argv)
-    app.setApplicationName("Transcripta")
+    app.setApplicationName(settings.app_name)
     window = MainWindow(settings=settings)
     window.show()
     return app.exec()

@@ -8,7 +8,7 @@ const { createMainWindow, showMainWindowAndFocus } = require("./windows/mainWind
 const { createTray } = require("./windows/tray");
 const { hideFloatingWindow, updateFloatingTranscription } = require("./windows/floatingWindow");
 const { showQuickSettingsWindow } = require("./windows/quickSettingsWindow");
-const { loadUserSettings, saveUserSettings } = require("./utils/api");
+const { loadUserSettings, loadDevicesForDesktop } = require("./utils/api");
 const {
   registerHotkey, unregisterHotkey, validateAccelerator, checkHotkeyAvailability,
   applyHotkeyConfig, toggleRecording
@@ -21,6 +21,7 @@ require("./ipc/handlers");
 app.whenReady().then(async () => {
   await startBackend();
   await waitForBackendReady();
+  state.backendReady = true;
 
   state.modelDownloadManager = new ModelDownloadManager({
     getApiOrigin: () => state.API_ORIGIN,
@@ -29,6 +30,9 @@ app.whenReady().then(async () => {
   });
 
   await initTextInjector();
+  try {
+    await Promise.allSettled([loadUserSettings(), loadDevicesForDesktop()]);
+  } catch {}
   createMainWindow();
   await createTray();
 

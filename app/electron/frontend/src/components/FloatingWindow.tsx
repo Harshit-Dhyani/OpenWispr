@@ -13,34 +13,75 @@ export function FloatingWindow() {
   const [audioLevels, setAudioLevels] = useState<number[]>(new Array(36).fill(0));
   const [timer, setTimer] = useState('00:00');
 
-  const animationRef = useRef<number | null>(null);
   const audioDataRef = useRef<AudioLevelData>({ levels: new Array(36).fill(0), peak: 0 });
   const recordingStartTime = useRef<number | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const targetLevelsRef = useRef<number[]>(new Array(36).fill(0));
   const currentLevelsRef = useRef<number[]>(new Array(36).fill(0));
   const recordingStateRef = useRef(recordingState);
+  const waveformTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastAudioUpdateRef = useRef<number>(0);
+  const processingTickRef = useRef(0);
+  const isWaveformActiveRef = useRef(false);
 
   // Keep ref in sync with state to avoid dependency issues
   useEffect(() => {
     recordingStateRef.current = recordingState;
   }, [recordingState]);
 
-  // Smooth animation for waveform bars - memoized to prevent excessive re-runs
-  const animateWaveform = useCallback(() => {
-    const SMOOTHING_FACTOR = 0.25;
-
-    // Interpolate towards target levels
-    const newLevels = currentLevelsRef.current.map((current, i) => {
-      const target = targetLevelsRef.current[i] || 0;
-      return current + (target - current) * SMOOTHING_FACTOR;
-    });
-
-    currentLevelsRef.current = newLevels;
-    setAudioLevels([...newLevels]);
-
-    animationRef.current = requestAnimationFrame(animateWaveform);
+  const stopWaveformLoop = useCallback(() => {
+    if (waveformTimerRef.current) {
+      clearInterval(waveformTimerRef.current);
+      waveformTimerRef.current = null;
+    }
+    isWaveformActiveRef.current = false;
   }, []);
+
+  const startWaveformLoop = useCallback(() => {
+    if (waveformTimerRef.current) {
+      return;
+    }
+
+    isWaveformActiveRef.current = true;
+    waveformTimerRef.current = setInterval(() => {
+      const now = Date.now();
+      const currentState = recordingStateRef.current;
+      const millisSinceAudio = now - lastAudioUpdateRef.current;
+
+      if (currentState === 'processing') {
+        processingTickRef.current += 1;
+        const phase = processingTickRef.current / 5;
+        targetLevelsRef.current = Array.from({ length: 36 }, (_, i) => {
+          const centerBias = 0.12 + 0.05 * Math.cos((i - 18) * 0.22);
+          return Math.max(0.03, Math.min(0.22, centerBias + Math.sin(phase + i * 0.15) * 0.04));
+        });
+      } else if (currentState === 'idle' && millisSinceAudio > 250) {
+        targetLevelsRef.current = new Array(36).fill(0.02);
+      } else if (millisSinceAudio > 250) {
+        targetLevelsRef.current = targetLevelsRef.current.map((level) => level * 0.82);
+      }
+
+      const newLevels = currentLevelsRef.current.map((current, i) => {
+        const target = targetLevelsRef.current[i] || 0;
+        return current + (target - current) * 0.35;
+      });
+
+      currentLevelsRef.current = newLevels;
+      setAudioLevels([...newLevels]);
+
+      const shouldStop =
+        currentState === 'idle' &&
+        millisSinceAudio > 400 &&
+        newLevels.every((level) => level < 0.03);
+
+      if (shouldStop) {
+        currentLevelsRef.current = new Array(36).fill(0.02);
+        targetLevelsRef.current = new Array(36).fill(0.02);
+        setAudioLevels([...currentLevelsRef.current]);
+        stopWaveformLoop();
+      }
+    }, 80);
+  }, [stopWaveformLoop]);
 
   // Update timer display
   const updateTimer = useCallback(() => {
@@ -54,70 +95,23 @@ export function FloatingWindow() {
     setTimer(`${minutes}:${seconds}`);
   }, []);
 
-  // Simulate audio data when no real data is coming
-  // Uses ref to avoid recreating callback on state changes
-  const simulateAudioData = useCallback(() => {
-    const currentState = recordingStateRef.current;
-
-    if (currentState === 'listening') {
-      const time = Date.now() / 150;
-      const voiceActivity = Math.sin(time * 0.5) * 0.5 + 0.5;
-
-      const simulated = Array.from({ length: 36 }, (_, i) => {
-        const freqResponse = Math.exp(-Math.pow((i - 18) / 8, 2) * 0.5);
-        const wave = Math.sin(time + i * 0.4) * 0.5 + 0.5;
-        const noise = Math.random() * 0.3;
-
-        let level = (wave * 0.4 + noise * 0.6) * freqResponse * voiceActivity;
-
-        // Add occasional peaks
-        if (Math.random() > 0.95) {
-          level *= 1.5;
-        }
-
-        return Math.max(0, Math.min(1, level * 1.2));
-      });
-
-      targetLevelsRef.current = simulated;
-    } else if (currentState === 'processing') {
-      // Gentle processing animation
-      const time = Date.now() / 300;
-      targetLevelsRef.current = Array.from({ length: 36 }, (_, i) =>
-        0.1 + Math.sin(time + i * 0.2) * 0.05
-      );
-    } else {
-      // Idle state - very low levels
-      targetLevelsRef.current = new Array(36).fill(0.05);
-    }
-  }, []); // No dependencies - uses ref instead
-
-  // Start animation loop once on mount
   useEffect(() => {
-    animationRef.current = requestAnimationFrame(animateWaveform);
-
-    // Start simulation interval - stable reference prevents excessive re-runs
-    const simulationInterval = setInterval(() => {
-      simulateAudioData();
-    }, 50);
-
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-      clearInterval(simulationInterval);
+      stopWaveformLoop();
     };
-  }, []); // Empty deps - animation runs continuously, uses refs for state
+  }, [stopWaveformLoop]);
 
   useEffect(() => {
     // Handle IPC events
     const handleAudioLevel = (data: { levels?: number[]; peak?: number }) => {
       if (data && data.levels) {
-        targetLevelsRef.current = data.levels.map(v => Math.min(1, Math.max(0, v)));
+        lastAudioUpdateRef.current = Date.now();
+        targetLevelsRef.current = data.levels.map((v) => Math.min(1, Math.max(0, v)));
         audioDataRef.current = {
           levels: data.levels,
           peak: data.peak || Math.max(...data.levels)
         };
+        startWaveformLoop();
       }
     };
 
@@ -130,6 +124,8 @@ export function FloatingWindow() {
       if (state.isRecording) {
         setRecordingState('listening');
         recordingStartTime.current = Date.now();
+        lastAudioUpdateRef.current = Date.now();
+        startWaveformLoop();
 
         // Start timer
         if (timerIntervalRef.current) {
@@ -139,6 +135,8 @@ export function FloatingWindow() {
         updateTimer();
       } else if (state.processing) {
         setRecordingState('processing');
+        lastAudioUpdateRef.current = Date.now();
+        startWaveformLoop();
         if (timerIntervalRef.current) {
           clearInterval(timerIntervalRef.current);
           timerIntervalRef.current = null;
@@ -147,6 +145,8 @@ export function FloatingWindow() {
         setRecordingState('idle');
         recordingStartTime.current = null;
         setTimer('00:00');
+        lastAudioUpdateRef.current = 0;
+        targetLevelsRef.current = new Array(36).fill(0.02);
         if (timerIntervalRef.current) {
           clearInterval(timerIntervalRef.current);
           timerIntervalRef.current = null;
@@ -167,6 +167,7 @@ export function FloatingWindow() {
         if (timerIntervalRef.current) {
           clearInterval(timerIntervalRef.current);
         }
+        stopWaveformLoop();
       };
     }
 
@@ -174,8 +175,9 @@ export function FloatingWindow() {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
+      stopWaveformLoop();
     };
-  }, [updateTimer]);
+  }, [startWaveformLoop, stopWaveformLoop, updateTimer]);
 
   const getStatusText = () => {
     switch (recordingState) {

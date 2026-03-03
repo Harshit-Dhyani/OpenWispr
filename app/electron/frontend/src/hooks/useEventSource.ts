@@ -48,10 +48,12 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isManuallyClosedRef = useRef(false);
   const isConnectingRef = useRef(false);
+  const isPollingRef = useRef(false);
   const processedEventIds = useRef<Set<string>>(new Set());
   const eventSequenceRef = useRef(0);
   const apiOriginRef = useRef<string>('http://127.0.0.1:8765');
   const reconnectAttemptsRef = useRef(0);
+  const lastPolledRevisionRef = useRef<number | null>(null);
 
   const resolveUrl = useCallback((path: string) => {
     if (path.startsWith('http')) {
@@ -82,16 +84,29 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
 
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current !== null) {
-      window.clearInterval(pollIntervalRef.current);
+      window.clearTimeout(pollIntervalRef.current);
     }
 
     setStatus('polling');
 
-    pollIntervalRef.current = window.setInterval(async () => {
+    const pollOnce = async () => {
+      if (isPollingRef.current || isManuallyClosedRef.current) {
+        return;
+      }
+
+      isPollingRef.current = true;
       try {
         const response = await fetch(resolveUrl(url).replace('/events', '/session'));
         if (response.ok) {
           const data = await response.json();
+          const revision =
+            typeof data?.runtime_revision === 'number' ? data.runtime_revision : null;
+          if (revision !== null && revision === lastPolledRevisionRef.current) {
+            return;
+          }
+          if (revision !== null) {
+            lastPolledRevisionRef.current = revision;
+          }
           const event: EventSourceEvent = {
             type: 'state',
             payload: data,
@@ -103,8 +118,15 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
       } catch (error) {
         const err = error instanceof Error ? error : new Error('Polling failed');
         onError?.(err);
+      } finally {
+        isPollingRef.current = false;
+        if (!isManuallyClosedRef.current) {
+          pollIntervalRef.current = window.setTimeout(pollOnce, pollInterval);
+        }
       }
-    }, pollInterval);
+    };
+
+    void pollOnce();
   }, [resolveUrl, url, pollInterval, onMessage, onError]);
 
   const connect = useCallback(() => {
@@ -138,7 +160,7 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
 
       es.onopen = () => {
         if (pollIntervalRef.current !== null) {
-          window.clearInterval(pollIntervalRef.current);
+          window.clearTimeout(pollIntervalRef.current);
           pollIntervalRef.current = null;
         }
         reconnectAttemptsRef.current = 0;
@@ -275,7 +297,7 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
       }
 
       if (pollIntervalRef.current !== null) {
-        window.clearInterval(pollIntervalRef.current);
+        window.clearTimeout(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
 

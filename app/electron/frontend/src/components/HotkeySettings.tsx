@@ -72,6 +72,22 @@ const RESERVED_HOTKEYS = [
   'F12',
 ];
 
+// Language options for transcription
+const LANGUAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'it', label: 'Italian' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'zh', label: 'Chinese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'ru', label: 'Russian' },
+];
+
 export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
   const hotkeyApi = window.transcriptaDesktop?.hotkey;
 
@@ -83,6 +99,11 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Quick settings state
+  const [autoInject, setAutoInject] = useState(true);
+  const [floatingWindow, setFloatingWindow] = useState(true);
+  const [language, setLanguage] = useState('auto');
+
   const recordingRef = useRef(false);
   const keysPressedRef = useRef<Set<string>>(new Set());
 
@@ -90,6 +111,15 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
   useEffect(() => {
     void loadHotkeyState();
   }, []);
+
+  // Sync local state with hotkey state
+  useEffect(() => {
+    if (hotkeyState?.config) {
+      setAutoInject(hotkeyState.config.auto_inject ?? true);
+      setFloatingWindow(hotkeyState.config.show_floating_window ?? true);
+      setLanguage(hotkeyState.config.language ?? 'auto');
+    }
+  }, [hotkeyState?.config]);
 
   const loadHotkeyState = async () => {
     if (!hotkeyApi?.getState) {
@@ -157,11 +187,10 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
     keysPressedRef.current.clear();
     setValidationError(null);
 
-    // Define listeners first so they're available for cleanup
     let timeoutId: number | null = null;
 
     const stopRecording = (capturedCombo?: string) => {
-      if (!recordingRef.current) return; // Already stopped
+      if (!recordingRef.current) return;
 
       recordingRef.current = false;
       setIsRecording(false);
@@ -223,7 +252,6 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
       }
     }, 10000);
 
-    // Store cleanup function for component unmount
     const cleanup = () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
@@ -236,13 +264,11 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
       }
     };
 
-    // Attach cleanup to window for emergency cleanup access
     (window as unknown as Record<string, () => void>).__hotkeyRecordingCleanup = cleanup;
 
     return cleanup;
   }, []);
 
-  // Ensure cleanup on unmount if recording is active
   useEffect(() => {
     return () => {
       const cleanup = (window as unknown as Record<string, () => void>).__hotkeyRecordingCleanup;
@@ -333,6 +359,15 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
     setValidationError(null);
   };
 
+  const handleQuickSettingChange = (
+    key: keyof HotkeySettings,
+    value: unknown
+  ) => {
+    if (onConfigChange && hotkeyState?.config) {
+      onConfigChange({ ...hotkeyState.config, [key]: value });
+    }
+  };
+
   const getStatusColor = () => {
     if (hotkeyState?.session?.is_recording) return 'text-theme-success';
     if (hotkeyState?.is_registered) return 'text-lawn-accent';
@@ -365,12 +400,21 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
         <div className="flex items-center gap-3">
           <Keyboard className="w-5 h-5 text-lawn-accent" />
           <h3 className="text-sm font-black uppercase tracking-wider text-lawn-border">
-            Hotkey Configuration
+            Hotkey Mode Configuration
           </h3>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span className={`font-bold ${getStatusColor()}`}>{getStatusText()}</span>
         </div>
+      </div>
+
+      {/* Mode Description */}
+      <div className="flex items-start gap-3 p-3 border border-lawn-border bg-lawn-bg/50">
+        <Info className="w-4 h-4 text-stone-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-stone-500">
+          Hotkey Mode lets you activate transcription with a keyboard shortcut.
+          Perfect for quick dictation while working in any application.
+        </p>
       </div>
 
       {/* Current Hotkey Display */}
@@ -463,13 +507,85 @@ export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
         </div>
       </div>
 
-      {/* Custom Option */}
-      <div className="flex items-start gap-2 p-3 border border-lawn-border bg-lawn-bg/50">
-        <Info className="w-4 h-4 text-stone-500 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-stone-500">
-          Select "Custom" to record your own key combination. Avoid common shortcuts like
-          Ctrl+C, Ctrl+V, or F5 which may conflict with system operations.
-        </p>
+      {/* Quick Settings */}
+      <div className="border-t-2 border-lawn-border pt-4 space-y-4">
+        <h4 className="text-[10px] font-bold uppercase text-stone-500">
+          Quick Settings
+        </h4>
+
+        {/* Model Selection */}
+        {/* Language Selection */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-lawn-border">
+            Language
+          </label>
+          <select
+            value={language}
+            onChange={(e) => {
+              const newLang = e.target.value;
+              setLanguage(newLang);
+              handleQuickSettingChange('language', newLang);
+            }}
+            className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold focus:border-lawn-accent focus:outline-none"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Toggles Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Auto-inject Toggle */}
+          <div className="flex items-center justify-between p-3 border border-lawn-border bg-lawn-bg">
+            <span className="text-xs font-bold">Auto-inject</span>
+            <button
+              onClick={() => {
+                const newValue = !autoInject;
+                setAutoInject(newValue);
+                handleQuickSettingChange('auto_inject', newValue);
+              }}
+              role="switch"
+              aria-checked={autoInject}
+              aria-label="Auto-inject transcription"
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                autoInject ? 'bg-lawn-accent' : 'bg-stone-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  autoInject ? 'translate-x-5' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Floating Window Toggle */}
+          <div className="flex items-center justify-between p-3 border border-lawn-border bg-lawn-bg">
+            <span className="text-xs font-bold">Floating Window</span>
+            <button
+              onClick={() => {
+                const newValue = !floatingWindow;
+                setFloatingWindow(newValue);
+                handleQuickSettingChange('show_floating_window', newValue);
+              }}
+              role="switch"
+              aria-checked={floatingWindow}
+              aria-label="Show floating window"
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                floatingWindow ? 'bg-lawn-accent' : 'bg-stone-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  floatingWindow ? 'translate-x-5' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Action Buttons */}

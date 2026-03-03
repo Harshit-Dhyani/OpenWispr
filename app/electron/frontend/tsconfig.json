@@ -21,12 +21,9 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
-"paths": {
+        "paths": {
             "@/*": [
                 "./src/*"
-            ],
-            "@config/*": [
-                "../../config/typescript/*"
             ]
         }
     },
@@ -34,6 +31,7 @@
         "src"
     ],
     "exclude": [
+        "src/test/**",
         "src/**/*.test.ts",
         "src/**/*.test.tsx",
         "src/**/__tests__/**"

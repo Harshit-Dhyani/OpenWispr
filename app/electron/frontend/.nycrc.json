@@ -1,0 +1,9 @@
+{
+  "reporterEnabled": "text, html, json-summary",
+  "jsonSummaryReporterOptions": {
+    "outputDir": "coverage"
+  },
+  "htmlReporterOptions": {
+    "outputDir": "coverage/html"
+  }
+}

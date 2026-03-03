@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
             on_state=self.on_state,
         )
         self.current_output_root = settings.export_root
-        self.setWindowTitle("Transcripta")
+        self.setWindowTitle(settings.app_name)
         self.resize(1100, 760)
         self._build_ui()
         self._load_devices()

@@ -115,6 +115,23 @@ export function applySegmentEvent(current: SnapshotPayload, segment: Segment): S
   });
 }
 
+export function applyRefinedSegmentEvent(
+  current: SnapshotPayload,
+  segment: Segment,
+): SnapshotPayload {
+  const transcript = mergeSegment(current.transcript, segment, MAX_TRANSCRIPT_SEGMENTS);
+  const needsReview = normalizeReviewSegments(
+    segment.review_flag
+      ? [...current.needs_review.filter((item) => item.id !== segment.id), segment]
+      : current.needs_review.filter((item) => item.id !== segment.id),
+  );
+  return syncSessionCounts({
+    ...current,
+    transcript,
+    needs_review: needsReview,
+  });
+}
+
 export function applySuppressedSegmentEvent(
   current: SnapshotPayload,
   segment: Segment,

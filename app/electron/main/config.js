@@ -9,7 +9,7 @@ const API_ORIGIN = "http://127.0.0.1:8765";
 const DEFAULT_HOTKEY = "CommandOrControl+Shift+T";
 
 // Hotkey debounce to prevent rapid successive fires
-const HOTKEY_DEBOUNCE_MS = 500;
+const HOTKEY_DEBOUNCE_MS = 150;
 
 // Window configuration
 const WINDOW_CONFIG = {

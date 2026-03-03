@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron desktop shell for Transcripta",
-  "main": "main/main.js",
+  "main": "main/index.js",
   "scripts": {
-    "build:frontend": "node .\\scripts\\build-frontend.js",
-    "dev": "node .\\scripts\\dev.js",
-    "start": "node .\\node_modules\\electron\\cli.js .",
+    "build:frontend": "node ./scripts/build-frontend.js",
+    "dev": "node ./scripts/dev.js",
+    "start": "node ./node_modules/electron/cli.js .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win portable nsis"
   },
@@ -18,12 +18,19 @@
       "output": "dist"
     },
     "files": [
+      "main/index.js",
       "main/main.js",
       "main/preload.js",
       "main/preload-floating.js",
       "main/preload-quick-settings.js",
       "main/model-download-manager.js",
+      "main/shared/**/*",
+      "main/utils/**/*",
+      "main/windows/**/*",
+      "main/ipc/**/*",
+      "main/services/**/*",
       "floating-window.html",
+      "quick-settings.html",
       "renderer/dist/**/*",
       "package.json"
     ],

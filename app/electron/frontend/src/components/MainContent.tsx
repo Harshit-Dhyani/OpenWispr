@@ -21,12 +21,31 @@ type Snapshot = {
 type MainContentProps = {
   snapshot: Snapshot;
   liveLatency?: number | null;
+  liveDraft?: {
+    committedText: string;
+    draftSuffix: string;
+  } | null;
+  transcriptDebugEvents?: Array<{
+    id: number;
+    type: string;
+    sessionId: string | null;
+    segmentId: string | null;
+    correlationId?: string | null;
+    detail?: string | null;
+    textLength: number;
+  }>;
   activityFeed?: React.ReactNode;
 };
 
 type InspectorPanel = 'review' | 'formulas' | 'suppressed' | 'errors' | 'session';
 
-export function MainContent({ snapshot, liveLatency, activityFeed }: MainContentProps) {
+export function MainContent({
+  snapshot,
+  liveLatency,
+  liveDraft,
+  transcriptDebugEvents = [],
+  activityFeed,
+}: MainContentProps) {
   const [activePanel, setActivePanel] = useState<InspectorPanel>('review');
   const [autoScroll, setAutoScroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -145,6 +164,45 @@ export function MainContent({ snapshot, liveLatency, activityFeed }: MainContent
                 />
               ))
             )}
+            {liveDraft && (liveDraft.committedText || liveDraft.draftSuffix) ? (
+              <article className="border-2 border-dashed border-lawn-accent bg-lawn-accent/5 p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-lawn-accent">
+                    Live Draft
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">
+                    committed prefix stays stable
+                  </span>
+                </div>
+                <p className="text-sm font-bold leading-6 text-lawn-border">
+                  {liveDraft.committedText ? (
+                    <span>{liveDraft.committedText}{liveDraft.draftSuffix ? ' ' : ''}</span>
+                  ) : null}
+                  {liveDraft.draftSuffix ? (
+                    <span className="text-lawn-accent/80">{liveDraft.draftSuffix}</span>
+                  ) : null}
+                </p>
+              </article>
+            ) : null}
+            {transcriptDebugEvents.length > 0 ? (
+              <article className="border-2 border-lawn-border bg-black/80 p-3 text-lawn-paper">
+                <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-lawn-accent">
+                  Runtime Event Debug
+                </div>
+                <div className="space-y-1 text-[10px] font-mono">
+                  {transcriptDebugEvents.map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between gap-3">
+                      <span className="truncate text-lawn-accent">{entry.type}</span>
+                      <span className="truncate opacity-70">{entry.sessionId ?? 'no-session'}</span>
+                      <span className="opacity-60">{entry.segmentId ?? '--'}</span>
+                      <span className="truncate opacity-60">{entry.correlationId ?? '--'}</span>
+                      <span className="truncate opacity-60">{entry.detail ?? '--'}</span>
+                      <span className="opacity-90">{entry.textLength}ch</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ) : null}
           </div>
         </section>
 
@@ -440,6 +498,11 @@ function TranscriptSegment({ segment, isLatest }: { segment: Segment; isLatest: 
           <span className="text-[10px] font-black text-lawn-border">
             {(segment.confidence * 100).toFixed(0)}%
           </span>
+          {segment.was_refined ? (
+            <span className="border border-lawn-accent/40 bg-lawn-accent/10 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-lawn-accent">
+              Refined
+            </span>
+          ) : null}
         </div>
         <span className="text-[10px] font-bold text-stone-400">
           {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s

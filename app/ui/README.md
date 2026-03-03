@@ -1,15 +1,15 @@
 # Qt/PySide UI (Legacy Fallback)
 
-This directory contains the legacy Qt-based UI implementation using PySide6.
+This directory contains the Qt-based UI implementation using PySide6. It serves as a functional fallback when the Electron UI is unavailable.
 
 ## Status
 
-**⚠️ Legacy/Fallback Only**
+**⚠️ Legacy/Fallback Status**
 
-This UI is **not actively used** in the current Electron-based distribution. It is kept as a fallback option for:
+This UI is functional but **secondary** to the Electron-based distribution. It is maintained as a fallback for:
 - Development and debugging purposes
-- Future headless/server deployments where Electron is not suitable
 - Emergency fallback if Electron issues arise
+- Environments where Electron is not suitable
 
 ## Active UI
 
@@ -21,9 +21,27 @@ The **primary and actively maintained UI** is the Electron app located at:
 - `main_window.py` - Main Qt window implementation with PySide6
 - `__init__.py` - Module exports
 
-## Usage (Development Only)
+## Qt UI Capabilities
 
-To use the Qt UI instead of Electron:
+The Qt UI provides basic functionality:
+- **Basic transcription** - Record and transcribe audio
+- **Settings management** - Configure transcription settings
+- **Session management** - Save and review past transcriptions
+- **Audio capture** - Microphone recording support
+
+## Limitations vs Electron
+
+The Qt UI has the following limitations:
+- **No floating window** - Cannot be used as an overlay
+- **No system tray** - Cannot minimize to system tray
+- **No global hotkeys** - Qt hotkeys only work when the window is focused
+- **Simpler UI** - Less polished interface
+
+**Note:** Settings and session data **are compatible** between both UIs.
+
+## Usage
+
+To run the Qt UI instead of Electron:
 
 ```python
 from PySide6.QtWidgets import QApplication
@@ -37,6 +55,11 @@ window.show()
 app.exec()
 ```
 
+Or via command line:
+```bash
+python -c "from PySide6.QtWidgets import QApplication; from app.ui.main_window import MainWindow; from app.core.config import AppSettings; app = QApplication([]); settings = AppSettings(); window = MainWindow(settings=settings); window.show(); app.exec()"
+```
+
 ## Migration Notes
 
 - All new UI development should happen in `app/electron/`
@@ -45,6 +68,6 @@ app.exec()
 
 ## Future Plans
 
-- Potential use for server/headless deployments
-- May be removed if Electron proves stable long-term
-- Could be revived for Linux native look-and-feel if needed
+- Maintained as a fallback/debugging tool
+- May be used for environments where Electron is unavailable
+- No active feature development planned

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="6" failures="0" errors="0" time="0.003706">
+    <testsuite name="src/lib/asrRouting.test.ts" timestamp="2026-03-03T16:07:29.554Z" hostname="THGisopbeast" tests="3" failures="0" errors="0" skipped="0" time="0.0025388">
+        <testcase classname="src/lib/asrRouting.test.ts" name="asrRouting &gt; resolves microphone and system models from source-specific settings" time="0.0013232">
+        </testcase>
+        <testcase classname="src/lib/asrRouting.test.ts" name="asrRouting &gt; propagates a new default model to source-specific ids that still inherit the default" time="0.0001996">
+        </testcase>
+        <testcase classname="src/lib/asrRouting.test.ts" name="asrRouting &gt; preserves explicit source-specific overrides when the default changes" time="0.0001248">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/liveTranscript.test.ts" timestamp="2026-03-03T16:07:29.556Z" hostname="THGisopbeast" tests="3" failures="0" errors="0" skipped="0" time="0.0011672">
+        <testcase classname="src/lib/liveTranscript.test.ts" name="liveTranscript &gt; accepts only events from the active session" time="0.0003138">
+        </testcase>
+        <testcase classname="src/lib/liveTranscript.test.ts" name="liveTranscript &gt; ignores legacy partials after structured draft events for the active session" time="0.0001631">
+        </testcase>
+        <testcase classname="src/lib/liveTranscript.test.ts" name="liveTranscript &gt; clears live draft only for matching commit events" time="0.0005155">
+        </testcase>
+    </testsuite>
+</testsuites>
