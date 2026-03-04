@@ -149,7 +149,8 @@ class TestLockContention:
         import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            manager = SettingsManager(settings_dir=temp_path := temp_dir)
+            temp_path = temp_dir
+            manager = SettingsManager(settings_dir=temp_path)
 
             def accessor():
                 for _ in range(1000):

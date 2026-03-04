@@ -52,19 +52,27 @@ class SoundcardBackend(AudioBackend):
             device_channels = getattr(device, "channels", None)
             for channel_count in candidate_channel_counts(self.channels, device_channels):
                 for rate in sample_rates_to_try:
+                    recorder_context = None
                     try:
-                        self._recorder_context = device.recorder(
+                        recorder_context = device.recorder(
                             samplerate=rate,
                             channels=channel_count,
                             blocksize=self.block_size,
                         )
-                        self._recorder = self._recorder_context.__enter__()
+                        recorder = recorder_context.__enter__()
+                        self._recorder_context = recorder_context
+                        self._recorder = recorder
                         self.resolved_name = candidate_name
                         self.runtime_sample_rate = rate
                         self.runtime_channels = channel_count
                         self._running = True
                         return
                     except (AssertionError, OSError, RuntimeError) as exc:
+                        if recorder_context is not None:
+                            try:
+                                recorder_context.__exit__(type(exc), exc, exc.__traceback__)
+                            except Exception:
+                                pass
                         last_exc = exc
                         self.attempts.append(
                             BackendAttempt(

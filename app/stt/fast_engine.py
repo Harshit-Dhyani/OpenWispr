@@ -414,6 +414,7 @@ class FastWhisperBackend:
                 download_root=self.download_root,
                 device=actual_device,
                 language=self.language_mode if self.language_mode != "auto" else None,
+                model_name=self.model_name,
             )
 
             # Warmup
@@ -445,6 +446,7 @@ class FastWhisperBackend:
                 download_root=self.download_root,
                 device="cpu",
                 language=self.language_mode if self.language_mode != "auto" else None,
+                model_name=self.model_name,
             )
             self._backend.warmup()
 

@@ -581,12 +581,14 @@ class OptimizedWhisperFactory:
         download_root: str,
         device: str = "cuda",
         language: str | None = None,
+        model_name: str | None = None,
     ) -> FastWhisperBackend:
         """Create an optimized backend for the specified mode."""
         mode_config = WISPR_MODE if mode == "wispr" else SYSTEM_MODE
+        resolved_model_name = model_name or mode_config.model_size
 
         model = model_pool.get_model(
-            model_name=mode_config.model_size,
+            model_name=resolved_model_name,
             device=device,
             compute_type=mode_config.compute_type,
             download_root=download_root,

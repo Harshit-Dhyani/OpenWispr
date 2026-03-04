@@ -216,9 +216,10 @@ class PlatformTextInjector:
     def _inject_macos(self, text: str) -> bool:
         """macOS text injection using AppleScript."""
         try:
+            escaped_text = text.replace('"', '\\"')
             script = f'''
                 tell application "System Events"
-                    keystroke "{text.replace('"', '\\"')}"
+                    keystroke "{escaped_text}"
                 end tell
             '''
             subprocess.run(

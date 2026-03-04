@@ -10,6 +10,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import time
 from unittest.mock import Mock
 
 import numpy as np
@@ -395,6 +396,39 @@ class TestSpeechSegmenter:
 
         assert len(segmenter.pending_segments) == 0
 
+    def test_finalize_single_pending_segment(self) -> None:
+        """Finalize should not drop the last valid pending segment."""
+        segmenter = SpeechSegmenter()
+        segment = SpeechSegment(
+            start_sample=0,
+            end_sample=16000,
+            audio=np.ones(16000, dtype=np.float32),
+            confidence=0.8,
+        )
+        segmenter.add_segment(segment)
+
+        finalized = segmenter.finalize()
+
+        assert len(finalized) == 1
+        assert finalized[0].confidence == pytest.approx(0.8)
+
+    def test_hysteresis_block_does_not_mutate_speech_start_or_buffer(self) -> None:
+        """Blocked transitions should not overwrite speech bookkeeping."""
+        vad = OptimizedVAD(
+            mode=VADMode.HOTKEY,
+            config=VADConfig.hotkey_mode(),
+            enable_adaptive=False,
+        )
+        vad.last_transition_time = time.perf_counter() * 1000
+        frame = np.ones(vad._frame_size_samples, dtype=np.float32) * 0.5
+
+        state, segment = vad.process_frame(frame)
+
+        assert state == VADState.SILENCE
+        assert segment is None
+        assert vad.speech_start_sample == 0
+        assert len(vad.pre_buffer) == 0
+
 
 class TestConvenienceFunctions:
     """Tests for convenience functions."""
@@ -432,3 +466,23 @@ class TestConvenienceFunctions:
         regions = detect_speech_regions(audio, sample_rate=16000)
 
         assert regions == []
+
+
+class TestVADRegressionGuards:
+    """Regression guards for recent VAD fixes."""
+
+    def test_first_successful_speech_transition_buffers_audio_once(self) -> None:
+        """First accepted speech frame should only be buffered once."""
+        config = VADConfig.hotkey_mode()
+        config.hysteresis_ms = 0.0
+        vad = OptimizedVAD(config=config)
+
+        audio = np.ones(1600, dtype=np.float32) * 0.5
+
+        state, segment = vad.process_frame(audio)
+
+        assert segment is None
+        assert state == VADState.SPEECH
+        assert len(vad.pre_buffer) == 1
+        np.testing.assert_array_equal(vad.pre_buffer[0], audio)
+        assert vad.metrics.speech_samples == len(audio)

@@ -290,6 +290,50 @@ def test_hotkey_segment_callback_emits_only_commit_final(tmp_path: Path) -> None
     assert events == ["hotkey_commit_final"]
 
 
+def test_hotkey_segment_callback_skips_duplicate_commit_events(tmp_path: Path) -> None:
+    service = HotkeyTranscriptionService(_make_settings(tmp_path))
+    revisions = iter([2, 3])
+    fake_session = SimpleNamespace(
+        cancel_requested=False,
+        suppress_stream_events=False,
+        session_id="hotkey-session-1",
+        language_mode="auto",
+        language_used="auto",
+        raw_partial_text="",
+        display_partial_text="",
+        partial_text="",
+        first_partial_at=None,
+        final_segments=[],
+        draft_stabilizer=SimpleNamespace(
+            consume_final_text=lambda text, start, end: SimpleNamespace(
+                revision=next(revisions),
+                stream_id="hotkey-stream-1",
+                committed_text=text,
+            )
+        ),
+    )
+    service._session = fake_session
+
+    events: list[str] = []
+    service.register_callback(lambda event_type, _payload: events.append(event_type))
+
+    segment = SimpleNamespace(
+        id="seg-1",
+        text="how are you",
+        display_text="how are you",
+        start=0.0,
+        end=1.0,
+        language="en",
+        confidence=0.9,
+    )
+
+    service._on_transcription_segment(fake_session, segment)
+    service._on_transcription_segment(fake_session, segment)
+
+    assert events == ["hotkey_commit_final"]
+    assert len(fake_session.final_segments) == 1
+
+
 def test_hotkey_model_resolution_uses_source_specific_model_ids(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

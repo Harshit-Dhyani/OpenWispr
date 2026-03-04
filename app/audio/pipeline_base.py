@@ -137,7 +137,7 @@ class AudioPipeline(ABC):
 
         # Output queue for processed audio
         self._output_queue: asyncio.Queue[np.ndarray] = asyncio.Queue(
-            maxsize=config.max_buffer_size // 800  # Approximate frame count
+            maxsize=max(1, config.max_buffer_size // 800)  # Approximate frame count
         )
 
         # Latency tracking

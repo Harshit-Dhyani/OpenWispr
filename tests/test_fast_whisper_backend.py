@@ -8,7 +8,12 @@ import pytest
 
 sys.modules.setdefault("faster_whisper", SimpleNamespace(WhisperModel=object))
 
-from app.stt.fast_whisper_backend import FastWhisperBackend, ModeConfig, normalize_suppress_tokens
+from app.stt.fast_whisper_backend import (
+    FastWhisperBackend,
+    ModeConfig,
+    OptimizedWhisperFactory,
+    normalize_suppress_tokens,
+)
 
 
 @pytest.mark.parametrize(
@@ -80,3 +85,22 @@ def test_transcribe_normalizes_string_suppress_tokens_before_model_call() -> Non
     assert result.text == "hello"
     assert captured_kwargs["suppress_tokens"] == [-1]
     assert not isinstance(captured_kwargs["suppress_tokens"], str)
+
+
+def test_factory_uses_requested_runtime_model_name() -> None:
+    captured: dict[str, object] = {}
+
+    class FakePool:
+        def get_model(self, **kwargs: object):
+            captured.update(kwargs)
+            return object()
+
+    OptimizedWhisperFactory.create_backend(
+        mode="system",
+        model_pool=FakePool(),
+        download_root="./models",
+        device="cuda",
+        model_name="turbo",
+    )
+
+    assert captured["model_name"] == "turbo"

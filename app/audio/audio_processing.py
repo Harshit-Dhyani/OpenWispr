@@ -475,7 +475,7 @@ class HighPassFilter(AudioFilter):
 
         rc = 1.0 / (2 * np.pi * self.cutoff_freq)
         dt = 1.0 / sample_rate
-        alpha = dt / (rc + dt)
+        alpha = rc / (rc + dt)
 
         result = np.empty_like(audio)
         result[0] = audio[0]

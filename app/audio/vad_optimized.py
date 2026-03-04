@@ -507,11 +507,9 @@ class OptimizedVAD:
         if self.state == VADState.SILENCE:
             if is_speech:
                 # Transition to speech
-                self._transition_to(VADState.SPEECH, current_time)
-                self.speech_start_sample = self.metrics.total_samples - len(audio)
-
-                # Include pre-buffer
-                self.pre_buffer.append(audio)
+                transitioned = self._transition_to(VADState.SPEECH, current_time)
+                if transitioned:
+                    self.speech_start_sample = self.metrics.total_samples - len(audio)
 
         elif self.state == VADState.SPEECH:
             if not is_speech:
@@ -539,15 +537,15 @@ class OptimizedVAD:
 
         return segment
 
-    def _transition_to(self, new_state: VADState, current_time: float) -> None:
+    def _transition_to(self, new_state: VADState, current_time: float) -> bool:
         """Handle state transition with hysteresis check."""
         if new_state == self.state:
-            return
+            return False
 
         # Check hysteresis
         time_since_last = current_time - self.last_transition_time
         if time_since_last < self.config.hysteresis_ms:
-            return
+            return False
 
         self.state = new_state
         self.last_transition_time = current_time
@@ -557,6 +555,7 @@ class OptimizedVAD:
             self.callback(new_state)
 
         logger.debug("VAD state: %s", new_state.name)
+        return True
 
     def _create_segment(self) -> SpeechSegment:
         """Create speech segment from buffered audio."""
@@ -708,15 +707,20 @@ class SpeechSegmenter:
             List of finalized segments
         """
         self.pending_segments.append(segment)
-        return self._process_pending()
+        return self._process_pending(flush=False)
 
-    def _process_pending(self) -> list[SpeechSegment]:
+    def _process_pending(self, *, flush: bool = False) -> list[SpeechSegment]:
         """Process pending segments and return finalized ones."""
-        if len(self.pending_segments) < 2:
+        if not self.pending_segments:
             return []
+        if len(self.pending_segments) == 1:
+            if not flush:
+                return []
+            segment = self.pending_segments[0]
+            self.pending_segments = []
+            return [segment] if self._is_valid_segment(segment) else []
 
         finalized: list[SpeechSegment] = []
-        merged: list[SpeechSegment] = []
 
         # Sort by start time
         sorted_segments = sorted(self.pending_segments, key=lambda s: s.start_sample)
@@ -789,9 +793,7 @@ class SpeechSegmenter:
 
     def finalize(self) -> list[SpeechSegment]:
         """Finalize all pending segments."""
-        segments = self._process_pending()
-        self.pending_segments = []
-        return segments
+        return self._process_pending(flush=True)
 
     def reset(self) -> None:
         """Reset segmenter state."""
