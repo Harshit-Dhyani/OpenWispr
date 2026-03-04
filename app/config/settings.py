@@ -543,6 +543,22 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Key Combination",
         description="Press the button to record a new hotkey",
     ),
+    "microphone_key_combination": SettingDefinition(
+        name="microphone_key_combination",
+        category="hotkey",
+        type="string",
+        default=UIConstants.DEFAULT_HOTKEY,
+        label="Microphone Hotkey",
+        description="Global shortcut for microphone dictation",
+    ),
+    "system_key_combination": SettingDefinition(
+        name="system_key_combination",
+        category="hotkey",
+        type="string",
+        default="CommandOrControl+Shift+Y",
+        label="System Audio Hotkey",
+        description="Global shortcut for system-audio transcription",
+    ),
     "hold_mode": SettingDefinition(
         name="hold_mode",
         category="hotkey",
@@ -574,6 +590,15 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default=AudioConstants.DEFAULT_CAPTURE_DEVICE_ID,
         label="Dictation Microphone",
         description="Microphone used for quick dictation",
+    ),
+    "capture_source": SettingDefinition(
+        name="capture_source",
+        category="hotkey",
+        type="enum",
+        default="microphone",
+        label="Hotkey Capture Source",
+        description="Choose whether the hotkey records microphone or system audio by default",
+        options=["system", "microphone"],
     ),
     "finish_mode_default": SettingDefinition(
         name="finish_mode_default",

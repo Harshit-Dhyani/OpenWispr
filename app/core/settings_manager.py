@@ -76,6 +76,19 @@ def _normalize_settings_payload(data: dict[str, Any]) -> dict[str, Any]:
     )
     audio["default_capture_source"] = default_capture_source
     audio.setdefault("captureMode", default_capture_source)
+    hotkey["capture_source"] = _normalize_capture_source(
+        hotkey.get("capture_source") or default_capture_source
+    )
+    microphone_hotkey = hotkey.get("microphone_key_combination") or hotkey.get("key_combination")
+    hotkey["microphone_key_combination"] = (
+        str(microphone_hotkey).strip() if microphone_hotkey else get_setting("key_combination").default
+    )
+    system_hotkey = hotkey.get("system_key_combination")
+    hotkey["system_key_combination"] = (
+        str(system_hotkey).strip()
+        if system_hotkey
+        else "CommandOrControl+Shift+Y"
+    )
 
     fallback_model_id = (
         _normalize_asr_model_id(transcription.get("default_asr_model_id"))
@@ -218,10 +231,17 @@ class HotkeySettings:
 
     enabled: bool = field(default_factory=lambda: get_setting("enabled").default)
     key_combination: str = field(default_factory=lambda: get_setting("key_combination").default)
+    microphone_key_combination: str = field(
+        default_factory=lambda: get_setting("microphone_key_combination").default
+    )
+    system_key_combination: str = field(
+        default_factory=lambda: get_setting("system_key_combination").default
+    )
     hold_mode: bool = field(default_factory=lambda: get_setting("hold_mode").default)
     auto_inject: bool = field(default_factory=lambda: get_setting("auto_inject").default)
     language: str = field(default_factory=lambda: get_setting("language").default)
     device_id: str = field(default_factory=lambda: get_setting("device_id").default)
+    capture_source: str = field(default_factory=lambda: get_setting("capture_source").default)
     finish_mode_default: str = field(
         default_factory=lambda: get_setting("finish_mode_default").default
     )
