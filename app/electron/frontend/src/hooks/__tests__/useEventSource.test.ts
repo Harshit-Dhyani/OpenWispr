@@ -233,4 +233,28 @@ describe('useEventSource', () => {
 
     expect(mockEventSource).toBeNull();
   });
+
+  it('does not connect when disabled and cleans up when disabled later', async () => {
+    const { rerender } = renderHook(
+      ({ enabled }) =>
+        useEventSource({
+          url: '/api/events',
+          enabled,
+          onMessage: mockOnMessage,
+        }),
+      { initialProps: { enabled: false } }
+    );
+
+    expect(mockEventSource).toBeNull();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => {
+      expect(mockEventSource).not.toBeNull();
+    });
+
+    rerender({ enabled: false });
+
+    expect(mockEventSource).toBeNull();
+  });
 });

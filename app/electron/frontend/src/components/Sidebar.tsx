@@ -169,6 +169,19 @@ export function Sidebar({
 
   const isPreloading = preloadStatus?.loading ?? false;
   const preloadProgress = preloadStatus?.progress ?? 0;
+  const preloadStage = preloadStatus?.stage ?? 'idle';
+  const preloadStageLabel =
+    preloadStage === 'warming'
+      ? 'Warming Up'
+      : preloadStage === 'loading'
+        ? 'Loading Model'
+        : preloadStage === 'downloading'
+          ? 'Preparing'
+          : preloadStage === 'ready'
+            ? 'Ready'
+            : preloadStage === 'failed'
+              ? 'Failed'
+              : 'Idle';
 
   return (
     <aside className="flex h-full w-full shrink-0 flex-col border-b-2 border-lawn-border bg-lawn-bg p-4 lg:h-full lg:overflow-hidden xl:border-b-0 xl:border-r-2">
@@ -378,17 +391,29 @@ export function Sidebar({
                         {preloadStatus?.message || 'Loading model...'}
                       </p>
                       <p className="text-[9px] text-stone-500">
-                        {form.modelName} (~{getModelLoadTime(form.modelName)}s)
+                        {preloadStageLabel} · {form.modelName} (~{getModelLoadTime(form.modelName)}s)
                       </p>
                     </div>
-                    <span className="text-xs font-black text-theme-warning">{preloadProgress}%</span>
+                    {preloadStage === 'downloading' ? (
+                      <span className="text-xs font-black text-theme-warning">{preloadProgress}%</span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-theme-warning">
+                        {preloadStageLabel}
+                      </span>
+                    )}
                   </div>
-                  <div className="h-2 border-[2px] border-lawn-border bg-lawn-bg overflow-hidden">
-                    <div
-                      className="h-full bg-theme-warning transition-all duration-300 ease-out border-r-2 border-lawn-border"
-                      style={{ width: `${preloadProgress}%` }}
-                    />
-                  </div>
+                  {preloadStage === 'downloading' ? (
+                    <div className="h-2 overflow-hidden border-[2px] border-lawn-border bg-lawn-bg">
+                      <div
+                        className="h-full border-r-2 border-lawn-border bg-theme-warning transition-all duration-300 ease-out"
+                        style={{ width: `${preloadProgress}%` }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-2 overflow-hidden border-[2px] border-lawn-border bg-lawn-bg">
+                      <div className="h-full w-2/3 animate-pulse bg-theme-warning/70" />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

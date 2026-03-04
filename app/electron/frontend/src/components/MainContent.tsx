@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, FileText, Filter, Sigma, TriangleAlert, Waves } from 'lucide-react';
 import type { Formula, Segment, SessionSummary } from '../types/api';
 
@@ -19,8 +18,12 @@ type Snapshot = {
 };
 
 type MainContentProps = {
+  scope?: 'dictation' | 'session';
   snapshot: Snapshot;
   liveLatency?: number | null;
+  workspaceLabel?: string;
+  workspaceTitle?: string;
+  workspaceDescription?: string;
   liveDraft?: {
     committedText: string;
     draftSuffix: string;
@@ -34,17 +37,19 @@ type MainContentProps = {
     detail?: string | null;
     textLength: number;
   }>;
-  activityFeed?: React.ReactNode;
 };
 
 type InspectorPanel = 'review' | 'formulas' | 'suppressed' | 'errors' | 'session';
 
 export function MainContent({
+  scope = 'session',
   snapshot,
   liveLatency,
+  workspaceLabel = 'Workspace',
+  workspaceTitle,
+  workspaceDescription,
   liveDraft,
   transcriptDebugEvents = [],
-  activityFeed,
 }: MainContentProps) {
   const [activePanel, setActivePanel] = useState<InspectorPanel>('review');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -58,6 +63,7 @@ export function MainContent({
     snapshot.session?.suppressed_count ?? snapshot.suppressed_transcript.length;
   const errorCount = Number(Boolean(snapshot.health.last_error)) + Number(Boolean(snapshot.health.last_warning));
   const sessionStatus = snapshot.session?.status ?? 'idle';
+  const visibleTranscript = useMemo(() => liveTranscript.slice(-200), [liveTranscript]);
 
   const panels = useMemo(
     () => [
@@ -103,25 +109,29 @@ export function MainContent({
       ? `${Math.round(liveLatency)}ms`
       : '--';
 
+  const emptyStateBody =
+    scope === 'dictation'
+      ? 'Start dictation to see live draft and finalized microphone segments here. Session audio transcripts stay on the Sessions screen.'
+      : 'Start a session and play system audio. Review, formulas, suppressed segments, and warnings will populate alongside the transcript.';
+
   return (
     <main className="flex min-h-0 flex-col gap-4 overflow-hidden bg-lawn-bg/30 p-4">
-      {activityFeed && <div className="xl:hidden shrink-0">{activityFeed}</div>}
-
       <header className="shrink-0 border-2 border-lawn-border bg-lawn-panel p-5 text-lawn-border shadow-brutal">
         <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
               <p className="text-[10px] font-black uppercase tracking-[0.15em] text-stone-500">
-                Workspace
+                {workspaceLabel}
               </p>
               <StatusBadge status={sessionStatus} />
             </div>
             <h2 className="font-display text-3xl uppercase tracking-tighter leading-none md:text-4xl">
-              {snapshot.session?.title || 'Live Workspace'}
+              {workspaceTitle || snapshot.session?.title || 'Live Transcript'}
             </h2>
             <p className="mt-2 max-w-3xl text-xs font-bold leading-4 opacity-70">
-              {snapshot.session?.output_dir ||
-                'Session transcript, verification, formulas, suppressed segments, and diagnostics stay visible here while capture is running.'}
+              {workspaceDescription ||
+                snapshot.session?.output_dir ||
+                'Transcript, verification, formulas, suppressed segments, and diagnostics stay visible here while capture is running.'}
             </p>
           </div>
 
@@ -153,11 +163,11 @@ export function MainContent({
             {liveTranscript.length === 0 ? (
               <EmptyState
                 title="No accepted transcript yet"
-                body="Start a session and play system audio. Review, formulas, suppressed segments, and warnings will populate alongside the transcript."
+                body={emptyStateBody}
               />
             ) : (
-              liveTranscript.slice(-120).map((segment, index, arr) => (
-                <TranscriptSegment
+              visibleTranscript.map((segment, index, arr) => (
+                <MemoTranscriptSegment
                   key={segment.id}
                   segment={segment}
                   isLatest={index === arr.length - 1}
@@ -261,6 +271,8 @@ export function MainContent({
     </main>
   );
 }
+
+const MemoTranscriptSegment = React.memo(TranscriptSegment);
 
 function ReviewPanel({ segments }: { segments: Segment[] }) {
   if (segments.length === 0) {

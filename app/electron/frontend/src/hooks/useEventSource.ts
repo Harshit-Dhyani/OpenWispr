@@ -10,6 +10,7 @@ export type EventSourceEvent = {
 
 type UseEventSourceOptions = {
   url: string;
+  enabled?: boolean;
   maxReconnectAttempts?: number;
   baseReconnectDelay?: number;
   maxReconnectDelay?: number;
@@ -30,6 +31,7 @@ type UseEventSourceReturn = {
 export function useEventSource(options: UseEventSourceOptions): UseEventSourceReturn {
   const {
     url,
+    enabled = true,
     maxReconnectAttempts = 10,
     baseReconnectDelay = 1000,
     maxReconnectDelay = 30000,
@@ -267,6 +269,13 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
     let cancelled = false;
 
     const start = async () => {
+      if (!enabled) {
+        setStatus('idle');
+        reconnectAttemptsRef.current = 0;
+        setReconnectAttempts(0);
+        return;
+      }
+
       if (window.transcriptaDesktop?.getApiOrigin) {
         try {
           apiOriginRef.current = await window.transcriptaDesktop.getApiOrigin();
@@ -306,7 +315,7 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
         eventSourceRef.current = null;
       }
     };
-  }, [connect]);
+  }, [connect, enabled]);
 
   return {
     status,

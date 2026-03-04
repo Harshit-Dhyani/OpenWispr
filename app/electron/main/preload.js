@@ -85,6 +85,8 @@ contextBridge.exposeInMainWorld("transcriptaDesktop", {
      * @returns {Promise<{success: boolean, enabled: boolean}>}
      */
     toggle: (enabled) => ipcRenderer.invoke("hotkey:toggle", enabled),
+    start: (source) => ipcRenderer.invoke("hotkey:start", { source }),
+    stop: () => ipcRenderer.invoke("hotkey:stop"),
 
     /**
      * Get current hotkey state
@@ -119,6 +121,12 @@ contextBridge.exposeInMainWorld("transcriptaDesktop", {
      * @param {function} callback - Callback function(event, {isRecording, hotkeyEnabled, accelerator})
      */
     onStateChange: (callback) => ipcRenderer.on("hotkey-state-change", callback),
+
+    onTranscriptEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on("hotkey-transcript-event", listener);
+      return () => ipcRenderer.removeListener("hotkey-transcript-event", listener);
+    },
 
     /**
      * Remove hotkey state change listener

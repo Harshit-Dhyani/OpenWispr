@@ -175,9 +175,12 @@ export type AudioSettings = z.infer<typeof audioSettingsSchema>;
 export const hotkeySettingsSchema = z.object({
   enabled: z.boolean().default(false),
   key_combination: z.string().min(1).default(UIConstants.DEFAULT_HOTKEY),
+  microphone_key_combination: z.string().min(1).default(UIConstants.DEFAULT_HOTKEY),
+  system_key_combination: z.string().min(1).default('CommandOrControl+Shift+Y'),
   hold_mode: z.boolean().default(false),
   auto_inject: z.boolean().default(true),
   language: z.string().default(UIConstants.DEFAULT_LANGUAGE),
+  capture_source: z.enum(['system', 'microphone']).default('microphone'),
   device_id: z.string().default(AudioConstants.DEFAULT_CAPTURE_DEVICE_ID),
   finish_mode_default: z.enum(['finish', 'finish_and_paste']).default('finish_and_paste'),
   show_floating_window: z.boolean().default(true),
@@ -280,9 +283,12 @@ export const DEFAULT_SETTINGS: SettingsState = {
   hotkey: {
     enabled: false,
     key_combination: UIConstants.DEFAULT_HOTKEY,
+    microphone_key_combination: UIConstants.DEFAULT_HOTKEY,
+    system_key_combination: 'CommandOrControl+Shift+Y',
     hold_mode: false,
     auto_inject: true,
     language: UIConstants.DEFAULT_LANGUAGE,
+    capture_source: 'microphone',
     device_id: AudioConstants.DEFAULT_CAPTURE_DEVICE_ID,
     finish_mode_default: 'finish_and_paste',
     show_floating_window: true,
@@ -432,9 +438,15 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
   // Hotkey
   { key: 'enabled', type: 'boolean', label: SETTING_LABELS.enabled, description: SETTING_DESCRIPTIONS.enabled, category: 'hotkey' },
   { key: 'key_combination', type: 'string', label: SETTING_LABELS.key_combination, description: SETTING_DESCRIPTIONS.key_combination, category: 'hotkey' },
+  { key: 'microphone_key_combination', type: 'string', label: 'Microphone Hotkey', description: 'Global shortcut for microphone dictation.', category: 'hotkey' },
+  { key: 'system_key_combination', type: 'string', label: 'System Audio Hotkey', description: 'Global shortcut for system-audio transcription.', category: 'hotkey' },
   { key: 'hold_mode', type: 'boolean', label: SETTING_LABELS.hold_mode, description: SETTING_DESCRIPTIONS.hold_mode, category: 'hotkey' },
   { key: 'auto_inject', type: 'boolean', label: SETTING_LABELS.auto_inject, description: SETTING_DESCRIPTIONS.auto_inject, category: 'hotkey' },
   { key: 'language', type: 'string', label: SETTING_LABELS.language, description: SETTING_DESCRIPTIONS.language, category: 'hotkey' },
+  { key: 'capture_source', type: 'enum', label: 'Hotkey Capture Source', description: 'Choose whether the hotkey records your microphone or system audio.', category: 'hotkey', options: [
+    { value: 'system', label: CAPTURE_MODE_LABELS.system },
+    { value: 'microphone', label: CAPTURE_MODE_LABELS.microphone },
+  ]},
   { key: 'device_id', type: 'string', label: SETTING_LABELS.device_id, description: SETTING_DESCRIPTIONS.device_id, category: 'hotkey' },
   { key: 'finish_mode_default', type: 'enum', label: SETTING_LABELS.finish_mode_default, description: SETTING_DESCRIPTIONS.finish_mode_default, category: 'hotkey', options: [
     { value: 'finish', label: FINISH_ACTION_LABELS.finish },

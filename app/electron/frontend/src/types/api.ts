@@ -241,6 +241,7 @@ export type ModelPreloadStatus = {
   progress: number;
   message: string;
   model_name?: string;
+  stage?: 'idle' | 'preparing' | 'downloading' | 'loading' | 'warming' | 'ready' | 'failed';
 };
 
 // ============================================

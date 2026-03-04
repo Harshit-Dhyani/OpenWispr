@@ -30,6 +30,8 @@ declare global {
       // Hotkey management
       hotkey: {
         toggle: (enabled: boolean) => Promise<unknown>;
+        start: (source?: 'microphone' | 'system') => Promise<unknown>;
+        stop: () => Promise<unknown>;
         register: (accelerator: string) => Promise<{ success: boolean; error?: string }>;
         unregister: () => Promise<{ success: boolean; error?: string }>;
         getState: () => Promise<{
@@ -39,6 +41,12 @@ declare global {
           error: string | null;
         }>;
         onStateChange: (callback: (event: unknown, state: import('./types/api').HotkeyState) => void) => void;
+        onTranscriptEvent: (
+          callback: (payload: {
+            type: string;
+            payload: import('./types/api').DraftPartialPayload | import('./types/api').CommitFinalPayload | Record<string, unknown>;
+          }) => void
+        ) => () => void;
         removeStateChangeListener: (callback: (event: unknown, state: import('./types/api').HotkeyState) => void) => void;
         updateConfig: (config: Partial<import('./lib/settingsSchema').HotkeySettings>) => Promise<{ success: boolean; config?: import('./lib/settingsSchema').HotkeySettings; error?: string }>;
       };

@@ -15,6 +15,26 @@ export function HotkeySection({
   updateSetting,
   resetSetting,
 }: SectionProps) {
+  const hotkeyDeviceOptions = [
+    {
+      value: 'default',
+      label:
+        settings.hotkey.capture_source === 'system'
+          ? 'Auto-detect system audio'
+          : 'Auto-detect microphone',
+    },
+    ...audioDevices
+      .filter((device) =>
+        settings.hotkey.capture_source === 'system'
+          ? Boolean(device.is_loopback || device.supports_loopback)
+          : Boolean(device.is_input && !(device.is_loopback || device.supports_loopback)),
+      )
+      .map((device) => ({
+        value: device.id,
+        label: device.name,
+      })),
+  ];
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -37,22 +57,61 @@ export function HotkeySection({
 
         {settings.hotkey.enabled && (
           <>
-            <SettingCard
-              title="Key Combination"
-              description="Press the button and enter your desired hotkey"
-              changed={isChanged('hotkey', 'key_combination')}
-              onReset={() => resetSetting('hotkey', 'key_combination')}
-            >
-              <HotkeyRecorder
-                value={settings.hotkey.key_combination}
-                onChange={(v) => updateSetting('hotkey', 'key_combination', v)}
-              />
-            </SettingCard>
+            <div className="grid gap-4 md:grid-cols-2">
+              <SettingCard
+                title="Microphone Hotkey"
+                description="Global shortcut for microphone dictation"
+                changed={
+                  isChanged('hotkey', 'microphone_key_combination') ||
+                  isChanged('hotkey', 'key_combination')
+                }
+                onReset={() => {
+                  resetSetting('hotkey', 'microphone_key_combination');
+                  resetSetting('hotkey', 'key_combination');
+                }}
+              >
+                <HotkeyRecorder
+                  value={settings.hotkey.microphone_key_combination}
+                  onChange={(v) => {
+                    updateSetting('hotkey', 'microphone_key_combination', v);
+                    updateSetting('hotkey', 'key_combination', v);
+                  }}
+                />
+              </SettingCard>
+
+              <SettingCard
+                title="System Audio Hotkey"
+                description="Global shortcut for loopback/system audio transcription"
+                changed={isChanged('hotkey', 'system_key_combination')}
+                onReset={() => resetSetting('hotkey', 'system_key_combination')}
+              >
+                <HotkeyRecorder
+                  value={settings.hotkey.system_key_combination}
+                  onChange={(v) => updateSetting('hotkey', 'system_key_combination', v)}
+                />
+              </SettingCard>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <SettingCard
+                title="Hotkey Capture Source"
+                description="Choose whether the hotkey records your microphone or system audio"
+                changed={isChanged('hotkey', 'capture_source')}
+                onReset={() => resetSetting('hotkey', 'capture_source')}
+              >
+                <Select
+                  value={settings.hotkey.capture_source}
+                  options={[
+                    { value: 'microphone', label: 'Microphone' },
+                    { value: 'system', label: 'System Audio' },
+                  ]}
+                  onChange={(v) => updateSetting('hotkey', 'capture_source', v)}
+                />
+              </SettingCard>
+
+              <SettingCard
                 title="Dictation Language"
-                description="Default language for microphone hotkey dictation"
+                description="Default language for hotkey transcription"
                 changed={isChanged('hotkey', 'language')}
                 onReset={() => resetSetting('hotkey', 'language')}
               >
@@ -84,22 +143,18 @@ export function HotkeySection({
             </div>
 
             <SettingCard
-              title="Dictation Microphone"
-              description="Microphone source used for quick dictation"
+              title={settings.hotkey.capture_source === 'system' ? 'System Audio Device' : 'Dictation Microphone'}
+              description={
+                settings.hotkey.capture_source === 'system'
+                  ? 'Loopback device used for quick system-audio transcription'
+                  : 'Microphone source used for quick dictation'
+              }
               changed={isChanged('hotkey', 'device_id')}
               onReset={() => resetSetting('hotkey', 'device_id')}
             >
               <Select
                 value={settings.hotkey.device_id}
-                options={[
-                  { value: 'default', label: 'Auto-detect microphone' },
-                  ...audioDevices
-                    .filter((device) => device.is_input && !(device.is_loopback || device.supports_loopback))
-                    .map((device) => ({
-                      value: device.id,
-                      label: device.name,
-                    })),
-                ]}
+                options={hotkeyDeviceOptions}
                 onChange={(v) => updateSetting('hotkey', 'device_id', v)}
               />
             </SettingCard>

@@ -67,29 +67,41 @@ function getRendererStatus() {
 }
 
 function buildHotkeyStatePayload() {
+  const microphoneAccelerator =
+    state.currentMicrophoneHotkeyAccelerator ||
+    state.hotkeyConfigState.microphone_key_combination ||
+    state.hotkeyConfigState.key_combination ||
+    state.DEFAULT_HOTKEY;
+  const systemAccelerator =
+    state.currentSystemHotkeyAccelerator ||
+    state.hotkeyConfigState.system_key_combination ||
+    "CommandOrControl+Shift+Y";
+
   return {
     enabled: state.hotkeyEnabled,
     isRecording: state.isRecording,
-    accelerator: state.currentHotkeyAccelerator || state.DEFAULT_HOTKEY,
-    registered: !!state.currentHotkeyAccelerator,
+    accelerator: microphoneAccelerator,
+    microphoneAccelerator,
+    systemAccelerator,
+    registered: !!(state.currentMicrophoneHotkeyAccelerator || state.currentSystemHotkeyAccelerator),
     defaultHotkey: state.DEFAULT_HOTKEY,
     mode: "toggle",
     audioFeedback: state.audioFeedbackEnabled,
     config: {
       ...state.hotkeyConfigState,
       enabled: state.hotkeyEnabled,
-      key_combination:
-        state.currentHotkeyAccelerator ||
-        state.hotkeyConfigState.key_combination ||
-        state.DEFAULT_HOTKEY,
+      key_combination: microphoneAccelerator,
+      microphone_key_combination: microphoneAccelerator,
+      system_key_combination: systemAccelerator,
     },
-    is_registered: !!state.currentHotkeyAccelerator,
+    is_registered: !!(state.currentMicrophoneHotkeyAccelerator || state.currentSystemHotkeyAccelerator),
     error: state.hotkeyLastError,
     session: {
       session_id: state.activeHotkeySessionId,
       is_recording: state.isRecording,
       status: getRendererStatus(),
       lifecycle_state: state.hotkeyLifecycleState,
+      capture_source: state.activeHotkeyCaptureSource,
       last_activated_at: null,
       total_activations: 0,
       current_text: state.hotkeyCurrentText,
@@ -103,10 +115,17 @@ function emitStateChange() {
   state.broadcastToWindows("hotkey-state-change", payload);
 }
 
+function emitHotkeyTranscriptEvent(type, payload) {
+  state.broadcastToWindows("hotkey-transcript-event", { type, payload });
+}
+
 function applyLifecycleState(nextState, extra = {}) {
   state.hotkeyLifecycleState = nextState;
   if (extra.sessionId !== undefined) {
     state.activeHotkeySessionId = extra.sessionId;
+  }
+  if (extra.captureSource !== undefined) {
+    state.activeHotkeyCaptureSource = extra.captureSource;
   }
   if (extra.currentText !== undefined) {
     state.hotkeyCurrentText = extra.currentText;
@@ -199,7 +218,9 @@ function resolveHotkeyModelId(config = state.hotkeyConfigState) {
 function checkHotkeyAvailability(accelerator) {
   try {
     if (
-      state.currentHotkeyAccelerator === accelerator &&
+      (state.currentHotkeyAccelerator === accelerator ||
+        state.currentMicrophoneHotkeyAccelerator === accelerator ||
+        state.currentSystemHotkeyAccelerator === accelerator) &&
       globalShortcut.isRegistered(accelerator)
     ) {
       return { registered: false, ownedByApp: true };
@@ -219,57 +240,174 @@ function checkHotkeyAvailability(accelerator) {
   }
 }
 
-function registerHotkey(accelerator) {
+function clearRegisteredHotkeys() {
+  if (state.currentMicrophoneHotkeyAccelerator) {
+    globalShortcut.unregister(state.currentMicrophoneHotkeyAccelerator);
+    state.currentMicrophoneHotkeyAccelerator = null;
+  }
+  if (state.currentSystemHotkeyAccelerator) {
+    globalShortcut.unregister(state.currentSystemHotkeyAccelerator);
+    state.currentSystemHotkeyAccelerator = null;
+  }
+  state.currentHotkeyAccelerator = null;
+}
+
+async function toggleRecordingForSource(source, forceState) {
+  const now = Date.now();
+  if (now - state.lastHotkeyPressTime < state.HOTKEY_DEBOUNCE_MS) {
+    console.log("[main] Hotkey debounced");
+    return;
+  }
+  state.lastHotkeyPressTime = now;
+
+  const requestedSource = source === "system" ? "system" : "microphone";
+  const lifecycle = state.hotkeyLifecycleState;
+  const activeSource = state.activeHotkeyCaptureSource || resolveCaptureSource();
+  const shouldStart =
+    forceState !== undefined ? forceState : lifecycle === "idle" || lifecycle === "error";
+
+  if (shouldStart) {
+    if (lifecycle === "starting" && activeSource === requestedSource) {
+      return;
+    }
+    if (lifecycle === "recording" && activeSource === requestedSource) {
+      return;
+    }
+    if (lifecycle === "stopping") {
+      state.pendingRestart = true;
+      state.pendingRestartSource = requestedSource;
+      return;
+    }
+    if ((lifecycle === "starting" || lifecycle === "recording") && activeSource !== requestedSource) {
+      state.pendingRestart = true;
+      state.pendingRestartSource = requestedSource;
+      await stopRecording();
+      return;
+    }
+
+    try {
+      await startRecording(requestedSource);
+    } catch (error) {
+      console.error("[main] Toggle error:", error.message);
+      applyLifecycleState("error", {
+        error: error.message,
+        isRecording: false,
+        captureSource: null,
+      });
+      hideFloatingWindow();
+    }
+    return;
+  }
+
+  if (lifecycle === "idle" || lifecycle === "error" || lifecycle === "stopping") {
+    return;
+  }
+
+  try {
+    await stopRecording();
+  } catch (error) {
+    console.error("[main] Stop failed:", error.message);
+    applyLifecycleState("error", {
+      error: error.message,
+      isRecording: false,
+      captureSource: null,
+    });
+    hideFloatingWindow();
+  }
+}
+
+function registerConfiguredHotkeys() {
   if (!state.hotkeyEnabled) {
     return { success: false, error: "Hotkey system is disabled" };
   }
 
-  if (state.currentHotkeyAccelerator === accelerator) {
-    return { success: true, accelerator, isToggleMode: true, alreadyRegistered: true };
+  const microphoneAccelerator =
+    state.hotkeyConfigState.microphone_key_combination ||
+    state.hotkeyConfigState.key_combination ||
+    state.DEFAULT_HOTKEY;
+  const systemAccelerator =
+    state.hotkeyConfigState.system_key_combination || "CommandOrControl+Shift+Y";
+
+  if (
+    microphoneAccelerator &&
+    systemAccelerator &&
+    microphoneAccelerator === systemAccelerator
+  ) {
+    return {
+      success: false,
+      error: "Microphone and system audio hotkeys must be different",
+    };
   }
 
-  const validation = validateAccelerator(accelerator);
-  if (!validation.valid) {
-    return { success: false, error: validation.error };
+  for (const accelerator of [microphoneAccelerator, systemAccelerator]) {
+    const validation = validateAccelerator(accelerator);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+    const availability = checkHotkeyAvailability(accelerator);
+    if (availability.registered && availability.error) {
+      return { success: false, error: availability.error };
+    }
   }
 
-  const availability = checkHotkeyAvailability(accelerator);
-  if (availability.registered && availability.error) {
-    return { success: false, error: availability.error };
-  }
+  clearRegisteredHotkeys();
 
-  if (state.currentHotkeyAccelerator) {
-    globalShortcut.unregister(state.currentHotkeyAccelerator);
-  }
+  let microphoneRegistered = false;
+  let systemRegistered = false;
 
   try {
-    const registered = globalShortcut.register(accelerator, async () => {
+    microphoneRegistered = globalShortcut.register(microphoneAccelerator, async () => {
       try {
-        await toggleRecording();
+        await toggleRecordingForSource("microphone");
       } catch (error) {
         console.error("[main] Hotkey toggle error:", error);
         applyLifecycleState("error", { error: error.message, isRecording: false });
       }
     });
 
-    if (!registered) {
+    systemRegistered = globalShortcut.register(systemAccelerator, async () => {
+      try {
+        await toggleRecordingForSource("system");
+      } catch (error) {
+        console.error("[main] Hotkey toggle error:", error);
+        applyLifecycleState("error", { error: error.message, isRecording: false });
+      }
+    });
+
+    if (!microphoneRegistered || !systemRegistered) {
+      clearRegisteredHotkeys();
       return { success: false, error: "Failed to register hotkey" };
     }
 
-    state.currentHotkeyAccelerator = accelerator;
-    console.log(`[main] Global hotkey registered: ${accelerator}`);
+    state.currentMicrophoneHotkeyAccelerator = microphoneAccelerator;
+    state.currentSystemHotkeyAccelerator = systemAccelerator;
+    state.currentHotkeyAccelerator = microphoneAccelerator;
+    console.log(`[main] Global hotkeys registered: mic=${microphoneAccelerator} system=${systemAccelerator}`);
     emitStateChange();
-    return { success: true, accelerator, isToggleMode: true };
+    return {
+      success: true,
+      accelerator: microphoneAccelerator,
+      microphoneAccelerator,
+      systemAccelerator,
+      isToggleMode: true,
+    };
   } catch (error) {
+    clearRegisteredHotkeys();
     return { success: false, error: error.message };
   }
 }
 
+function registerHotkey(accelerator) {
+  state.hotkeyConfigState = {
+    ...state.hotkeyConfigState,
+    key_combination: accelerator,
+    microphone_key_combination: accelerator,
+  };
+  return registerConfiguredHotkeys();
+}
+
 function unregisterHotkey() {
-  if (state.currentHotkeyAccelerator) {
-    globalShortcut.unregister(state.currentHotkeyAccelerator);
-    state.currentHotkeyAccelerator = null;
-  }
+  clearRegisteredHotkeys();
   emitStateChange();
   return { success: true, wasRegistered: true };
 }
@@ -304,6 +442,7 @@ async function connectHotkeyWebSocket(sessionId) {
           if (!isExpectedHotkeySession(payload.session_id)) {
             return;
           }
+          emitHotkeyTranscriptEvent("hotkey_status", payload);
           state.activeHotkeySessionId = payload.session_id ?? state.activeHotkeySessionId;
           state.hotkeyCurrentText = payload.display_partial_text || payload.partial_text || "";
           state.hotkeyLastError = null;
@@ -335,6 +474,7 @@ async function connectHotkeyWebSocket(sessionId) {
           const text = payload.display_partial_text || payload.partial_text || "";
           state.hotkeyCurrentText = text;
           emitStateChange();
+          emitHotkeyTranscriptEvent("hotkey_draft_partial", payload);
           if (text && state.floatingWindow && !state.floatingWindow.isDestroyed()) {
             state.floatingWindow.webContents.send("transcription-update", {
               text,
@@ -348,6 +488,7 @@ async function connectHotkeyWebSocket(sessionId) {
           if (!isExpectedHotkeySession(payload.session_id)) {
             return;
           }
+          emitHotkeyTranscriptEvent("hotkey_commit_final", payload);
           const text =
             payload.segment?.display_text ||
             payload.segment?.text ||
@@ -401,6 +542,7 @@ async function connectHotkeyWebSocket(sessionId) {
           if (!isExpectedHotkeySession(payload.session_id)) {
             return;
           }
+          emitHotkeyTranscriptEvent("hotkey_stopped", payload);
           const text = payload.final_transcription || "";
           if (text && state.floatingWindow && !state.floatingWindow.isDestroyed()) {
             state.floatingWindow.webContents.send("transcription-update", {
@@ -409,7 +551,12 @@ async function connectHotkeyWebSocket(sessionId) {
             });
           }
           state.hotkeyCurrentText = "";
-          applyLifecycleState("idle", { sessionId: null, currentText: "", isRecording: false });
+          applyLifecycleState("idle", {
+            sessionId: null,
+            currentText: "",
+            isRecording: false,
+            captureSource: null,
+          });
           resolveStopWaiter("hotkey_stopped", payload.session_id ?? null);
           return;
         }
@@ -430,11 +577,18 @@ async function connectHotkeyWebSocket(sessionId) {
       state.hotkeyWebSocket = null;
       state.hotkeyWebSocketSessionId = null;
       if (code === 1000 && state.hotkeyLifecycleState === "stopping") {
-        applyLifecycleState("idle", { sessionId: null, currentText: "", isRecording: false });
+        applyLifecycleState("idle", {
+          sessionId: null,
+          currentText: "",
+          isRecording: false,
+          captureSource: null,
+        });
         resolveStopWaiter(reason || "normal-close");
         if (state.pendingRestart) {
+          const nextSource = state.pendingRestartSource || resolveCaptureSource();
           state.pendingRestart = false;
-          void toggleRecording(true);
+          state.pendingRestartSource = null;
+          void startRecording(nextSource);
         }
         return;
       }
@@ -469,6 +623,16 @@ async function applyHotkeyConfig(config) {
       config.key_combination ||
       state.hotkeyConfigState.key_combination ||
       state.DEFAULT_HOTKEY,
+    microphone_key_combination:
+      config.microphone_key_combination ||
+      config.key_combination ||
+      state.hotkeyConfigState.microphone_key_combination ||
+      state.hotkeyConfigState.key_combination ||
+      state.DEFAULT_HOTKEY,
+    system_key_combination:
+      config.system_key_combination ||
+      state.hotkeyConfigState.system_key_combination ||
+      "CommandOrControl+Shift+Y",
     model_name: config.model_name || state.hotkeyConfigState.model_name || "small",
     capture_source:
       config.capture_source || state.hotkeyConfigState.capture_source || "microphone",
@@ -495,23 +659,30 @@ async function applyHotkeyConfig(config) {
     return { success: true, enabled: false };
   }
 
-  const result = registerHotkey(state.hotkeyConfigState.key_combination);
+  const result = registerConfiguredHotkeys();
   if (result.success) {
     safeUpdateTrayTooltip();
   }
   return result;
 }
 
-async function startRecording() {
+async function startRecording(source = resolveCaptureSource()) {
   console.log("[main] Starting recording");
-  applyLifecycleState("starting", { error: null, currentText: "" });
+  const captureSource = source === "system" ? "system" : "microphone";
+  applyLifecycleState("starting", {
+    error: null,
+    currentText: "",
+    captureSource,
+  });
 
   if (state.hotkeyConfigState.show_floating_window) {
     showFloatingWindow();
   }
 
-  const captureSource = resolveCaptureSource();
-  const resolvedModelId = resolveHotkeyModelId();
+  const resolvedModelId = resolveHotkeyModelId({
+    ...state.hotkeyConfigState,
+    capture_source: captureSource,
+  });
   const response = await fetch(`${state.API_ORIGIN}/api/transcription/hotkey/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -538,6 +709,7 @@ async function startRecording() {
     sessionId: result.session_id || null,
     error: null,
     currentText: "",
+    captureSource,
   });
   return result;
 }
@@ -601,11 +773,14 @@ async function stopRecording() {
       currentText: "",
       error: null,
       isRecording: false,
+      captureSource: null,
     });
 
     if (state.pendingRestart) {
+      const nextSource = state.pendingRestartSource || resolveCaptureSource();
       state.pendingRestart = false;
-      await startRecording();
+      state.pendingRestartSource = null;
+      await startRecording(nextSource);
     }
   })();
 
@@ -618,50 +793,7 @@ async function stopRecording() {
 }
 
 async function toggleRecording(forceState) {
-  const now = Date.now();
-  if (now - state.lastHotkeyPressTime < state.HOTKEY_DEBOUNCE_MS) {
-    console.log("[main] Hotkey debounced");
-    return;
-  }
-  state.lastHotkeyPressTime = now;
-
-  const lifecycle = state.hotkeyLifecycleState;
-  const shouldStart =
-    forceState !== undefined ? forceState : lifecycle === "idle" || lifecycle === "error";
-
-  if (shouldStart) {
-    if (lifecycle === "recording" || lifecycle === "starting") {
-      return;
-    }
-    if (lifecycle === "stopping") {
-      state.pendingRestart = true;
-      return;
-    }
-
-    try {
-      await startRecording();
-    } catch (error) {
-      console.error("[main] Toggle error:", error.message);
-      applyLifecycleState("error", { error: error.message, isRecording: false });
-      hideFloatingWindow();
-    }
-    return;
-  }
-
-  if (lifecycle === "idle" || lifecycle === "error") {
-    return;
-  }
-  if (lifecycle === "stopping") {
-    return;
-  }
-
-  try {
-    await stopRecording();
-  } catch (error) {
-    console.error("[main] Stop failed:", error.message);
-    applyLifecycleState("error", { error: error.message, isRecording: false });
-    hideFloatingWindow();
-  }
+  await toggleRecordingForSource(resolveCaptureSource(), forceState);
 }
 
 module.exports = {
@@ -672,7 +804,10 @@ module.exports = {
   connectHotkeyWebSocket,
   closeHotkeyWebSocket,
   applyHotkeyConfig,
+  startRecording,
+  stopRecording,
   toggleRecording,
+  toggleRecordingForSource,
   buildHotkeyStatePayload,
   emitStateChange,
   playStopSound,

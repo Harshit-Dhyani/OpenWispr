@@ -11,6 +11,7 @@ const {
   validateAccelerator, checkHotkeyAvailability, registerHotkey, unregisterHotkey,
   applyHotkeyConfig, toggleRecording, buildHotkeyStatePayload
 } = require("./hotkeyHandlers");
+const { startRecording, stopRecording } = require("./hotkeyHandlers");
 const { closeHotkeyWebSocket } = require("./hotkeyHandlers");
 
 // File dialogs
@@ -99,6 +100,14 @@ ipcMain.handle("hotkey:toggle", async (event, enabled) => {
   const { updateTrayTooltip } = require("../windows/tray");
   updateTrayTooltip();
   return { success: true, enabled: state.hotkeyEnabled };
+});
+
+ipcMain.handle("hotkey:start", async (event, { source } = {}) => {
+  return startRecording(source);
+});
+
+ipcMain.handle("hotkey:stop", async (event) => {
+  return stopRecording();
 });
 
 ipcMain.handle("hotkey:get-state", async () => {

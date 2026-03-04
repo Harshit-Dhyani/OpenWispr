@@ -32,6 +32,7 @@ import {
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  inline?: boolean;
   initialSettings?: SettingsState;
   onSettingsChange?: (settings: SettingsState) => void | Promise<void>;
   onSettingsReset?: () => void | Promise<void>;
@@ -48,6 +49,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({
   isOpen,
   onClose,
+  inline = false,
   initialSettings,
   onSettingsChange,
   onSettingsReset,
@@ -275,11 +277,16 @@ export function SettingsPanel({
     onRemoveModel,
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !inline) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-5xl h-[85vh] bg-lawn-bg border-2 border-lawn-border shadow-brutal flex flex-col">
+  const panelBody = (
+    <div
+      className={
+        inline
+          ? "w-full bg-lawn-bg border-2 border-lawn-border shadow-brutal flex min-h-0 flex-1 flex-col"
+          : "w-full max-w-5xl h-[85vh] bg-lawn-bg border-2 border-lawn-border shadow-brutal flex flex-col"
+      }
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b-2 border-lawn-border bg-lawn-panel">
           <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -341,12 +348,14 @@ export function SettingsPanel({
               </label>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 border-2 border-lawn-border bg-lawn-bg hover:bg-theme-error/10 hover:border-theme-error transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {!inline ? (
+              <button
+                onClick={onClose}
+                className="p-2 border-2 border-lawn-border bg-lawn-bg hover:bg-theme-error/10 hover:border-theme-error transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -450,6 +459,15 @@ export function SettingsPanel({
           </div>
         </div>
       </div>
+  );
+
+  if (inline) {
+    return panelBody;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      {panelBody}
     </div>
   );
 }

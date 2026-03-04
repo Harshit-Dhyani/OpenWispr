@@ -65,4 +65,51 @@ describe('liveTranscript', () => {
     expect(clearLiveDraftForCommit(draft, 'session-a', staleCommit)).toEqual(draft);
     expect(clearLiveDraftForCommit(draft, 'session-a', activeCommit)).toBeNull();
   });
+
+  it('maintains replace semantics across mixed draft and commit ordering', () => {
+    const activeSessionId = 'session-a';
+    let current = null as ReturnType<typeof buildStructuredLiveDraft> | null;
+
+    const activeDraft = (revision: number, text: string, committed = '', draftSuffix = text) =>
+      buildStructuredLiveDraft({
+        session_id: activeSessionId,
+        segment_id: 'seg-1',
+        revision,
+        stream_id: 'stream-1',
+        text,
+        start: 0,
+        end: 1,
+        committed_text: committed,
+        draft_suffix: draftSuffix,
+      });
+
+    const makeCommit = (sessionId: string, revision: number, text: string) => ({
+      session_id: sessionId,
+      segment_id: 'seg-1',
+      revision,
+      stream_id: 'stream-1',
+      text,
+      start: 0,
+      end: 1,
+      committed_text: text,
+      draft_suffix: '',
+      segment: createMockSegment({ id: 'seg-1', text }),
+    });
+
+    current = activeDraft(1, 'hello');
+    expect(current?.draftSuffix).toBe('hello');
+
+    current = activeDraft(2, 'hello world', 'hello', 'world');
+    expect(current?.committedText).toBe('hello');
+    expect(current?.draftSuffix).toBe('world');
+
+    current = clearLiveDraftForCommit(current, activeSessionId, makeCommit('session-b', 3, 'stale'));
+    expect(current?.draftSuffix).toBe('world');
+
+    current = clearLiveDraftForCommit(current, activeSessionId, makeCommit(activeSessionId, 4, 'hello world'));
+    expect(current).toBeNull();
+
+    current = activeDraft(5, 'next chunk');
+    expect(current?.draftSuffix).toBe('next chunk');
+  });
 });

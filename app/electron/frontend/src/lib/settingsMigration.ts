@@ -51,6 +51,14 @@ function normalizeSourceAwareSettings(data: Record<string, unknown>): Record<str
     'microphone') as 'microphone' | 'system';
   audio.default_capture_source = captureSource;
   audio.captureMode = captureSource;
+  hotkey.capture_source =
+    ((hotkey.capture_source as string | undefined) ?? captureSource) as 'microphone' | 'system';
+  hotkey.microphone_key_combination =
+    (hotkey.microphone_key_combination as string | undefined) ??
+    (hotkey.key_combination as string | undefined) ??
+    'Ctrl+Shift+T';
+  hotkey.system_key_combination =
+    (hotkey.system_key_combination as string | undefined) ?? 'CommandOrControl+Shift+Y';
 
   if ('model_name' in hotkey) {
     delete hotkey.model_name;
@@ -126,9 +134,21 @@ const migrations: Record<number, (data: unknown) => unknown> = {
       hotkey: {
         enabled: (old.hotkey as Record<string, unknown>)?.enabled ?? false,
         key_combination: (old.hotkey as Record<string, unknown>)?.key_combination ?? 'Ctrl+Shift+T',
+        microphone_key_combination:
+          (old.hotkey as Record<string, unknown>)?.microphone_key_combination ??
+          (old.hotkey as Record<string, unknown>)?.key_combination ??
+          'Ctrl+Shift+T',
+        system_key_combination:
+          (old.hotkey as Record<string, unknown>)?.system_key_combination ??
+          'CommandOrControl+Shift+Y',
         hold_mode: (old.hotkey as Record<string, unknown>)?.hold_mode ?? false,
         auto_inject: (old.hotkey as Record<string, unknown>)?.auto_inject ?? true,
         language: (old.hotkey as Record<string, unknown>)?.language ?? 'auto',
+        capture_source:
+          (old.hotkey as Record<string, unknown>)?.capture_source ??
+          (old.audio as Record<string, unknown>)?.default_capture_source ??
+          (old.audio as Record<string, unknown>)?.captureMode ??
+          'microphone',
         device_id: (old.hotkey as Record<string, unknown>)?.device_id ?? 'default',
         finish_mode_default: (old.hotkey as Record<string, unknown>)?.finish_mode_default ?? 'finish_and_paste',
         show_floating_window: (old.hotkey as Record<string, unknown>)?.show_floating_window ?? true,

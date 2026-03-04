@@ -20,6 +20,8 @@ let cachedDevices = [];
 let hotkeyEnabled = false;
 let isRecording = false;
 let currentHotkeyAccelerator = null;
+let currentMicrophoneHotkeyAccelerator = null;
+let currentSystemHotkeyAccelerator = null;
 let lastHotkeyPressTime = 0;
 const HOTKEY_DEBOUNCE_MS = 150;
 
@@ -46,6 +48,8 @@ let hotkeyLastError = null;
 let hotkeyWebSocketSessionId = null;
 let hotkeyWebSocketGeneration = 0;
 let hotkeyPendingAction = null;
+let pendingRestartSource = null;
+let activeHotkeyCaptureSource = null;
 
 // Tray icons cache
 let trayIconIdle = null;
@@ -63,6 +67,8 @@ const DEFAULT_HOTKEY = "CommandOrControl+Shift+T";
 let hotkeyConfigState = {
   enabled: false,
   key_combination: DEFAULT_HOTKEY,
+  microphone_key_combination: DEFAULT_HOTKEY,
+  system_key_combination: "CommandOrControl+Shift+Y",
   hold_mode: false,
   auto_inject: true,
   language: "auto",
@@ -135,6 +141,10 @@ module.exports = {
   set isRecording(value) { isRecording = value; },
   get currentHotkeyAccelerator() { return currentHotkeyAccelerator; },
   set currentHotkeyAccelerator(value) { currentHotkeyAccelerator = value; },
+  get currentMicrophoneHotkeyAccelerator() { return currentMicrophoneHotkeyAccelerator; },
+  set currentMicrophoneHotkeyAccelerator(value) { currentMicrophoneHotkeyAccelerator = value; },
+  get currentSystemHotkeyAccelerator() { return currentSystemHotkeyAccelerator; },
+  set currentSystemHotkeyAccelerator(value) { currentSystemHotkeyAccelerator = value; },
   get lastHotkeyPressTime() { return lastHotkeyPressTime; },
   set lastHotkeyPressTime(value) { lastHotkeyPressTime = value; },
   HOTKEY_DEBOUNCE_MS,
@@ -178,6 +188,10 @@ module.exports = {
   set hotkeyWebSocketGeneration(value) { hotkeyWebSocketGeneration = value; },
   get hotkeyPendingAction() { return hotkeyPendingAction; },
   set hotkeyPendingAction(value) { hotkeyPendingAction = value; },
+  get pendingRestartSource() { return pendingRestartSource; },
+  set pendingRestartSource(value) { pendingRestartSource = value; },
+  get activeHotkeyCaptureSource() { return activeHotkeyCaptureSource; },
+  set activeHotkeyCaptureSource(value) { activeHotkeyCaptureSource = value; },
 
   // Tray icons
   get trayIconIdle() { return trayIconIdle; },
