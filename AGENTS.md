@@ -22,6 +22,12 @@ Keep this file short. Only add rules that prevent repeat regressions.
 
 - If a control is visible in the UI, it must change real behavior. Remove or hide placebo controls.
 - When fixing a bug, add or update at least one focused regression test.
+- For any non-trivial feature or workflow change, add the smallest sensible test mix:
+  - unit test for local logic
+  - integration test for wiring/contracts
+  - regression test for the bug or failure mode
+  - E2E coverage if the user-visible flow changed materially
+  - property-style/invariant test when ordering, serialization, dedupe, or aggregation logic is involved
 - When changing event schemas, update both backend and frontend consumers in the same change.
 - Prefer one canonical source of truth for shared constants/settings. Compatibility shims are acceptable; duplicate live definitions are not.
 - Keep microphone and system audio as mutually exclusive active capture modes.
