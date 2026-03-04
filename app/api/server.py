@@ -83,6 +83,17 @@ def _resolve_log_level_from_settings_payload(settings_payload: dict[str, Any]) -
     return configured if configured in valid_levels else "INFO"
 
 
+def _apply_runtime_log_levels(log_level: str) -> None:
+    resolved = str(log_level or "INFO").upper()
+    if resolved not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+        resolved = "INFO"
+    logging.getLogger().setLevel(getattr(logging, resolved))
+    logger.setLevel(getattr(logging, resolved))
+    quiet_level = logging.DEBUG if resolved == "DEBUG" else logging.WARNING
+    logging.getLogger("httpx").setLevel(quiet_level)
+    logging.getLogger("httpcore").setLevel(quiet_level)
+
+
 def _make_json_safe(value: Any) -> Any:
     return make_json_safe(value)
 
@@ -1119,7 +1130,24 @@ class HotkeyTranscriptionService:
             start=payload["start"],
             end=payload["end"],
         )
-        if not merge_segment_texts(session.final_segments, raw_text or display_text):
+        prior_last_text = (
+            normalize_dictation_text(
+                session.final_segments[-1].get("raw_text")
+                or session.final_segments[-1].get("text")
+                or ""
+            )
+            if session.final_segments
+            else ""
+        )
+        merged_existing = merge_segment_texts(session.final_segments, raw_text or display_text)
+        if merged_existing:
+            payload = {**session.final_segments[-1]}
+            current_last_text = normalize_dictation_text(
+                payload.get("raw_text") or payload.get("text") or ""
+            )
+            if current_last_text == prior_last_text:
+                return
+        else:
             session.final_segments.append(payload)
         draft_state = session.draft_stabilizer.consume_final_text(
             payload["text"],
@@ -1578,8 +1606,7 @@ async def lifespan(_: FastAPI):
         manager = get_settings_manager()
         user_settings = manager.get_settings_dict()
         log_level = _resolve_log_level_from_settings_payload(user_settings)
-        logging.getLogger().setLevel(getattr(logging, log_level))
-        logger.setLevel(getattr(logging, log_level))
+        _apply_runtime_log_levels(log_level)
 
         logger.debug("Lifespan startup: initializing service")
         service = BackendService(settings)
@@ -2443,8 +2470,7 @@ def save_settings(request: dict[str, Any]) -> dict[str, Any]:
     if success:
         # Update logging level when advanced.logLevel changes.
         log_level = _resolve_log_level_from_settings_payload(request)
-        logging.getLogger().setLevel(getattr(logging, log_level))
-        logger.setLevel(getattr(logging, log_level))
+        _apply_runtime_log_levels(log_level)
 
         return {"success": True, "message": "Settings saved successfully"}
     else:

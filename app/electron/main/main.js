@@ -6,6 +6,16 @@ const os = require("os");
 const { ModelDownloadManager } = require("./model-download-manager");
 const { ModelDownloadService } = require("./services/modelDownloadService");
 const { APP_NAME } = require("./shared/generated/appMeta");
+const isDebugRendererLogging =
+  (process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug";
+
+function shouldIgnoreRendererConsoleMessage(message) {
+  return (
+    typeof message === "string" &&
+    (message.includes("Electron Security Warning") ||
+      message.includes("'console-message' arguments are deprecated"))
+  );
+}
 
 // Window references
 let mainWindow = null;
@@ -1029,14 +1039,15 @@ function createMainWindow() {
     );
   });
 
-  mainWindow.webContents.on(
-    "console-message",
-    (_event, level, message, line, sourceId) => {
-      if (level >= 2) {
-        console.error(`[renderer] ${sourceId}:${line} ${message}`);
-      }
+  mainWindow.webContents.on("console-message", (event) => {
+    const { level, message, lineNumber, sourceId } = event;
+    if (shouldIgnoreRendererConsoleMessage(message)) {
+      return;
     }
-  );
+    if (level >= 2 || isDebugRendererLogging) {
+      console.error(`[renderer] ${sourceId}:${lineNumber} ${message}`);
+    }
+  });
 
   const explicitRendererUrl = process.env.TRANSCRIPTA_RENDERER_URL;
   if (explicitRendererUrl) {

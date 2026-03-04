@@ -11,11 +11,24 @@ Tests cover:
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
+import sys
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 import pytest_asyncio
+from types import SimpleNamespace
+
+sys.modules.setdefault(
+    "soundcard",
+    SimpleNamespace(
+        all_speakers=lambda: [],
+        all_microphones=lambda include_loopback=True: [],
+        default_microphone=lambda: None,
+    ),
+)
+sys.modules.setdefault("faster_whisper", SimpleNamespace(WhisperModel=object))
 
 
 class TestWebSocketManager:
@@ -71,9 +84,9 @@ class TestWebSocketMessages:
         """Test message type enumeration."""
         from app.api.websocket_server import MessageType
 
-        assert MessageType.HEALTH.value == "health"
-        assert MessageType.SEGMENT.value == "segment"
-        assert MessageType.PARTIAL.value == "partial"
+        assert MessageType.HEALTH_METRICS.value == "health_metrics"
+        assert MessageType.TRANSCRIPTION_SEGMENT.value == "transcription_segment"
+        assert MessageType.TRANSCRIPTION_PARTIAL.value == "transcription_partial"
         assert MessageType.ERROR.value == "error"
 
 
@@ -86,9 +99,42 @@ class TestWebSocketConnection:
 
         config = ConnectionConfig()
 
-        assert config.heartbeat_interval_seconds == 30.0
-        assert config.max_message_size_bytes == 1024 * 1024
-        assert config.compression_enabled is True
+        assert config.heartbeat_interval == 30.0
+        assert config.max_message_size == 1024 * 1024
+        assert config.compression_threshold > 0
+
+    @pytest.mark.asyncio
+    async def test_handle_message_decompresses_full_message_envelope(self) -> None:
+        """Compressed messages should dispatch the inner payload, not the full envelope."""
+        from app.api.websocket_server import ConnectionConfig, MessageType, WebSocketConnection
+
+        websocket = AsyncMock()
+        websocket.client_state = websocket.application_state = 1
+        connection = WebSocketConnection(websocket, ConnectionConfig(), "conn", "127.0.0.1")
+
+        received = {}
+
+        def handler(payload, _connection):
+            received["payload"] = payload
+
+        connection.register_message_handler(MessageType.HEALTH_METRICS, handler)
+
+        envelope = {
+            "type": MessageType.HEALTH_METRICS,
+            "payload": {"value": 42},
+            "timestamp": 123.0,
+        }
+        compressed = gzip.compress(json.dumps(envelope).encode("utf-8"))
+
+        await connection.handle_message(
+            {
+                "type": MessageType.HEALTH_METRICS,
+                "_compressed": True,
+                "_data": compressed.hex(),
+            }
+        )
+
+        assert received["payload"] == {"value": 42}
 
 
 class TestSettingsSynchronizer:
@@ -96,13 +142,14 @@ class TestSettingsSynchronizer:
 
     def test_sync_config_defaults(self) -> None:
         """Test sync configuration defaults."""
-        from app.api.settings_sync import SyncConfig
+        from app.api.settings_sync import SyncConfig, SyncConflictResolution, SyncDirection
 
         config = SyncConfig()
 
-        assert config.enabled is True
-        assert config.auto_sync is True
-        assert config.conflict_resolution == "server_wins"
+        assert config.direction == SyncDirection.BIDIRECTIONAL
+        assert config.conflict_resolution == SyncConflictResolution.SERVER_WINS
+        assert config.notify_on_change is True
+        assert config.batch_updates is True
 
     def test_sync_direction_enum(self) -> None:
         """Test sync direction enumeration."""
@@ -127,17 +174,21 @@ class TestHotkeyWebSocket:
         """Test hotkey WebSocket event types."""
         # These are the event types that should be supported
         expected_events = [
-            "hotkey_started",
+            "hotkey_status",
+            "hotkey_stop_ack",
+            "hotkey_stopping",
             "hotkey_stopped",
-            "hotkey_partial",
+            "hotkey_draft_partial",
+            "hotkey_commit_final",
             "hotkey_audio_level",
             "hotkey_error",
         ]
 
         # Just verify the list is reasonable
-        assert len(expected_events) == 5
-        assert "hotkey_started" in expected_events
+        assert len(expected_events) == 8
+        assert "hotkey_status" in expected_events
         assert "hotkey_audio_level" in expected_events
+        assert "hotkey_commit_final" in expected_events
 
 
 class TestWebSocketErrorHandling:

@@ -2,6 +2,16 @@
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
+const isDebugRendererLogging =
+  (process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug";
+
+function shouldIgnoreRendererConsoleMessage(message) {
+  return (
+    typeof message === "string" &&
+    (message.includes("Electron Security Warning") ||
+      message.includes("'console-message' arguments are deprecated"))
+  );
+}
 
 function createMainWindow() {
   state.mainWindow = new BrowserWindow({
@@ -45,14 +55,15 @@ function createMainWindow() {
     );
   });
 
-  state.mainWindow.webContents.on(
-    "console-message",
-    (_event, level, message, line, sourceId) => {
-      if (level >= 2) {
-        console.error(`[renderer] ${sourceId}:${line} ${message}`);
-      }
+  state.mainWindow.webContents.on("console-message", (event) => {
+    const { level, message, lineNumber, sourceId } = event;
+    if (shouldIgnoreRendererConsoleMessage(message)) {
+      return;
     }
-  );
+    if (level >= 2 || isDebugRendererLogging) {
+      console.error(`[renderer] ${sourceId}:${lineNumber} ${message}`);
+    }
+  });
 
   const explicitRendererUrl = process.env.TRANSCRIPTA_RENDERER_URL;
   if (explicitRendererUrl) {

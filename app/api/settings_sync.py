@@ -313,9 +313,6 @@ class SettingsSynchronizer:
     async def _apply_changes(self, category: str, updates: dict[str, Any], source: str) -> None:
         """Apply settings changes to the settings manager."""
         async with self._lock:
-            # Get current settings
-            settings = self.settings_manager.get_settings()
-
             # Apply updates
             self.settings_manager.update_partial(category, updates)
 
@@ -327,11 +324,8 @@ class SettingsSynchronizer:
                     except Exception as exc:
                         logger.exception("Change callback error: %s", exc)
 
-            self._last_change_time = asyncio.get_event_loop().time()
-
-            logger.debug(
-                "Applied settings changes: %s.%s = %s (from %s)", category, key, value, source
-            )
+            self._last_change_time = asyncio.get_running_loop().time()
+            logger.debug("Applied settings changes: %s updates=%s (from %s)", category, updates, source)
 
     async def _queue_changes(self, category: str, updates: dict[str, Any], source: str) -> None:
         """Queue changes for batched application."""
@@ -400,7 +394,7 @@ class SettingsSynchronizer:
         """
         return await connection.send(
             MessageType.SETTINGS_REQUEST,
-            {"request_id": f"req_{asyncio.get_event_loop().time()}"},
+            {"request_id": f"req_{asyncio.get_running_loop().time()}"},
         )
 
     def get_sync_status(self) -> dict[str, Any]:

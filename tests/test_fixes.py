@@ -131,7 +131,7 @@ class TestCriticalFixes:
 
         for file_path in python_files:
             try:
-                source = file_path.read_text()
+                source = file_path.read_text(encoding="utf-8", errors="ignore")
                 tree = ast.parse(source)
 
                 for node in ast.walk(tree):

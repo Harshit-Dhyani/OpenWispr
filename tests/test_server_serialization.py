@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import random
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,3 +55,31 @@ def test_make_json_safe_handles_dataclasses_datetime_and_path() -> None:
 
     assert result["when"] == "2026-03-03T12:00:00+00:00"
     assert Path(result["path"]) == Path("models/refiner.gguf")
+
+
+def test_make_json_safe_randomized_payloads_can_be_json_encoded() -> None:
+    rng = random.Random(1337)
+
+    def build_value(depth: int = 0):
+        leaf_values = [
+            lambda: rng.randint(-10, 10),
+            lambda: np.int64(rng.randint(-10, 10)),
+            lambda: np.float32(rng.random()),
+            lambda: np.array([rng.random(), rng.random()], dtype=np.float32),
+            lambda: Path(f"logs/sample-{rng.randint(1, 5)}.txt"),
+            lambda: datetime(2026, 3, 4, 1, rng.randint(0, 59), tzinfo=timezone.utc),
+            lambda: {"flag": bool(rng.randint(0, 1))},
+        ]
+        if depth >= 2:
+            return rng.choice(leaf_values)()
+        branch_builders = [
+            lambda: [build_value(depth + 1) for _ in range(rng.randint(1, 3))],
+            lambda: {f"k{idx}": build_value(depth + 1) for idx in range(rng.randint(1, 3))},
+            lambda: rng.choice(leaf_values)(),
+        ]
+        return rng.choice(branch_builders)()
+
+    for _ in range(25):
+        payload = {"root": build_value()}
+        encoded = json.dumps(_make_json_safe(payload))
+        assert encoded.startswith("{")

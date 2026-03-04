@@ -376,7 +376,12 @@ class WebSocketConnection:
             if message.get("_compressed"):
                 compressed_data = bytes.fromhex(message["_data"])
                 json_data = gzip.decompress(compressed_data).decode("utf-8")
-                payload = json.loads(json_data)
+                decompressed = json.loads(json_data)
+                if isinstance(decompressed, dict) and "type" in decompressed and "payload" in decompressed:
+                    msg_type_str = decompressed.get("type", msg_type_str)
+                    payload = decompressed.get("payload", payload)
+                else:
+                    payload = decompressed
 
             # Handle pong
             if msg_type_str == MessageType.PONG:
