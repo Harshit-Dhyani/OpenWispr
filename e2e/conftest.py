@@ -710,31 +710,62 @@ class APIClient:
 
     async def get_health(self) -> dict[str, Any]:
         """Get health status."""
-        return await self.get("/health")
+        return await self.get("/api/health")
 
-    async def start_hotkey_session(self) -> dict[str, Any]:
+    async def start_hotkey_session(self, **params) -> dict[str, Any]:
         """Start hotkey recording session."""
-        return await self.post("/api/hotkey/start")
+        payload = {
+            "capture_source": "microphone",
+            "device_id": params.pop("device_id", None),
+            "model_name": params.pop("model_name", "whisper-turbo"),
+            "language_mode": params.pop("language_mode", "auto"),
+            "execution_mode": params.pop("execution_mode", "auto"),
+        }
+        payload.update(params)
+        return await self.post("/api/transcription/hotkey/start", json=payload)
 
-    async def stop_hotkey_session(self) -> dict[str, Any]:
+    async def stop_hotkey_session(self, **params) -> dict[str, Any]:
         """Stop hotkey recording session."""
-        return await self.post("/api/hotkey/stop")
+        payload = {"mode": params.pop("mode", "finish_and_paste")}
+        payload.update(params)
+        return await self.post("/api/transcription/hotkey/stop", json=payload)
+
+    async def get_hotkey_status(self) -> dict[str, Any]:
+        """Get hotkey status."""
+        return await self.get("/api/transcription/hotkey/status")
 
     async def start_system_session(self, **params) -> dict[str, Any]:
         """Start system recording session."""
-        return await self.post("/api/system/start", json=params)
+        payload = {
+            "title": params.pop("title", "System Audio Session"),
+            "output_root": params.pop("output_root", "sessions"),
+            "model_name": params.pop("model_name", "whisper-turbo"),
+            "language_mode": params.pop("language_mode", "auto"),
+            "device_id": params.pop("device_id", "default"),
+            "live_mode": params.pop("live_mode", "balanced"),
+            "execution_mode": params.pop("execution_mode", "auto"),
+            "capture_source": "system",
+            "vad_threshold": params.pop("vad_threshold", 0.6),
+            "vad_min_silence_ms": params.pop("vad_min_silence_ms", 450),
+            "vad_speech_pad_ms": params.pop("vad_speech_pad_ms", 200),
+        }
+        payload.update(params)
+        return await self.post("/api/session/start", json=payload)
 
     async def stop_system_session(self, **params) -> dict[str, Any]:
         """Stop system recording session."""
-        return await self.post("/api/system/stop", json=params)
+        return await self.post("/api/session/stop", json=params or None)
 
     async def get_mode_status(self) -> dict[str, Any]:
-        """Get current mode status."""
-        return await self.get("/api/mode/status")
+        """Get current session and hotkey status."""
+        return {
+            "session": await self.get("/api/session"),
+            "hotkey": await self.get_hotkey_status(),
+        }
 
     async def switch_mode(self, mode: str) -> dict[str, Any]:
-        """Switch transcription mode."""
-        return await self.post("/api/mode/switch", json={"mode": mode})
+        """Compatibility shim for selecting active capture source."""
+        return {"mode": mode}
 
 
 # =============================================================================
