@@ -2,6 +2,19 @@
 
 Keep this file short. Only add rules that prevent repeat regressions.
 
+See `agent_engine.md` for the fuller workflow and implementation playbook. Keep the rules here short, but do not omit repo-critical engineering standards.
+
+## Engineering Standards
+
+- Treat this as a public repo. Never commit personal identifiers, real transcript snippets, or user-specific examples.
+- Do not add user-facing copy inline. Put renderer strings in `app/electron/frontend/src/strings/en.ts`, Electron shell strings in `app/electron/strings/en.js`, backend API copy in `app/api/strings/en.py`, and prompt text in `app/stt/prompts.py`.
+- Do not let files grow without bounds. If a module mixes routing, orchestration, and pure logic or grows past roughly 300-500 lines, split it by responsibility before adding more behavior.
+- Keep boundaries clean:
+  - routes: HTTP/WebSocket validation and transport only
+  - services: orchestration and stateful business logic
+  - STT modules: decoding, aggregation, cleanup, refinement, prompts
+  - utilities: pure helpers with focused tests
+
 ## Never Reintroduce These Bugs
 
 - Always route transcript/websocket/SSE payloads through a single JSON-safe encoder. Numpy scalars/arrays, dataclasses, `datetime`, and `Path` must never be sent raw.
@@ -19,6 +32,12 @@ Keep this file short. Only add rules that prevent repeat regressions.
 - Do not log everything at DEBUG just because debug mode is enabled. `debugMode` controls extra diagnostics; `logLevel` controls verbosity.
 - Do not leave verbose backend or Electron dev logging on by default. Default to INFO/WARNING noise levels unless `TRANSCRIPTA_LOG_LEVEL=DEBUG` is explicitly set.
 - Do not trust legacy class names or stale UI labels as truth. Use resolved runtime fields (`capture_source`, resolved device kind, resolved model id, runtime model name).
+- Do not let hotkey final text sources drift. For microphone dictation, `aggregated_clean_text` is the canonical deterministic final transcript, `paste_text` is the only text Electron should inject/copy, and coach/refiner output must layer on top of that instead of rebuilding from raw segments elsewhere.
+- Do not hardcode a separate tray/quick-settings palette. Shared app themes must come from the common theme-token source so the main window, quick settings, and floating surfaces stay visually aligned.
+- Do not ship fake floating-window activity. Waveforms must come from real live audio amplitude (RMS/peak from PCM), silence must render flat, and the floating timer must be owned by a local monotonic clock instead of transcript events.
+- Do not let floating-window transcript UX regress. The transcript surface must stay scrollable, auto-scroll only while pinned to bottom, and Cancel/Finish must respect discard vs configured finish behavior without reopening stale result state.
+- Do not split transcription behavior settings across unrelated sections. Language, presets, finish action, refinement intensity/profile, and cleanup instructions belong under Transcription; Models is only for download/cache/runtime controls.
+- Do not let finish-time cleanup profiles corrupt technical text. Protect decimals, percentages, version-like strings, hotkeys, uppercase tokens, and code/log tokens with placeholders before runtime cleanup and restore them exactly afterward.
 
 ## Required Rules For New Work
 
@@ -31,10 +50,40 @@ Keep this file short. Only add rules that prevent repeat regressions.
   - E2E coverage if the user-visible flow changed materially
   - property-style/invariant test when ordering, serialization, dedupe, or aggregation logic is involved
 - When changing event schemas, update both backend and frontend consumers in the same change.
+- When changing config/text/constants on the Python side, update the generated frontend exports or regenerate them in the same change.
 - Keep exactly one active SSE/WebSocket subscription per workflow/route. New listeners must have stable deps and guaranteed cleanup.
 - Do not introduce repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, or `/api/models/catalog`. Load once, cache, and resubscribe only when needed.
 - Prefer one canonical source of truth for shared constants/settings. Compatibility shims are acceptable; duplicate live definitions are not.
 - Keep microphone and system audio as mutually exclusive active capture modes.
+
+## Regression Checklist
+
+- Floating waveform is driven by real amplitude data, not fake animation.
+- Floating timer starts immediately, increments correctly, and resets on cancel/finish.
+- Floating transcript scrolls correctly, auto-scrolls only while pinned to the bottom, and pauses when the user scrolls up.
+- Cancel discards transcript and closes without paste/copy. Finish uses the configured finish behavior.
+- Floating header remains draggable, while transcript/buttons stay `no-drag`.
+- Transcription presets actually update the active profile/runtime behavior.
+- Code/Logs mode preserves numbers, percentages, versions, hotkeys, uppercase tokens, and command-like strings.
+- Models owns runtime/download/cache controls only. Transcription owns language, presets, finish mode, and refinement behavior.
+
+## Feature Placement
+
+- Strings:
+  - renderer copy -> `app/electron/frontend/src/strings/en.ts`
+  - Electron shell copy -> `app/electron/strings/en.js`
+  - backend API messages -> `app/api/strings/en.py`
+- Prompts:
+  - add new prompt templates or refiner instructions in `app/stt/prompts.py`
+- Routes / services:
+  - new HTTP/WebSocket handlers go in `app/api/routes/`
+  - orchestration belongs in service modules, not routers
+  - pure STT behavior belongs in `app/stt/`
+- Tests:
+  - pure logic -> unit test
+  - wiring/contracts -> integration or smoke test
+  - user-visible regression -> add the smallest focused regression for the affected flow
+  - renderer copy rule -> run `python tools/check_renderer_strings.py`
 
 ## Before Merging
 

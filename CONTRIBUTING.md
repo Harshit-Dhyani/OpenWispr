@@ -15,7 +15,47 @@ Thank you for your interest in contributing to Transcripta. This document provid
 - [Code Review Checklist](#code-review-checklist)
 - [Architecture Constraints](#architecture-constraints)
 - [Areas Needing Contribution](#areas-needing-contribution)
+- [Documentation Contributions](#documentation-contributions)
 - [Reporting Issues](#reporting-issues)
+
+## Documentation Contributions
+
+Contributing to documentation follows the same process as code contributions.
+
+### Quick Start
+
+1. Edit docs in the `docs/` directory
+2. Add required YAML frontmatter to new files (see [docs/_style.md](./docs/_style.md))
+3. Update `docs/_inventory.yml` for new files
+4. Run `python tools/ci/verify-docs.py` to validate
+5. Include doc changes in your PR
+
+### Detailed Guide
+
+See [docs/engineering/contributing-docs.md](./docs/engineering/contributing-docs.md) for:
+- Required frontmatter format
+- Code citation standards
+- Cross-linking guidelines
+- Terminology standards
+- Review checklist
+
+### Pull Request Template
+
+When submitting PRs with documentation changes, please use this template:
+
+```markdown
+## Summary
+Brief description of changes
+
+## Documentation Changes
+- [ ] Added/updated frontmatter
+- [ ] Updated inventory (docs/_inventory.yml)
+- [ ] Cross-links validated
+- [ ] verify-docs.py passes
+
+## Verification
+<!-- Paste output from: python tools/ci/verify-docs.py -->
+```
 
 ## Prerequisites
 

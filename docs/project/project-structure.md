@@ -1,3 +1,13 @@
+---
+title: Project Structure
+audience: developers
+last_verified: 2026-03-04
+source_of_truth:
+  - app/
+  - tests/
+  - tools/
+---
+
 # Project Structure
 
 This document outlines the organized project structure for Transcripta.

@@ -1,3 +1,15 @@
+---
+title: Features Documentation
+audience: all
+last_verified: 2026-03-04
+source_of_truth:
+  - app/audio/capture.py
+  - app/api/service.py
+  - app/core/mode_manager.py
+  - app/core/modes.py
+  - app/stt/fast_engine.py
+---
+
 # Transcripta Features Documentation
 
 Comprehensive documentation of Transcripta's features, capabilities, and implementation details.

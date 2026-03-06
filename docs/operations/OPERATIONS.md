@@ -1,3 +1,15 @@
+---
+title: Operations Guide
+audience: operators
+last_verified: 2026-03-04
+source_of_truth:
+  - app/api/server.py
+  - app/api/routes/system.py
+  - app/core/logging_utils.py
+  - app/storage/session_store.py
+  - app/api/streaming_metrics.py
+---
+
 # Transcripta Operations Guide
 
 Production operations guide for running and maintaining the Transcripta desktop transcription application on Windows 11.
@@ -46,7 +58,7 @@ After packaging with electron-builder:
 
 ### Environment Variables
 
-Configure before starting (from `app/core/config.py`):
+Configure before starting:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -102,17 +114,30 @@ Get-Process | Where-Object {$_.ProcessName -in @("python","electron","Transcript
 |----------|-------------|
 | `sessions/<session-slug>/logs/app.log` | Per-session structured logs (JSON Lines format) |
 | `sessions/<session-slug>/logs/app.log.1` ... `app.log.5` | Rotated log files (1MB per file, 5 backups) |
+| `~/.transcripta/app.log` | Legacy global log location |
 | Console | Real-time backend API output |
+
+Log rotation is configured in `app/core/logging_utils.py`:
+- Max size: 1MB per file
+- Backup count: 5 files
+- Format: JSON Lines
 
 ### Log Format
 
-Logs are structured JSON (JSON Lines format) from `app/core/logging_utils.py`:
+Logs are structured JSON (JSON Lines format):
 
 ```json
 {"time": "2024-01-15T09:23:45", "level": "INFO", "logger": "transcripta", "message": "Session started"}
 ```
 
-### Log Levels (from `app/core/logging_utils.py`)
+Standard fields:
+- `time`: Timestamp in ISO format (`%Y-%m-%dT%H:%M:%S`)
+- `level`: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `logger`: Logger name (e.g., `transcripta`)
+- `message`: Log message
+- `exception`: Exception info (if an exception occurred)
+
+### Log Levels
 
 - `DEBUG` - Detailed diagnostic information
 - `INFO` - General operational information
@@ -169,7 +194,7 @@ while ($true) {
 
 ### Health Endpoint Metrics
 
-Query via health endpoint from `app/api/server.py`:
+Query via health endpoint:
 
 ```powershell
 # Get current health metrics
@@ -177,17 +202,17 @@ $response = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 $response.health
 ```
 
-**Health Response Fields** (from `app/stt/fast_engine.py` lines 719-726):
+**Health Response Fields**:
 
 | Field | Description |
 |-------|-------------|
-| `gpu_mode` | Device/compute type (e.g., `cuda/float16`, `cpu/int8`) |
-| `queue_depth` | Pending transcription chunks in queue |
-| `dropped_stt_chunks` | Lost audio chunks due to backlog |
-| `stt_backpressure_state` | `"normal"`, `"elevated"`, or `"critical"` |
-| `estimated_backlog_seconds` | Estimated processing delay in seconds |
+| `ok` | Overall health status boolean |
+| `health` | Health metrics dict (gpu_mode, queue_depth, dropped_stt_chunks, stt_backpressure_state, estimated_backlog_seconds) |
+| `meter_value` | Current audio input level |
+| `model_cache` | Cached model information |
+| `hotkey` | Hotkey recording status (is_recording, session_id, duration_ms) |
 
-**Actual Response Format** (from `app/api/server.py` lines 1873-1879):
+**Example Response**:
 
 ```json
 {
@@ -197,7 +222,7 @@ $response.health
     "queue_depth": 2,
     "dropped_stt_chunks": 0,
     "stt_backpressure_state": "normal",
-    "estimated_backlog_seconds": 0.5
+    "estimated_backlog_seconds": 0.0
   },
   "meter_value": 0.75,
   "model_cache": {
@@ -227,6 +252,26 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/cache" -Method DELETE
 # Preload model for faster startup
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/preload" -Method POST -Body '{"model_name":"small","execution_mode":"auto"}' -ContentType "application/json"
 ```
+
+### Metrics Endpoints
+
+Available metrics endpoint:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/metrics/streaming` | GET | Streaming transcription metrics |
+
+**Streaming Metrics** (`app/api/streaming_metrics.py`):
+
+| Metric | Description |
+|--------|-------------|
+| `draft_emit_ms_avg` | Average draft transcript emit latency |
+| `commit_emit_ms_avg` | Average final transcript emit latency |
+| `refine_ms_avg` | Average text refinement latency |
+| `superseded_refines` | Count of superseded refinement operations |
+| `draft_samples` | Number of draft samples collected |
+| `commit_samples` | Number of commit samples collected |
+| `refine_samples` | Number of refine samples collected |
 
 ### System Resource Monitoring
 
@@ -396,19 +441,21 @@ Get-Content sessions\<session-name>\transcript.jsonl |
 
 ### Settings Storage Location
 
-Settings are stored in `user_settings.json` (from `app/core/settings_manager.py`):
+Settings are stored in `user_settings.json`:
 
 | Location | Description |
 |----------|-------------|
 | `%APPDATA%/Transcripta/settings.json` | Windows app data directory |
 | `user_settings.json` | Application root directory (fallback) |
 
-### Session Files to Backup
+### Session Storage Paths
+
+Session data structure (`app/storage/session_store.py`):
 
 | File | Purpose |
 |------|---------|
 | `sessions/<slug>/session.json` | Session metadata and configuration |
-| `sessions/<slug>/transcript.jsonl` | Raw transcript segments (JSON Lines) |
+| `sessions/<slug>/transcript.jsonl` | Raw transcript segments (JSON Lines, append-only) |
 | `sessions/<slug>/transcript.txt` | Human-readable transcript |
 | `sessions/<slug>/notes.md` | Extracted notes and formulas |
 | `sessions/<slug>/formulas.json` | Structured formula data |
@@ -457,7 +504,7 @@ Get-ChildItem "D:\Backups\Transcripta" |
     Remove-Item -Recurse -Force
 ```
 
-### Session Recovery Procedures (from `app/storage/session_store.py`)
+### Session Recovery Procedures
 
 #### Recover from Partial Session
 
@@ -517,7 +564,7 @@ Get-ChildItem sessions | ForEach-Object {
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 ```
 
-**Actual Response** (from `app/api/server.py` lines 1873-1879):
+**Response Format**:
 
 ```json
 {
@@ -527,7 +574,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
     "queue_depth": 2,
     "dropped_stt_chunks": 0,
     "stt_backpressure_state": "normal",
-    "estimated_backlog_seconds": 0.5
+    "estimated_backlog_seconds": 0.0
   },
   "meter_value": 0.75,
   "model_cache": {
@@ -558,6 +605,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health"
 | `/api/events` | GET | SSE event stream |
 | `/api/system/profile` | GET | Hardware profile |
 | `/api/system/optimize` | GET | Auto-optimized settings |
+| `/api/metrics/streaming` | GET | Streaming transcription metrics |
 
 ### Session Status
 
@@ -603,18 +651,53 @@ Write-Host "System healthy - meter: $($health.meter_value), queue: $($health.hea
 
 ## 7. Emergency Procedures
 
-### Error Categories and Recovery (from `app/core/error_handler.py`)
+### Error Categories and Recovery
 
-| Category | Error Type | User Action |
-|----------|-----------|-------------|
-| `AUDIO_DEVICE_DISCONNECTED` | Device unplugged | Reconnect device or switch to default |
-| `AUDIO_PERMISSION_DENIED` | No mic access | Grant permission in Windows Settings |
-| `AUDIO_BACKEND_FAILURE` | Driver issue | Restart Windows Audio service |
-| `MODEL_OOM` | Out of GPU memory | Switch to CPU mode or smaller model |
-| `MODEL_NOT_FOUND` | Missing model | Wait for automatic download |
-| `SESSION_DISK_FULL` | No disk space | Free up disk space |
-| `SESSION_WRITE_PERMISSION` | Access denied | Check folder permissions |
-| `SESSION_CORRUPTED` | Data corruption | Restore from backup |
+Error categories defined in `app/core/error_handler.py`:
+
+| Category | Error Type | Recovery Action |
+|----------|-----------|-----------------|
+| `AUDIO_DEVICE_DISCONNECTED` | Device unplugged | Switches to default device |
+| `AUDIO_PERMISSION_DENIED` | No mic access | Shows guidance dialog |
+| `AUDIO_BACKEND_FAILURE` | Driver issue | Restarts backend with fallback |
+| `AUDIO_CAPTURE_ERROR` | Format/channel mismatch | Tries fallback formats |
+| `MODEL_OOM` | GPU out of memory | GPU→CPU fallback, reduces batch |
+| `MODEL_NOT_FOUND` | Missing model | Auto-download with retry |
+| `MODEL_CORRUPTED` | Bad model file | Re-downloads model |
+| `MODEL_LOAD_FAILED` | Incompatible model | Falls back to smaller model |
+| `NETWORK_BACKEND_UNAVAILABLE` | Backend not responding | Retries with backoff |
+| `NETWORK_SYNC_FAILED` | Cloud sync failure | Saves locally, retries later |
+| `NETWORK_TIMEOUT` | Slow/unstable connection | Exponential backoff |
+| `SESSION_DISK_FULL` | No disk space | Pauses recording, suggests cleanup |
+| `SESSION_WRITE_PERMISSION` | Access denied | Prompts for new location |
+| `SESSION_CORRUPTED` | Data corruption | Attempts partial recovery |
+| `SYSTEM_RESOURCE_EXHAUSTED` | CPU/RAM exhausted | Reduces load |
+| `SYSTEM_CONFIG_ERROR` | Invalid configuration | Uses defaults |
+| `SYSTEM_UNKNOWN` | Unexpected error | Logs and notifies |
+
+### Recovery Strategies
+
+Recovery strategies from `app/core/recovery_strategies.py`:
+
+| Strategy | Category | Action |
+|----------|----------|--------|
+| `audio_device_switch` | `AUDIO_DEVICE_DISCONNECTED` | Switches to default/first available |
+| `audio_permission_guidance` | `AUDIO_PERMISSION_DENIED` | Shows platform-specific guidance |
+| `model_oom_recovery` | `MODEL_OOM` | GPU→CPU, batch size reduction |
+| `model_auto_download` | `MODEL_NOT_FOUND`/`CORRUPTED` | Downloads with retry |
+| `model_size_fallback` | `MODEL_LOAD_FAILED` | Falls back to smaller model |
+| `network_retry` | Network errors | Exponential backoff retry |
+| `offline_mode_switch` | `NETWORK_BACKEND_UNAVAILABLE` | Switches to offline mode |
+| `disk_full_handler` | `SESSION_DISK_FULL` | Pauses, suggests cleanup |
+| `session_corruption_recovery` | `SESSION_CORRUPTED` | Attempts partial JSON recovery |
+
+### Fallback Chains
+
+| Chain | Options | Purpose |
+|-------|---------|---------|
+| `compute_device` | cuda → cpu | GPU OOM recovery |
+| `model_size` | large-v3 → turbo → medium → small → base → tiny | Model load failure |
+| `batch_size` | 16 → 8 → 4 → 2 → 1 | Memory reduction |
 
 ### Application Freeze
 
@@ -727,6 +810,8 @@ npm run dev
 | Data corruption | Restore from backup, use JSONL recovery |
 | App won't start | Check port 8765, kill orphaned processes |
 | High memory usage | Clear model cache, restart application |
+| Model download fails | Check disk space, verify internet connection |
+| Session corruption | Use backup restore or partial recovery |
 
 ---
 

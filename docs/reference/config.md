@@ -1,15 +1,170 @@
+---
+title: Configuration Reference
+audience: developers
+last_verified: 2026-03-04
+source_of_truth:
+  - app/core/settings_manager.py
+  - app/config/settings.py
+  - app/config/constants.py
+  - app/core/modes.py
+---
+
 # Transcripta Configuration Reference
 
 Complete reference for all Transcripta configuration options, including environment variables, settings file structure, mode-specific defaults, and validation bounds.
 
 ## Table of Contents
 
-1. [Environment Variables](#environment-variables)
-2. [Settings File Structure](#settings-file-structure)
-3. [Mode-Specific Defaults](#mode-specific-defaults)
-4. [Validation Bounds](#validation-bounds)
-5. [Live Mode Profiles](#live-mode-profiles)
-6. [Example Configurations](#example-configurations)
+1. [Settings Schema](#settings-schema)
+2. [Environment Variables](#environment-variables)
+3. [Settings File Structure](#settings-file-structure)
+4. [Mode-Specific Defaults](#mode-specific-defaults)
+5. [Validation Bounds](#validation-bounds)
+6. [Live Mode Profiles](#live-mode-profiles)
+7. [Example Configurations](#example-configurations)
+8. [Migration History](#migration-history)
+
+---
+
+## Settings Schema
+
+<!-- GENERATED: settings-schema -->
+## General Settings
+
+General application settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `defaultSessionTitle` | string | 'New Session' | |
+| `defaultLanguage` | string | 'auto' | |
+| `exportDirectory` | string | '' | |
+| `autoSaveInterval` | integer | 30 | |
+| `showNotifications` | boolean | True | |
+| `minimizeToTray` | boolean | True | |
+| `startupWithSystem` | boolean | False | |
+| `theme` | string | 'light' | |
+
+## Transcription Settings
+
+Transcription-related settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `model_name` | string | 'medium' | |
+| `default_asr_model_id` | string | 'whisper-medium' | |
+| `microphone_asr_model_id` | string | 'whisper-medium' | |
+| `system_asr_model_id` | string | 'whisper-medium' | |
+| `refinement_mode` | string | 'off' | |
+| `refinement_profile` | string | 'raw' | |
+| `transcription_mode` | string | 'dictation' | |
+| `compute_type` | string | 'float16' | |
+| `chunk_duration` | float | 1.6 | |
+| `overlap_ratio` | float | 0.2 | |
+| `vad_enabled` | boolean | True | |
+| `vad_threshold_db` | float | -40.0 | |
+| `vad_min_silence_ms` | integer | 200 | |
+| `vad_speech_pad_ms` | integer | 200 | |
+| `confidence_threshold` | float | 0.6 | |
+| `enable_filler_filter` | boolean | True | |
+| `enable_hallucination_filter` | boolean | True | |
+| `min_segment_length` | float | 0.5 | |
+| `max_workers` | integer | 4 | |
+| `use_parallel_processing` | boolean | True | |
+| `preload_model` | boolean | True | |
+| `hotkey_optimized` | boolean | False | |
+| `beam_size` | integer | 5 | |
+| `best_of` | integer | 5 | |
+| `patience` | float | 1.0 | |
+| `temperature` | float | 0.0 | |
+
+## Audio Settings
+
+Audio capture settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `captureMode` | string | 'microphone' | |
+| `default_capture_source` | string | 'microphone' | |
+| `defaultDeviceId` | string | 'default' | |
+| `backend` | string | 'auto' | |
+| `audio_backend` | string | 'auto' | |
+| `sampleRate` | integer | 16000 | |
+| `vadEnabled` | boolean | True | |
+| `vadThresholdDb` | float | -40.0 | |
+| `noiseFiltering` | boolean | True | |
+| `echoCancellation` | boolean | True | |
+| `autoGainControl` | boolean | True | |
+
+## Refiner Settings
+
+LLM refiner settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `selected_model_id` | string | 'qwen2.5-3b-instruct' | |
+| `runtime_enabled` | boolean | False | |
+| `cleanup_instructions` | string | '' | |
+| `engine_preference` | string | 'llamacpp' | |
+
+## Hotkey Settings
+
+Global hotkey settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | False | |
+| `key_combination` | string | 'Ctrl+Shift+T' | |
+| `microphone_key_combination` | string | 'Ctrl+Shift+T' | |
+| `system_key_combination` | string | 'CommandOrControl+Shift+Y' | |
+| `hold_mode` | boolean | False | |
+| `auto_inject` | boolean | True | |
+| `language` | string | 'auto' | |
+| `device_id` | string | 'default' | |
+| `capture_source` | string | 'microphone' | |
+| `finish_mode_default` | string | 'finish_and_paste' | |
+| `enable_refiner_on_stop` | boolean | False | |
+| `save_debug_wav` | boolean | False | |
+| `show_floating_window` | boolean | True | |
+| `floating_window_position` | string | 'bottom-right' | |
+| `record_on_start` | boolean | False | |
+| `stop_on_release` | boolean | False | |
+| `copy_to_clipboard` | boolean | True | |
+
+## Coach Settings
+
+English Coach settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `coach_enabled` | boolean | True | |
+| `coach_show_live_hints` | boolean | False | |
+| `coach_detail_level` | string | 'compact' | |
+| `copy_polished_by_default` | boolean | True | |
+| `show_diff_view` | boolean | True | |
+| `coach_template_id_mic` | string | 'default_english_coach' | |
+| `coach_template_id_system` | string | 'default_english_coach' | |
+| `coach_prompt_custom_enabled` | boolean | False | |
+| `coach_prompt_custom_text` | string | '' | |
+| `coach_overrides` | CoachPromptOverrides | '<computed>' | |
+| `privacy_mode` | string | 'local_only' | |
+| `show_floating_coach_result` | boolean | True | |
+| `coach_prompt_templates` | array | '<computed>' | |
+
+## Advanced Settings
+
+Advanced settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `debugMode` | boolean | False | |
+| `logLevel` | string | 'INFO' | |
+| `enableMetrics` | boolean | True | |
+| `maxLogFiles` | integer | 10 | |
+| `experimentalStem` | boolean | False | |
+| `experimentalGpuAccel` | boolean | True | |
+<!-- END GENERATED -->
+
+---
 
 ---
 
@@ -121,7 +276,7 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
 
 ```json
 {
-  "version": 3,
+  "version": 5,
   "general": {
     "defaultSessionTitle": "New Session",
     "defaultLanguage": "auto",
@@ -138,6 +293,8 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
     "microphone_asr_model_id": "whisper-medium",
     "system_asr_model_id": "whisper-medium",
     "refinement_mode": "off",
+    "refinement_profile": "raw",
+    "transcription_mode": "dictation",
     "compute_type": "float16",
     "chunk_duration": 1.6,
     "overlap_ratio": 0.2,
@@ -157,6 +314,26 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
     "best_of": 5,
     "patience": 1.0,
     "temperature": 0.0
+  },
+  "coach": {
+    "coach_enabled": true,
+    "coach_show_live_hints": false,
+    "coach_detail_level": "compact",
+    "copy_polished_by_default": true,
+    "show_diff_view": true,
+    "coach_template_id_mic": "default_english_coach",
+    "coach_template_id_system": "default_english_coach",
+    "coach_prompt_custom_enabled": false,
+    "coach_prompt_custom_text": "",
+    "coach_overrides": {
+      "tone": "neutral",
+      "aggressiveness": "light",
+      "filler_removal": true,
+      "keep_slang": true,
+      "target_style": "simple"
+    },
+    "privacy_mode": "local_only",
+    "show_floating_coach_result": true
   },
   "refiner": {
     "selected_model_id": "qwen2.5-3b-instruct",
@@ -214,6 +391,7 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
 | `general` | Application-wide settings (theme, language, auto-save) |
 | `transcription` | Core transcription parameters (model, VAD, quality) |
 | `refiner` | LLM refinement settings |
+| `coach` | English Coach settings (polished output, coaching notes) |
 | `audio` | Audio capture and device settings |
 | `hotkey` | Global hotkey configuration |
 | `advanced` | Debug, logging, and experimental features |
@@ -375,6 +553,8 @@ All settings are validated against these bounds. Values outside these ranges wil
 | `execution_mode` | `auto`, `cpu_only`, `gpu_only` | `auto` |
 | `optimization_mode` | `maximum`, `balanced`, `speed`, `low_memory` | `balanced` |
 | `refinement_mode` | `off`, `strict`, `polished` | `off` |
+| `refinement_profile` | `raw`, `clean_dictation`, `professional`, `student_notes`, `code_logs` | `raw` |
+| `transcription_mode` | `dictation`, `literal` | `dictation` |
 | `engine_preference` | `llamacpp`, `ollama` | `llamacpp` |
 | `captureMode` | `system`, `microphone` | `microphone` |
 | `floating_window_position` | `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` | `bottom-right` |
@@ -505,7 +685,7 @@ TRANSCRIPTA_ENABLE_METRICS=true
 
 ```json
 {
-  "version": 3,
+  "version": 5,
   "general": {
     "defaultSessionTitle": "Meeting Notes",
     "defaultLanguage": "en",
@@ -648,6 +828,34 @@ TRANSCRIPTA_ENABLE_METRICS=true
 | Constants | `app/config/constants.py` |
 | Settings Registry | `app/config/settings.py` |
 | Frontend Constants | `app/electron/frontend/src/config/generated/constants.ts` |
+
+---
+
+## Migration History
+
+Settings are automatically migrated when the app starts. Current version: **5**
+
+| Version | Changes |
+|---------|---------|
+| 1 | Initial versioned settings with categories (general, transcription, refiner, audio, hotkey, advanced) |
+| 2 | Added `default_asr_model_id`, `refinement_mode`, `refinement_profile`, and refiner settings |
+| 3 | Added hotkey settings, moved VAD settings to transcription category |
+| 4 | Renamed `backend` to `audio_backend`, removed duplicate VAD from audio |
+| 5 | Added `coach` category with English Coach settings and prompt templates |
+
+---
+
+## Migration History
+
+Settings are automatically migrated when the app starts. Current version: **5**
+
+| Version | Changes |
+|---------|---------|
+| 1 | Initial versioned settings with categories (general, transcription, refiner, audio, hotkey, advanced) |
+| 2 | Added `default_asr_model_id`, `refinement_mode`, `refinement_profile`, and refiner settings |
+| 3 | Added hotkey settings, moved VAD settings to transcription category |
+| 4 | Renamed `backend` to `audio_backend`, removed duplicate VAD from audio |
+| 5 | Added `coach` category with English Coach settings and prompt templates |
 
 ---
 

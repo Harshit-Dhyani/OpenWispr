@@ -1,3 +1,13 @@
+---
+title: Deployment Guide
+audience: operators
+last_verified: 2026-03-04
+source_of_truth:
+  - tools/setup/
+  - package.json
+  - requirements.txt
+---
+
 # Transcripta Deployment Guide
 
 Production-grade deployment instructions for the Transcripta Windows 11 desktop transcription application.

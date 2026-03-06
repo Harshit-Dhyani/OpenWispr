@@ -1,3 +1,13 @@
+---
+title: Model System Architecture
+audience: developers
+last_verified: 2026-03-04
+source_of_truth:
+  - app/core/model_catalog.py
+  - app/api/model_service.py
+  - app/audio/transcription.py
+---
+
 # Model System
 
 ## Source of truth

@@ -6,6 +6,8 @@
 
 **Privacy-first, local desktop transcription for Windows 11**
 
+> **Last Updated:** March 5, 2026
+
 Transcripta is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
 
 ## Key Features
@@ -61,12 +63,13 @@ Transcripta is a production-grade desktop application for real-time speech-to-te
 
 | Model | Size | VRAM | Speed | Quality | Runtime |
 |-------|------|------|-------|---------|---------|
-| tiny | 39 MB | 0 GB | Fastest | Basic | enabled |
-| base | 74 MB | 1 GB | Fast | Good | enabled |
-| small | 244 MB | 2 GB | Fast | Better | enabled |
-| medium | 769 MB | 5 GB | Balanced | Best | enabled (default) |
-| large-v3 | 1.55 GB | 10 GB | Slower | Excellent | enabled |
+| tiny | 80 MB | 0 GB | Fastest | Basic | enabled |
+| small | 460 MB | 2 GB | Fast | Good | enabled |
+| medium | 1.5 GB | 5 GB | Balanced | Better | enabled (default) |
+| large-v3 | 3.1 GB | 10 GB | Slower | Excellent | enabled |
 | turbo | 1.6 GB | 6 GB | Fast | Very Good | disabled |
+
+*Sizes and VRAM from `app/core/model_catalog.py`*
 
 - **On-demand model loading** - Only download what you use
 - **Smart GPU/CPU fallback** - Automatic OOM recovery with cascade
@@ -110,6 +113,31 @@ Transcripta is a production-grade desktop application for real-time speech-to-te
 - **Incremental output rebuild** - Efficient note generation
 - **Document context** - PDF attachment for enhanced transcription
 
+### English Coach (AI-Powered Refinement)
+
+- **LLM-powered transcript improvement** - Local AI refines dictation output
+- **Prompt templates** - Customizable coaching instructions
+- **Privacy modes** - `local_only` (offline) or `allow_llm` (cloud)
+- **Technical content protection** - Preserves formulas, code, hotkeys
+- **Refinement profiles** - `standard` or `code_logs` for technical text
+- **Floating window results** - Shows suggestions without interrupting flow
+- **Cache system** - LRU cache for repeated phrases (500 entries)
+
+### Dual Hotkey System
+
+- **Microphone hotkey** - `Ctrl+Shift+T` (customizable) for mic dictation
+- **System audio hotkey** - `Ctrl+Shift+Y` (customizable) for system audio
+- **Separate model selection** - Different ASR models per source (microphone vs system)
+- **Independent settings** - Per-source VAD, beam size, latency targets
+
+### Advanced Configuration
+
+- **Transcription presets** - `wispr` (low latency) or `system` (high quality) modes
+- **Refinement modes** - `off`, `strict`, `polished` for different use cases
+- **Settings import/export** - JSON-based portability between installations
+- **Debug mode** - Detailed logging for troubleshooting
+- **Metrics collection** - Optional anonymous performance data
+
 ### Production-Grade Features
 
 - **Comprehensive error handling** - Structured error types with recovery
@@ -145,13 +173,13 @@ python -m venv .venv
 python -m pip install --upgrade pip setuptools wheel
 pip install -e .[dev]
 
-# Install Node dependencies
+# Install Node dependencies (project uses pnpm)
 cd app/electron
-npm install
+pnpm install
 cd ..
 
 # Start development
-npm run dev
+pnpm run dev
 ```
 
 ### GPU Verification
@@ -166,14 +194,22 @@ python -c "from faster_whisper import WhisperModel; m = WhisperModel('small', de
 
 ## Usage
 
-### Hotkey Mode
+### Hotkey Mode (Quick Dictation)
 
-1. Press `Ctrl+Shift+T` (default) to start recording
-2. Speak naturally - text appears in real-time in the floating window
-3. Press `Ctrl+Shift+T` again to stop
-4. Text is automatically pasted at cursor position
+Two independent hotkeys for different audio sources:
 
-**Pro tip:** Use `tiny` or `base` model for fastest response. Change in Settings > Models.
+**Microphone Dictation** - `Ctrl+Shift+T` (default)
+1. Press to start recording from microphone
+2. Speak naturally - text appears in real-time in floating window
+3. Press again to stop
+4. Text automatically pasted at cursor position
+
+**System Audio Dictation** - `Ctrl+Shift+Y` (default)
+1. Press to capture system audio (videos, meetings, etc.)
+2. Transcribes any playing audio in real-time
+3. Press again to stop
+
+**Pro tip:** Use `tiny` or `small` model for fastest response. Configure separate models for microphone vs system audio in Settings > Models.
 
 ### System Mode
 
@@ -271,7 +307,7 @@ pytest e2e -q
 
 # Linting
 ruff check .
-npm run lint
+cd app/electron && pnpm run lint
 ```
 
 ### Test Coverage

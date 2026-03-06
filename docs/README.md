@@ -1,7 +1,16 @@
+---
+title: Documentation Home
+audience: all
+last_verified: 2026-03-05
+source_of_truth:
+  - docs/
+  - README.md
+---
+
 # Transcripta Documentation Hub
 
 > Complete documentation for the Transcripta desktop transcription application.  
-> **Last Updated:** March 3, 2026  
+> **Last Updated:** March 5, 2026  
 > **Version:** 1.0.0
 
 ---
@@ -11,17 +20,17 @@
 Choose your path based on your role:
 
 ### New Users
-📖 [Main README](../README.md) → 🚀 [Deployment Guide](./deployment/deployment.md) → ▶️ [Quick Start Guide](./getting-started/quick-start.md)
+📖 [Main README](../README.md) → 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
-**Start here if you're new to Transcripta.** Learn what the app does, install it, and run your first transcription.
+**Start here if you're new to Transcripta.** Learn what the app does, install it, and resolve common issues.
 
 ### Developers
-🏗️ [Architecture Overview](./architecture/MODEL_SYSTEM.md) → 🔌 [API Reference](./api/endpoints.md) → 🤝 [Contributing Guidelines](../CONTRIBUTING.md)
+🏗️ [Architecture Overview](./engineering/architecture-overview.md) → 🔌 [API Reference](./api/endpoints.md) → 🤝 [Contributing Guidelines](../CONTRIBUTING.md)
 
 **For contributors and developers.** Understand the codebase, extend functionality, and submit improvements.
 
 ### Operators
-🚀 [Deployment Guide](./deployment/deployment.md) → ⚙️ [Operations Guide](./operations/operations.md) → 🔧 [Troubleshooting](#troubleshooting)
+🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → ⚙️ [Operations Guide](./operations/OPERATIONS.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
 **For system administrators.** Deploy, monitor, and maintain Transcripta in production.
 
@@ -31,56 +40,62 @@ Choose your path based on your role:
 
 ### Getting Started
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 📘 [Main README](../README.md) | ✅ Complete | Project overview, features, and quick intro | 2026-03-01 | overview, features, introduction |
-| 🚀 [Deployment Guide](./deployment/deployment.md) | ✅ Complete | Windows installation and setup instructions | 2026-03-01 | install, setup, windows, configuration |
-| ▶️ Quick Start | 📝 Draft | First-time user walkthrough | 2026-03-01 | tutorial, beginner, first steps |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 📘 [Main README](../README.md) | ✅ Complete | Project overview, features, and quick intro | overview, features, introduction |
+| 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) | ✅ Complete | Windows installation and setup instructions | install, setup, windows, configuration |
 
 ### Architecture
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 🏗️ [Model System](./architecture/MODEL_SYSTEM.md) | ✅ Complete | Model catalog and management architecture | 2026-03-02 | models, whisper, catalog, registry |
-| ⚡ [Optimization Roadmap](./architecture/OPTIMIZATION_ROADMAP.md) | ✅ Complete | Performance optimization plan and benchmarks | 2026-03-02 | performance, speed, latency, roadmap |
-| 🗺️ [System Architecture](./architecture/system-architecture.md) | 📝 Draft | High-level system design and components | 2026-02-28 | design, components, structure |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 🏗️ [Model System](./architecture/MODEL_SYSTEM.md) | ✅ Complete | Model catalog and management architecture | models, whisper, catalog, registry |
+| 📐 [Architecture Overview](./engineering/architecture-overview.md) | ✅ Complete | High-level system design and components | design, components, structure |
+| 🔌 [Electron-Backend Contract](./engineering/architecture-electron-backend-contract.md) | ✅ Complete | IPC and WebSocket API contract | electron, ipc, websocket, contract |
 
 ### API Documentation
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 🔌 [Endpoints](./api/endpoints.md) | ✅ Complete | REST API and WebSocket reference | 2026-03-01 | rest, websocket, api, endpoints |
-| 📊 [API Examples](./api/examples.md) | 📝 Draft | Common API usage patterns | 2026-02-28 | examples, patterns, usage |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 🔌 [Endpoints](./api/endpoints.md) | ✅ Complete | REST API and WebSocket reference | rest, websocket, api, endpoints |
 
 ### Operations
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| ⚙️ [Operations Guide](./operations/operations.md) | ✅ Complete | Running, monitoring, and maintenance | 2026-03-01 | monitoring, maintenance, production |
-| 🔧 [Troubleshooting](./operations/troubleshooting.md) | ⚠️ Outdated | Common issues and solutions | 2026-02-15 | errors, issues, debug, fix |
-| 📈 [Monitoring](./operations/monitoring.md) | 📝 Draft | Metrics and alerting setup | 2026-02-28 | metrics, alerts, observability |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| ⚙️ [Operations Guide](./operations/OPERATIONS.md) | ✅ Complete | Running, monitoring, and maintenance | monitoring, maintenance, production |
+| 🔧 [Troubleshooting](./troubleshooting.md) | ✅ Complete | Common issues and solutions | errors, issues, debug, fix |
+
+### Reference
+
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 📋 [Features](./reference/features.md) | ✅ Complete | Feature documentation and capabilities | features, modes, dictation |
+| ⚙️ [Configuration](./reference/config.md) | ✅ Complete | Configuration reference and environment variables | config, settings, env |
+| 🎨 [Style Guide](./_style.md) | ✅ Complete | Documentation standards and conventions | style, standards, frontmatter |
 
 ### Project Documentation
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 📁 [Project Structure](./project/project-structure.md) | ✅ Complete | Repository organization and conventions | 2026-03-01 | structure, organization, folders |
-| 🤖 [Agent Guidelines](./project/agents.md) | ✅ Complete | AI assistant development guidelines | 2026-03-01 | ai, agents, development, guidelines |
-| 🤝 [Contributing](../CONTRIBUTING.md) | ✅ Complete | How to contribute to the project | 2026-03-01 | contribute, pr, guidelines |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 📁 [Project Structure](./project/project-structure.md) | ✅ Complete | Repository organization and conventions | structure, organization, folders |
+| 🤝 [Contributing](../CONTRIBUTING.md) | ✅ Complete | How to contribute to the project | contribute, pr, guidelines |
+| 📝 [Contributing to Docs](./engineering/contributing-docs.md) | ✅ Complete | Documentation contribution guide | docs, documentation, style |
 
-### Audits & Reviews
+### Engineering Guides
 
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 🔍 [Performance Audit](./audits/performance-audit.md) | ✅ Complete | Latency analysis and benchmarks | 2026-03-02 | performance, latency, benchmarks |
-| 🔒 [Security Audit](./audits/security-audit.md) | ✅ Complete | Security review and vulnerabilities | 2026-03-02 | security, vulnerabilities, audit |
-
-### Development
-
-| Document | Status | Description | Last Updated | Keywords |
-|----------|--------|-------------|--------------|----------|
-| 🛠️ [Development Setup](./development/dev-setup.md) | 📝 Draft | Local development environment | 2026-02-28 | dev, setup, local, environment |
-| 🧪 [Testing Guide](./development/testing.md) | 📝 Draft | Testing procedures and best practices | 2026-02-28 | tests, testing, jest, cypress |
+| Document | Status | Description | Keywords |
+|----------|--------|-------------|----------|
+| 🧪 [Testing Guide](./engineering/testing.md) | ✅ Complete | Testing procedures and best practices | tests, testing, pytest, vitest |
+| 🚀 [Model Runtime](./engineering/model-runtime.md) | ✅ Complete | Model runtime and routing | models, runtime, routing, download |
+| ⚡ [Performance](./engineering/performance.md) | ✅ Complete | Performance tuning and optimization | performance, speed, latency |
+| ⏱️ [Latency Playbook](./engineering/latency-playbook.md) | ✅ Complete | Diagnostic guide for lag issues | latency, diagnostics, remediation |
+| 🔒 [Security](./engineering/security.md) | ✅ Complete | Security documentation | security, threats, mitigations |
+| 🎙️ [Audio Capture](./engineering/audio-capture.md) | ✅ Complete | Audio capture system architecture | audio, capture, microphone, system |
+| 📝 [Dictation Pipeline](./engineering/dictation-pipeline.md) | ✅ Complete | STT pipeline and streaming flow | stt, streaming, transcription |
+| 🎯 [English Coach](./engineering/english-coach.md) | ✅ Complete | LLM-powered transcript refinement | coach, llm, refinement, grammar |
+| 📡 [Events & Streaming](./engineering/events-streaming.md) | ✅ Complete | SSE and WebSocket streaming | events, sse, websocket, realtime |
+| ⚙️ [Settings System](./engineering/settings.md) | ✅ Complete | Settings management and sync | settings, persistence, sync |
 
 ---
 
@@ -98,35 +113,40 @@ Choose your path based on your role:
 ## Quick Search by Topic
 
 ### 🔧 Configuration & Setup
-- [Deployment Guide](./deployment/deployment.md) - Installation
+- [Deployment Guide](./deployment/DEPLOYMENT.md) - Installation
+- [Configuration Reference](./reference/config.md) - Settings
 - [Project Structure](./project/project-structure.md) - Organization
-- [Development Setup](./development/dev-setup.md) - Local dev
 
 ### ⚡ Performance
-- [Optimization Roadmap](./architecture/OPTIMIZATION_ROADMAP.md) - Roadmap
-- [Performance Audit](./audits/performance-audit.md) - Benchmarks
-- [Monitoring](./operations/monitoring.md) - Metrics
+- [Performance Guide](./engineering/performance.md) - Tuning
+- [Latency Playbook](./engineering/latency-playbook.md) - Diagnostics
+- [Model Runtime](./engineering/model-runtime.md) - Model routing
 
 ### 🔒 Security
-- [Security Audit](./audits/security-audit.md) - Security review
+- [Security Documentation](./engineering/security.md) - Security review
 
 ### 🏗️ Architecture & Design
+- [Architecture Overview](./engineering/architecture-overview.md) - System design
 - [Model System](./architecture/MODEL_SYSTEM.md) - Models
-- [System Architecture](./architecture/system-architecture.md) - Design
+- [Electron-Backend Contract](./engineering/architecture-electron-backend-contract.md) - IPC contract
+- [Audio Capture](./engineering/audio-capture.md) - Audio system
+- [Dictation Pipeline](./engineering/dictation-pipeline.md) - STT flow
+- [Events & Streaming](./engineering/events-streaming.md) - Realtime events
 
 ### 🤝 Contributing
 - [Contributing](../CONTRIBUTING.md) - Guidelines
-- [Agent Guidelines](./project/agents.md) - AI guidelines
-- [Testing Guide](./development/testing.md) - Testing
+- [Contributing to Docs](./engineering/contributing-docs.md) - Documentation
+- [Testing Guide](./engineering/testing.md) - Testing
+- [Style Guide](./_style.md) - Documentation standards
 
 ---
 
 ## Need Help?
 
-- 🐛 **Found a bug?** Check [Troubleshooting](./operations/troubleshooting.md) first
+- 🐛 **Found a bug?** Check [Troubleshooting](./troubleshooting.md) first
 - 💡 **Have an idea?** See [Contributing](../CONTRIBUTING.md) for how to propose features
-- ❓ **Questions?** Review the [FAQ](./getting-started/faq.md) (coming soon)
+- 📝 **Docs issue?** Review [Contributing to Docs](./engineering/contributing-docs.md)
 
 ---
 
-*This documentation hub is maintained by the Transcripta team. For updates, see the [project repository](https://github.com/your-org/transcripta).*
+*This documentation hub is maintained by the Transcripta team.*

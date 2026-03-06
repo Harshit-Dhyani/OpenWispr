@@ -1,374 +1,517 @@
+---
+title: Troubleshooting Guide
+audience: operators
+last_verified: 2026-03-04
+source_of_truth:
+  - app/core/error_handler.py
+  - app/core/recovery_strategies.py
+  - AGENTS.md
+---
+
 # Transcripta Troubleshooting Guide
 
-Comprehensive guide for diagnosing and resolving common issues in Transcripta.
-
-## Table of Contents
-
-- [Quick Diagnostics](#quick-diagnostics)
-- [Error Categories & Recovery](#error-categories--recovery)
-- [Common Issues](#common-issues)
-- [Diagnostic Commands](#diagnostic-commands)
-- [Log Locations](#log-locations)
-- [PowerShell Quick Fixes](#powershell-quick-fixes)
+Quick reference for diagnosing and resolving issues using the Symptom → Cause → Fix → Verify format.
 
 ---
 
 ## Quick Diagnostics
 
-Run these commands first to identify your issue:
+Run these first:
 
 ```powershell
-# Audio diagnostics
-python tools/diagnostics/check-audio.py --verbose
+# Check backend health
+Invoke-RestMethod http://127.0.0.1:8765/api/health
 
-# System/GPU diagnostics  
-python tools/diagnostics/check-system.py --verbose
+# Check logs
+Get-Content sessions\<session>\logs\app.log -Tail 30
 
-# Check if backend is responding
-curl http://127.0.0.1:8765/health
+# Check GPU
+nvidia-smi
 ```
 
 ---
 
-## Error Categories & Recovery
+## No Audio Captured
 
-### Audio Errors
+**Symptom:** VU meter shows no activity, transcripts are empty.
 
-| Error | Cause | Automatic Recovery | Manual Fix |
-|-------|-------|-------------------|------------|
-| `AUDIO_DEVICE_DISCONNECTED` | Headset/speaker unplugged | Switches to default device | Reconnect device or select new device |
-| `AUDIO_PERMISSION_DENIED` | Windows privacy settings | Shows guidance dialog | Grant microphone permissions in Settings |
-| `AUDIO_BACKEND_FAILURE` | WASAPI/driver failure | Restarts backend | Restart app or update drivers |
-| `AUDIO_CAPTURE_ERROR` | Format/channel mismatch | Tries fallback formats | Check audio device properties |
+**Causes:**
+- Wrong capture device selected
+- Windows exclusive mode enabled
+- Audio playing through different output
+- WASAPI permissions denied
 
-**Recovery Strategy** (`app/core/recovery_strategies.py:331-411`):
-- Audio device recovery switches to default/first available device
-- Permission errors show platform-specific guidance
-- Backend failures trigger automatic restart with format fallback
-
-### Model Errors
-
-| Error | Cause | Automatic Recovery | Manual Fix |
-|-------|-------|-------------------|------------|
-| `MODEL_OOM` | GPU out of memory | Falls back to CPU + reduces batch size | Close GPU apps or use smaller model |
-| `MODEL_NOT_FOUND` | Model not downloaded | Auto-downloads model | Check internet/disk space |
-| `MODEL_CORRUPTED` | Bad model file | Re-downloads model | Clear `~/.transcripta/models/` |
-| `MODEL_LOAD_FAILED` | Incompatible model | Falls back to smaller model | Check model compatibility |
-
-**Recovery Strategy** (`app/core/recovery_strategies.py:417-589`):
-- OOM: GPU → CPU fallback chain with batch size reduction (16→8→4→2→1)
-- Missing/corrupted: Auto-download with retry (max 3 attempts)
-- Load failure: Model size fallback (large-v3 → turbo → medium → small → base → tiny)
-
-### Session Errors
-
-| Error | Cause | Automatic Recovery | Manual Fix |
-|-------|-------|-------------------|------------|
-| `SESSION_DISK_FULL` | No free space | Pauses recording, suggests cleanup | Free disk space |
-| `SESSION_WRITE_PERMISSION` | Access denied | Prompts for new location | Check folder permissions |
-| `SESSION_CORRUPTED` | File corruption | Attempts partial recovery | Restore from backup |
-
-**Recovery Strategy** (`app/core/recovery_strategies.py:701-867`):
-- Disk full: Pauses recording, identifies temp/cache files for cleanup
-- Corruption: Attempts partial JSON extraction, then backup restore
-
-### Network Errors
-
-| Error | Cause | Automatic Recovery | Manual Fix |
-|-------|-------|-------------------|------------|
-| `NETWORK_BACKEND_UNAVAILABLE` | Backend not responding | Retries with backoff | Check if backend is running |
-| `NETWORK_SYNC_FAILED` | Cloud sync failure | Saves locally, retries later | Check internet connection |
-| `NETWORK_TIMEOUT` | Slow/unstable connection | Exponential backoff | Check network stability |
-
-**Recovery Strategy** (`app/core/recovery_strategies.py:594-696`):
-- Retry with exponential backoff (1s, 2s, 4s, max 30s)
-- After exhaustion: Switches to offline mode
-
----
-
-## Common Issues
-
-### 1. No Audio Captured
-
-**Symptoms:** VU meter shows no activity, transcripts are empty
-
-**Diagnostic:**
+**Fix:**
 ```powershell
-python tools/diagnostics/check-audio.py --verbose --test <device_id>
+# 1. List devices
+Invoke-RestMethod http://127.0.0.1:8765/api/devices
+
+# 2. Disable exclusive mode
+# Settings > System > Sound > More sound settings > Playback > Device > Advanced > Uncheck "Exclusive Mode"
+
+# 3. Check privacy settings
+# Settings > Privacy > Microphone > Allow apps to access microphone
+
+# 4. Restart audio service
+Restart-Service audiosrv -Force
 ```
 
-**Causes & Fixes:**
-
-| Cause | Fix |
-|-------|-----|
-| Wrong capture device selected | Run diagnostic to find correct loopback device |
-| Windows exclusive mode enabled | Disable: Sound → Playback → Device → Advanced → Uncheck "Exclusive Mode" |
-| Audio playing through different output | Ensure audio plays through the captured device |
-| WASAPI permissions | Check Windows Privacy → Microphone permissions |
-
-**Backend Fallback** (`app/audio/backends/factory.py:34-83`):
-- Primary: PyAudioWASAPI (supports loopback)
-- Fallback: Soundcard (if installed)
-- Both fail: Check `tools/diagnostics/check-audio.py` output
-
----
-
-### 2. GPU Not Detected
-
-**Symptoms:** Transcription uses CPU (slow), logs show "CUDA not available"
-
-**Diagnostic:**
+**Verify:**
 ```powershell
-# Check PyTorch CUDA
-python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}'); print(f'Devices: {torch.cuda.device_count()}')"
+# Probe device
+Invoke-RestMethod "http://127.0.0.1:8765/api/devices/default/probe?duration=5"
 
-# Full system check
-python tools/diagnostics/check-system.py
+# Check meter in health response
+(Invoke-RestMethod http://127.0.0.1:8765/api/health).meter_value
 ```
 
-**Fixes:**
-
-| Step | Command/Action |
-|------|----------------|
-| 1. Verify NVIDIA drivers | `nvidia-smi` - should show driver version |
-| 2. Check CUDA toolkit | `python -c "import torch; print(torch.version.cuda)"` |
-| 3. Force CPU fallback | Set `TRANSCRIPTA_DEVICE=cpu` in `.env` |
-| 4. Reinstall PyTorch with CUDA | `pip install torch --index-url https://download.pytorch.org/whl/cu121` |
-
-**Compute Fallback Chain** (`app/core/recovery_strategies.py:163-188`):
-- Primary: CUDA (if `torch.cuda.is_available()`)
-- Fallback: CPU (always available)
-
 ---
 
-### 3. Transcription Slow
+## GPU Not Detected
 
-**Symptoms:** High latency, falling behind real-time
+**Symptom:** Transcription uses CPU (slow), logs show "CUDA not available".
 
-**Diagnostic:**
+**Causes:**
+- NVIDIA drivers outdated
+- CUDA toolkit mismatch
+- PyTorch installed without CUDA support
+
+**Fix:**
 ```powershell
-# Check GPU usage
+# 1. Verify drivers
 nvidia-smi
 
-# Check queue depth (via API)
-curl http://127.0.0.1:8765/health
+# 2. Force CPU fallback if needed
+$env:TRANSCRIPTA_DEVICE="cpu"
+$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+
+# 3. Or reinstall PyTorch with CUDA
+pip install torch --index-url https://download.pytorch.org/whl/cu121
 ```
 
-**Fixes:**
-
-| Solution | How |
-|----------|-----|
-| Use smaller model | Set `TRANSCRIPTA_DEFAULT_MODEL=small` or `base` |
-| Reduce chunk duration | Set `TRANSCRIPTA_CHUNK_SECONDS=1.0` |
-| Enable auto-optimization | Set `TRANSCRIPTA_AUTO_OPTIMIZE=true` |
-| Check GPU memory | `nvidia-smi` - ensure < 90% VRAM used |
-| Close other GPU apps | Close games, video editors, browsers |
-
-**Live Mode Profiles** (`app/core/config.py:373-379`):
-- `ultra`: 100ms chunks (fastest, lowest quality)
-- `realtime`: 200ms chunks (fast)
-- `low_latency`: 500ms chunks
-- `balanced`: 1s chunks (default)
-- `high_accuracy`: 2s chunks (slowest, best quality)
+**Verify:**
+```powershell
+python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+python -c "import ctranslate2; print('CUDA devices:', ctranslate2.get_cuda_device_count())"
+Invoke-RestMethod http://127.0.0.1:8765/api/health | Select-Object -ExpandProperty health | Select-Object gpu_mode
+```
 
 ---
 
-### 4. Model Download Fails
+## Transcription Slow / High Latency
 
-**Symptoms:** "Model not found" error, download progress stuck
+**Symptom:** Delay between speech and transcription, backpressure warnings.
 
-**Diagnostic:**
+**Causes:**
+- Model too large for hardware
+- Queue depth too high
+- GPU memory exhausted
+- Other apps using GPU
+
+**Fix:**
 ```powershell
-# Check internet
-ping huggingface.co
+# 1. Use smaller model
+$env:TRANSCRIPTA_DEFAULT_MODEL="small"  # or base, tiny
 
-# Check disk space
-Get-PSDrive C | Select-Object Used,Free
+# 2. Reduce chunk duration
+$env:TRANSCRIPTA_CHUNK_SECONDS="1.0"
+
+# 3. Clear model cache
+Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
+
+# 4. Close other GPU apps
 ```
 
-**Fixes:**
-
-| Cause | Fix |
-|-------|-----|
-| No internet | Connect to internet or use offline mode |
-| Disk full | Free up space in `TRANSCRIPTA_DOWNLOAD_ROOT` (default: `./models`) |
-| HuggingFace down | Try again later or use mirror |
-| Corporate firewall | Set `HF_ENDPOINT=https://hf-mirror.com` |
-
-**Manual Download**:
+**Verify:**
 ```powershell
-# Download manually to cache
+# Check backpressure state
+$health = Invoke-RestMethod http://127.0.0.1:8765/api/health
+$health.health.stt_backpressure_state  # Should be "normal"
+$health.health.queue_depth             # Should be < 5
+$health.health.estimated_backlog_seconds  # Should be < 2
+```
+
+---
+
+## Model Download Fails
+
+**Symptom:** "Model not found" error, download progress stuck.
+
+**Causes:**
+- No internet connection
+- Disk full
+- HuggingFace down
+- Corporate firewall blocking
+
+**Fix:**
+```powershell
+# 1. Check internet
+ping huggingface.co
+
+# 2. Check disk space
+Get-PSDrive C | Select-Object Used,Free
+
+# 3. Use mirror if behind firewall
+$env:HF_ENDPOINT="https://hf-mirror.com"
+
+# 4. Manual download
 huggingface-cli download Systran/faster-whisper-medium --local-dir ./models
 ```
 
----
-
-### 5. High Latency / Backpressure
-
-**Symptoms:** Delay between speech and transcription, queue warnings
-
-**Diagnostic:**
+**Verify:**
 ```powershell
-# Check queue depth
-curl http://127.0.0.1:8765/health | ConvertFrom-Json | Select queue_depth
+# Check model cache
+Invoke-RestMethod http://127.0.0.1:8765/api/models/cache
 
-# Check processing time in logs
-Get-Content sessions/<session>/logs/app.log | Select-String "processing_time"
+# Preload model
+Invoke-RestMethod http://127.0.0.1:8765/api/models/preload -Method POST `
+    -Body '{"model_name":"small","execution_mode":"auto"}' `
+    -ContentType "application/json"
 ```
 
-**Fixes:**
-
-| Setting | Default | Reduce To |
-|---------|---------|-----------|
-| `TRANSCRIPTA_CHUNK_SECONDS` | 3.2 | 1.0 or 0.5 |
-| `TRANSCRIPTA_DEFAULT_MODEL` | medium | small |
-| `TRANSCRIPTA_MAX_QUEUE_ITEMS` | 16 | 8 |
-| `TRANSCRIPTA_BEAM_SIZE` | 5 | 1 |
-
 ---
 
-### 6. Session Not Saving
+## Session Not Saving
 
-**Symptoms:** Transcripts lost after closing app
+**Symptom:** Transcripts lost after closing app, no files in session folder.
 
-**Diagnostic:**
+**Causes:**
+- Permissions denied
+- Disk full
+- Session directory doesn't exist
+
+**Fix:**
 ```powershell
-# Check sessions directory
-Get-ChildItem sessions/ -ErrorAction SilentlyContinue
+# 1. Create directory
+mkdir sessions -Force
 
-# Check permissions
-Get-Acl sessions/ | Format-List
+# 2. Fix permissions
+icacls sessions/ /grant "$env:USERNAME:(OI)(CI)F" /T
 
-# Check disk space
+# 3. Check disk space
 Get-PSDrive C | Select-Object Free
+
+# 4. Change export path if needed
+$env:TRANSCRIPTA_EXPORT_ROOT="D:\Transcripta\Sessions"
 ```
 
-**Fixes:**
+**Verify:**
+```powershell
+# Check session folder exists
+Test-Path sessions -PathType Container
 
-| Cause | Fix |
-|-------|-----|
-| Permissions | Run: `icacls sessions/ /grant "$env:USERNAME:(OI)(CI)F"` |
-| Disk full | Free up space or change `TRANSCRIPTA_EXPORT_ROOT` |
-| Path doesn't exist | Create directory: `mkdir sessions` |
+# Check session state
+Invoke-RestMethod http://127.0.0.1:8765/api/session
+
+# List session files
+Get-ChildItem sessions\<session-name>
+```
 
 ---
 
-### 7. Hotkey Not Working
+## Backend Fails to Start (Port in Use)
 
-**Symptoms:** Push-to-talk doesn't activate recording
+**Symptom:** "Address already in use" error, connection refused.
 
-**Diagnostic:**
+**Causes:**
+- Orphaned Python process holding port
+- Another app using port 8765
+
+**Fix:**
 ```powershell
-# Check if hotkey service is running
-curl http://127.0.0.1:8765/modes/status
+# 1. Find process on port 8765
+Get-NetTCPConnection -LocalPort 8765 | Select-Object OwningProcess
+
+# 2. Kill the process
+Stop-Process -Id <PID> -Force
+
+# 3. Or kill all Python
+Get-Process python | Stop-Process -Force
+
+# 4. Change port
+$env:TRANSCRIPTA_API_PORT="8766"
 ```
 
-**Fixes:**
+**Verify:**
+```powershell
+# Check port is free
+Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue
 
-| Cause | Fix |
-|-------|-----|
-| App not focused | Click on app window first |
-| Hotkey conflict | Change hotkey in settings |
-| Permissions | Run app as administrator (Windows) |
+# Start backend and check health
+python -m app.api_main
+Invoke-RestMethod http://127.0.0.1:8765/api/health
+```
 
 ---
 
-### 8. Electron Won't Start
+## Out of Memory (OOM)
 
-**Symptoms:** UI doesn't appear, "connection refused" errors
+**Symptom:** "CUDA out of memory", system freeze, GPU memory exhausted.
 
-**Diagnostic:**
+**Causes:**
+- Model too large for GPU
+- Batch size too large
+- Other apps using GPU memory
+
+**Fix:**
 ```powershell
-# Check port availability
+# 1. Switch to CPU
+$env:TRANSCRIPTA_DEVICE="cpu"
+$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+
+# 2. Use smaller model
+$env:TRANSCRIPTA_DEFAULT_MODEL="base"
+
+# 3. Clear model cache
+Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
+
+# 4. Close other GPU apps
+```
+
+**Verify:**
+```powershell
+# Check GPU memory
+nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+
+# Check model loaded on CPU
+Invoke-RestMethod http://127.0.0.1:8765/api/health | Select-Object -ExpandProperty health | Select-Object gpu_mode
+```
+
+---
+
+## Hotkey Not Working
+
+**Symptom:** Push-to-talk doesn't activate recording.
+
+**Causes:**
+- App not focused
+- Hotkey conflict with other app
+- Permissions issue
+
+**Fix:**
+```powershell
+# 1. Check hotkey status
+Invoke-RestMethod http://127.0.0.1:8765/modes/status
+
+# 2. Change hotkey in UI settings
+# 3. Run as administrator if needed
+```
+
+**Verify:**
+```powershell
+# Check hotkey in health
+(Invoke-RestMethod http://127.0.0.1:8765/api/health).hotkey
+```
+
+---
+
+## Session Data Corruption
+
+**Symptom:** Cannot load session, missing transcripts, parse errors.
+
+**Causes:**
+- Crash during write
+- Disk full during write
+- Power loss
+
+**Fix:**
+```powershell
+# 1. Check for transcript.jsonl
+$lines = Get-Content sessions\<session>\transcript.jsonl
+
+# 2. Recover segments
+$segments = $lines | ForEach-Object { 
+    try { $_ | ConvertFrom-Json } catch { $null } 
+} | Where-Object { $_ -ne $null }
+
+# 3. Rebuild transcript
+$segments | ForEach-Object { "[$($_.start) - $($_.end)] $($_.text)" } | Out-File recovered.txt
+
+# 4. Check for backup
+$backup = Get-ChildItem sessions\<session>\*.backup -ErrorAction SilentlyContinue
+```
+
+**Verify:**
+```powershell
+# Check recovered data
+Get-Content recovered.txt -Head 10
+
+# Validate JSONL
+Get-Content sessions\<session>\transcript.jsonl | ForEach-Object {
+    try { $_ | ConvertFrom-Json | Out-Null; "Valid" } catch { "Invalid: $_" }
+}
+```
+
+---
+
+## Electron Won't Start
+
+**Symptom:** UI doesn't appear, "connection refused" errors.
+
+**Causes:**
+- Backend not running
+- Port conflict
+- Orphaned processes
+
+**Fix:**
+```powershell
+# 1. Check port availability
 netstat -ano | findstr 8765
 
+# 2. Kill orphaned Python
+taskkill /F /IM python.exe
+
+# 3. Kill by port
+Get-NetTCPConnection -LocalPort 8765 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+
+# 4. Change port in .env
+echo "TRANSCRIPTA_PORT=8766" >> .env
+```
+
+**Verify:**
+```powershell
 # Check Python processes
-Get-Process python -ErrorAction SilentlyContinue
+Get-Process python
 
 # Check logs
 Get-Content sessions/latest/logs/app.log -Tail 50
 ```
 
-**Fixes:**
+---
 
-| Step | Command |
-|------|---------|
-| Kill orphaned Python | `taskkill /F /IM python.exe` |
-| Kill by port | `netstat -ano \| findstr 8765` then `taskkill /PID <pid> /F` |
-| Verify venv | `.\venv\Scripts\activate` |
-| Check port conflict | Change `TRANSCRIPTA_PORT` in `.env` |
+## Error Categories Reference
+
+From `app/core/error_handler.py`:
+
+### Audio Errors
+
+| Error Category | Trigger | User Message |
+|----------------|---------|--------------|
+| `AUDIO_DEVICE_DISCONNECTED` | Headset/speaker unplugged | "Your audio device was disconnected. Switching to default device." |
+| `AUDIO_PERMISSION_DENIED` | Windows privacy settings | "Transcripta needs microphone access to transcribe audio." |
+| `AUDIO_BACKEND_FAILURE` | WASAPI/driver failure | "The audio backend encountered an error." |
+| `AUDIO_CAPTURE_ERROR` | Format/channel mismatch | Check audio device properties |
+
+### Model Errors
+
+| Error Category | Trigger | User Message |
+|----------------|---------|--------------|
+| `MODEL_OOM` | GPU out of memory | "The transcription model ran out of memory. Switching to CPU mode." |
+| `MODEL_NOT_FOUND` | Model not downloaded | "The requested transcription model is not available. Downloading now." |
+| `MODEL_CORRUPTED` | Bad model file | "The transcription model file appears to be corrupted. Re-downloading." |
+| `MODEL_LOAD_FAILED` | Incompatible model | "Failed to load the transcription model. Trying fallback model." |
+| `MODEL_INFERENCE_ERROR` | Runtime inference failure | Model error with details |
+
+### Session Errors
+
+| Error Category | Trigger | User Message |
+|----------------|---------|--------------|
+| `SESSION_DISK_FULL` | No free space | "Your disk is full. Recording has been paused." |
+| `SESSION_WRITE_PERMISSION` | Access denied | "Cannot save session to the selected location." |
+| `SESSION_CORRUPTED` | File corruption | "Your session file appears to be corrupted. Attempting recovery." |
+| `SESSION_NOT_FOUND` | Missing session | Session not found error |
+
+### Network Errors
+
+| Error Category | Trigger | User Message |
+|----------------|---------|--------------|
+| `NETWORK_BACKEND_UNAVAILABLE` | Backend not responding | "The transcription backend is not responding. Retrying connection." |
+| `NETWORK_SYNC_FAILED` | Cloud sync failure | "Could not synchronize your settings with the cloud. Saved locally." |
+| `NETWORK_TIMEOUT` | Slow/unstable connection | Connection timeout error |
+| `NETWORK_CONNECTION_ERROR` | General connection failure | Connection error |
+
+### System Errors
+
+| Error Category | Trigger | User Message |
+|----------------|---------|--------------|
+| `SYSTEM_RESOURCE_EXHAUSTED` | CPU/RAM exhausted | System resource error |
+| `SYSTEM_CONFIG_ERROR` | Invalid configuration | Configuration error |
+| `SYSTEM_UNKNOWN` | Unexpected error | "An unexpected error occurred. Please try again." |
 
 ---
 
-## Diagnostic Commands
+## Recovery Strategies
 
-### Audio Diagnostics
+From `app/core/recovery_strategies.py`:
 
-```powershell
-# List all devices
-python tools/diagnostics/check-audio.py --verbose
+| Strategy | Handles | Recovery Action |
+|----------|---------|-----------------|
+| `audio_device_switch` | `AUDIO_DEVICE_DISCONNECTED` | Switches to default/first available device |
+| `audio_permission_guidance` | `AUDIO_PERMISSION_DENIED` | Shows platform-specific guidance (Windows/Mac/Linux) |
+| `model_oom_recovery` | `MODEL_OOM` | GPU→CPU fallback, batch size reduction (16→8→4→2→1) |
+| `model_auto_download` | `MODEL_NOT_FOUND`, `MODEL_CORRUPTED` | Downloads model with retry (max 2 attempts, 2s base delay) |
+| `model_size_fallback` | `MODEL_LOAD_FAILED` | Falls back to smaller model (large→turbo→medium→small→base→tiny) |
+| `network_retry` | Network errors | Exponential backoff (1s, 2s, 4s, max 30s) |
+| `offline_mode_switch` | `NETWORK_BACKEND_UNAVAILABLE` | Switches to offline mode with periodic retry |
+| `disk_full_handler` | `SESSION_DISK_FULL` | Pauses recording, identifies cleanup candidates |
+| `session_corruption_recovery` | `SESSION_CORRUPTED` | Attempts partial JSON extraction, then backup restore |
 
-# Test specific device
-python tools/diagnostics/check-audio.py --test <device_id>
+### Fallback Chains
 
-# JSON output for scripting
-python tools/diagnostics/check-audio.py --json
-```
+| Chain | Options | When Activated |
+|-------|---------|----------------|
+| `compute_device` | cuda → cpu | GPU OOM detected |
+| `model_size` | large-v3 → turbo → medium → small → base → tiny | Model load failure |
+| `batch_size` | 16 → 8 → 4 → 2 → 1 | Memory pressure |
 
-### System Diagnostics
+---
 
-```powershell
-# Full system check
-python tools/diagnostics/check-system.py --verbose
+## Known Issues (Never Reintroduce)
 
-# JSON output
-python tools/diagnostics/check-system.py --json
-```
+From `AGENTS.md` - These bugs must not be reintroduced:
 
-### API Health Check
+### Serialization Issues
 
-```powershell
-# Check backend health
-curl http://127.0.0.1:8765/health
+| Issue | Prevention |
+|-------|------------|
+| Numpy scalars/arrays sent raw | Always route payloads through single JSON-safe encoder |
+| Dataclasses sent raw | Convert to dict before sending |
+| datetime/Path sent raw | Serialize to string/JSON-safe format |
 
-# Check current modes
-curl http://127.0.0.1:8765/modes/status
+### State Management Issues
 
-# Check active config
-curl http://127.0.0.1:8765/config
-```
+| Issue | Prevention |
+|-------|------------|
+| Live transcript text appended | Draft/final updates must replace by `session_id + segment_index` |
+| State shared between Dictation and Sessions | Keep separate scoped slices, render only active mode's data |
+| Duplicate hotkey transcript events | One live draft lane and one final lane only |
+| Microphone/system model selection drift | Active capture must resolve matching ASR model |
 
-### GPU Diagnostics
+### Progress and UX Issues
 
-```powershell
-# NVIDIA GPU status
-nvidia-smi
+| Issue | Prevention |
+|-------|------------|
+| Fake progress shown | Show percent only when total size known; use truthful state labels |
+| Hard-fail on optional artifacts | Missing vocabulary-style files must be skipped gracefully |
+| Refiner runtime mandatory | If `llama-cpp-python` unavailable, degrade once, log once, return original |
+| Normal disconnects treated as errors | Handle `CancelledError` and clean closes as expected |
 
-# NVIDIA GPU every 1 second
-nvidia-smi -l 1
+### Logging Issues
 
-# PyTorch CUDA check
-python -c "import torch; print(torch.cuda.is_available())"
+| Issue | Prevention |
+|-------|------------|
+| Everything at DEBUG | `debugMode` controls diagnostics; `logLevel` controls verbosity |
+| Verbose dev logging default | Default to INFO/WARNING unless `TRANSCRIPTA_LOG_LEVEL=DEBUG` set |
 
-# CTranslate2 check
-python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"
-```
+### Data Integrity Issues
+
+| Issue | Prevention |
+|-------|------------|
+| Trusting legacy class names | Use resolved runtime fields (`capture_source`, resolved device kind, resolved model id) |
 
 ---
 
 ## Log Locations
 
-### Application Logs
-
 | Location | Description |
 |----------|-------------|
 | `sessions/<session_id>/logs/app.log` | Session-specific logs (JSON format) |
 | `~/.transcripta/reports/crash_*.json` | Crash dumps with full context |
+| `~/.transcripta/app.log` | Legacy global log (if configured) |
 | Console output | Real-time logs when running in terminal |
 
 ### Log Format
 
-Logs use JSON format (`app/core/logging_utils.py:10-48`):
 ```json
 {
   "time": "2026-01-15T10:30:00",
@@ -380,11 +523,17 @@ Logs use JSON format (`app/core/logging_utils.py:10-48`):
 }
 ```
 
-### Log Rotation
+### Finding Error IDs
 
-- Max size: 1MB (`TRANSCRIPTA_LOG_MAX_BYTES`)
-- Backup count: 5 files (`TRANSCRIPTA_LOG_BACKUP_COUNT`)
-- Location: `sessions/<session>/logs/app.log`
+Error IDs are 8-character codes (e.g., `abc123`) in log messages:
+
+```powershell
+# Find recent errors with IDs
+Get-Content sessions\<session>\logs\app.log | 
+    ConvertFrom-Json | 
+    Where-Object { $_.level -eq "ERROR" } |
+    Select-Object time, message, error_id, category
+```
 
 ---
 
@@ -428,34 +577,28 @@ echo "TRANSCRIPTA_DEVICE=cpu" >> .env
 echo "TRANSCRIPTA_COMPUTE_TYPE=int8" >> .env
 ```
 
-### Download Model Manually
+### Emergency Session Export
 
 ```powershell
-# Using huggingface-cli
-huggingface-cli download Systran/faster-whisper-medium --local-dir ./models
+$exportDir = "$env:USERPROFILE\Desktop\Transcripta-Emergency-$(Get-Date -Format 'yyyyMMdd')"
+New-Item -ItemType Directory -Path $exportDir -Force
 
-# Or using Python
-python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu')"
-```
+Get-ChildItem sessions | ForEach-Object {
+    $dest = "$exportDir\$($_.Name)"
+    New-Item -ItemType Directory -Path $dest -Force
+    @("session.json", "transcript.jsonl", "transcript.txt", "notes.md") | ForEach-Object {
+        $src = "$($_.FullName)\$_"
+        if (Test-Path $src) { Copy-Item $src $dest -Force }
+    }
+}
 
-### Check System Resources
-
-```powershell
-# Disk space
-Get-PSDrive C | Select-Object Used,Free,@{N="Used%";E={[math]::Round($_.Used/($_.Used+$_.Free)*100,2)}}
-
-# Memory
-Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory
-
-# CPU
-Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors
+Compress-Archive -Path $exportDir -DestinationPath "$exportDir.zip"
+Write-Host "Export complete: $exportDir.zip"
 ```
 
 ---
 
-## Environment Variables Reference
-
-Key variables from `.env.example`:
+## Environment Variables Quick Reference
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -475,9 +618,9 @@ Key variables from `.env.example`:
 
 If issues persist:
 
-1. Run full diagnostics: `python tools/diagnostics/check-system.py --json > diagnostics.json`
-2. Collect logs from `sessions/*/logs/app.log`
-3. Check crash dumps in `~/.transcripta/reports/`
-4. Include error IDs from log messages when reporting issues
+1. Run diagnostics and collect error IDs from logs
+2. Check crash dumps in `~/.transcripta/reports/`
+3. Include error IDs (8-character codes) when reporting issues
+4. Verify against known issues in this guide
 
-Error IDs (8-character codes like `abc123`) help trace specific failures in the error handling system (`app/core/error_handler.py:90`).
+Error IDs help trace specific failures through the error handling system.
