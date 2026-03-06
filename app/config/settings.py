@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional
 
+from app.config.coach_prompts import get_default_coach_templates
 from app.core.constants import (
     AudioConstants,
     ModelConstants,
@@ -26,7 +27,7 @@ class SettingDefinition:
 
     name: str
     category: str
-    type: Literal["string", "number", "boolean", "enum", "range"]
+    type: Literal["string", "number", "boolean", "enum", "range", "object", "array"]
     default: Any
     label: str
     description: str
@@ -142,7 +143,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default=UIConstants.DEFAULT_THEME,
         label="Theme",
         description="Application color theme",
-        options=["light", "dark", "cyber", "dracula"],
+        options=["light", "dark", "cyber", "dracula", "ocean", "sunset", "forest"],
     ),
     # ============================================
     # Transcription Settings
@@ -188,6 +189,24 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Refinement Mode",
         description="Post-processing mode for transcript refinement",
         options=["off", "strict", "polished"],
+    ),
+    "refinement_profile": SettingDefinition(
+        name="refinement_profile",
+        category="transcription",
+        type="enum",
+        default=RefinerConstants.DEFAULT_REFINEMENT_PROFILE,
+        label="Refinement Profile",
+        description="Choose how optional finish-time refinement should shape the final transcript",
+        options=["raw", "clean_dictation", "professional", "student_notes", "code_logs"],
+    ),
+    "transcription_mode": SettingDefinition(
+        name="transcription_mode",
+        category="transcription",
+        type="enum",
+        default="dictation",
+        label="Transcription Mode",
+        description="Choose between natural dictation cleanup and literal technical token handling",
+        options=["dictation", "literal"],
     ),
     "compute_type": SettingDefinition(
         name="compute_type",
@@ -524,6 +543,14 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         description="Automatically adjust input volume",
         is_fake=True,
     ),
+    "mute_transcripta_audio_during_dictation": SettingDefinition(
+        name="mute_transcripta_audio_during_dictation",
+        category="audio",
+        type="boolean",
+        default=False,
+        label="Mute App Audio During Dictation",
+        description="Mute Transcripta renderer audio while microphone dictation is active",
+    ),
     # ============================================
     # Hotkey Settings
     # ============================================
@@ -607,7 +634,23 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default="finish_and_paste",
         label="Default Finish Action",
         description="What happens when dictation stops from the hotkey toggle",
-        options=["finish", "finish_and_paste"],
+        options=["finish", "finish_and_paste", "cancel"],
+    ),
+    "enable_refiner_on_stop": SettingDefinition(
+        name="enable_refiner_on_stop",
+        category="hotkey",
+        type="boolean",
+        default=False,
+        label="Enable Refiner on Dictation Stop",
+        description="Run the text refiner after hotkey dictation stops",
+    ),
+    "save_debug_wav": SettingDefinition(
+        name="save_debug_wav",
+        category="hotkey",
+        type="boolean",
+        default=False,
+        label="Save Hotkey Debug WAV",
+        description="Write captured dictation audio to logs/hotkey-debug on stop",
     ),
     "show_floating_window": SettingDefinition(
         name="show_floating_window",
@@ -651,6 +694,209 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         description="Automatically copy transcription",
     ),
     # ============================================
+    # Coach Settings
+    # ============================================
+    "coach_enabled": SettingDefinition(
+        name="coach_enabled",
+        category="coach",
+        type="boolean",
+        default=True,
+        label="Enable English Coach",
+        description="Generate polished text and coaching notes after microphone dictation stops",
+    ),
+    "coach_show_live_hints": SettingDefinition(
+        name="coach_show_live_hints",
+        category="coach",
+        type="boolean",
+        default=False,
+        label="Show Live Hints",
+        description="Reserved for future live coaching during streaming dictation",
+        is_fake=True,
+    ),
+    "coach_detail_level": SettingDefinition(
+        name="coach_detail_level",
+        category="coach",
+        type="enum",
+        default="compact",
+        label="Coach Detail Level",
+        description="How much coaching detail to include after dictation stops",
+        options=["compact", "standard", "deep"],
+    ),
+    "copy_polished_by_default": SettingDefinition(
+        name="copy_polished_by_default",
+        category="coach",
+        type="boolean",
+        default=True,
+        label="Paste Polished Text",
+        description="Use the polished coached paragraph when copying or pasting dictation results",
+    ),
+    "show_diff_view": SettingDefinition(
+        name="show_diff_view",
+        category="coach",
+        type="boolean",
+        default=True,
+        label="Show Diff View",
+        description="Display edit differences between the original and polished transcript",
+    ),
+    "coach_template_id_mic": SettingDefinition(
+        name="coach_template_id_mic",
+        category="coach",
+        type="string",
+        default="default_english_coach",
+        label="Microphone Coach Template",
+        description="Prompt template used for microphone dictation coaching",
+    ),
+    "coach_template_id_system": SettingDefinition(
+        name="coach_template_id_system",
+        category="coach",
+        type="string",
+        default="default_english_coach",
+        label="System Coach Template",
+        description="Stored prompt template for future system-audio coaching",
+    ),
+    "coach_prompt_custom_enabled": SettingDefinition(
+        name="coach_prompt_custom_enabled",
+        category="coach",
+        type="boolean",
+        default=False,
+        label="Use Custom Coach Prompt",
+        description="Override the selected prompt template's user section with custom text",
+    ),
+    "coach_prompt_custom_text": SettingDefinition(
+        name="coach_prompt_custom_text",
+        category="coach",
+        type="string",
+        default="",
+        label="Custom Coach Prompt",
+        description="Custom user prompt used when custom prompts are enabled",
+    ),
+    "coach_overrides": SettingDefinition(
+        name="coach_overrides",
+        category="coach",
+        type="object",
+        default={
+            "tone": "neutral",
+            "aggressiveness": "light",
+            "filler_removal": True,
+            "keep_slang": True,
+            "target_style": "simple",
+        },
+        label="Coach Overrides",
+        description="Stable prompt override values injected into the selected coach template",
+    ),
+    "privacy_mode": SettingDefinition(
+        name="privacy_mode",
+        category="coach",
+        type="enum",
+        default="local_only",
+        label="Coach Privacy Mode",
+        description="Allow local LLM coaching or stay transcript-only",
+        options=["local_only", "allow_llm"],
+    ),
+    "show_floating_coach_result": SettingDefinition(
+        name="show_floating_coach_result",
+        category="coach",
+        type="boolean",
+        default=True,
+        label="Show Floating Coach Result",
+        description="Keep the floating window open with the coach summary after dictation stops",
+    ),
+    "coach_prompt_templates": SettingDefinition(
+        name="coach_prompt_templates",
+        category="coach",
+        type="array",
+        default=get_default_coach_templates(),
+        label="Coach Prompt Templates",
+        description="Versioned prompt templates available to the English Coach",
+    ),
+    # ============================================
+    # History Settings
+    # ============================================
+    "retention_days": SettingDefinition(
+        name="retention_days",
+        category="history",
+        type="range",
+        default=30,
+        label="History Retention Days",
+        description="How many days transcript history is retained before cleanup",
+        min=1,
+        max=365,
+        step=1,
+    ),
+    "persist_audio": SettingDefinition(
+        name="persist_audio",
+        category="history",
+        type="boolean",
+        default=True,
+        label="Persist Audio",
+        description="Store per-session audio references for retry and downloads",
+    ),
+    "allow_retry": SettingDefinition(
+        name="allow_retry",
+        category="history",
+        type="boolean",
+        default=True,
+        label="Allow Retry",
+        description="Enable retry transcript action from Home history",
+    ),
+    "default_analytics_range_days": SettingDefinition(
+        name="default_analytics_range_days",
+        category="history",
+        type="enum",
+        default=7,
+        label="Default Analytics Range",
+        description="Default Home analytics lookback window",
+        options=[7, 30, 90, "all"],
+    ),
+    # ============================================
+    # Dictionary Settings
+    # ============================================
+    "dictionary_enabled": SettingDefinition(
+        name="dictionary_enabled",
+        category="dictionary",
+        type="boolean",
+        default=True,
+        label="Enable Dictionary",
+        description="Apply dictionary replacements during final transcript composition",
+    ),
+    # ============================================
+    # Snippet Settings
+    # ============================================
+    "snippets_enabled": SettingDefinition(
+        name="snippets_enabled",
+        category="snippets",
+        type="boolean",
+        default=True,
+        label="Enable Snippets",
+        description="Expand snippet triggers during final transcript composition",
+    ),
+    "snippets_quick_insert": SettingDefinition(
+        name="snippets_quick_insert",
+        category="snippets",
+        type="boolean",
+        default=False,
+        label="Quick Insert",
+        description="Enable quick snippet insert behavior in output composition",
+    ),
+    # ============================================
+    # Style Settings
+    # ============================================
+    "style_default_profile": SettingDefinition(
+        name="style_default_profile",
+        category="style",
+        type="string",
+        default="",
+        label="Default Style Profile",
+        description="Optional global default style profile id",
+    ),
+    "style_apply_enabled": SettingDefinition(
+        name="style_apply_enabled",
+        category="style",
+        type="boolean",
+        default=True,
+        label="Enable Style Pipeline",
+        description="Apply style profile transform during final transcript composition",
+    ),    # ============================================
     # Advanced Settings
     # ============================================
     "debugMode": SettingDefinition(
@@ -796,6 +1042,12 @@ def validate_setting(name: str, value: Any) -> tuple[bool, str]:
     elif defn.type == "enum":
         if defn.options is not None and value not in defn.options:
             return False, f"Invalid value. Must be one of: {defn.options}"
+    elif defn.type == "object":
+        if not isinstance(value, dict):
+            return False, f"Expected object, got {type(value).__name__}"
+    elif defn.type == "array":
+        if not isinstance(value, list):
+            return False, f"Expected array, got {type(value).__name__}"
 
     # Range validation
     if defn.min is not None:
@@ -888,3 +1140,4 @@ CURRENT_SETTINGS_VERSION = UIConstants.SETTINGS_VERSION
 def get_settings_version() -> int:
     """Get the current settings version."""
     return CURRENT_SETTINGS_VERSION
+

@@ -21,6 +21,7 @@ from app.config.settings import (
     get_category_defaults,
     get_setting,
 )
+from app.config.coach_prompts import get_default_coach_templates
 from app.core.model_catalog import MODEL_CATALOG_BY_ID
 from app.core.config import ModeConfig, SettingsContainer, create_default_mode_configs
 from app.core.modes import (
@@ -111,12 +112,32 @@ def _normalize_settings_payload(data: dict[str, Any]) -> dict[str, Any]:
     normalized["hotkey"] = hotkey
     return normalized
 
+
+def _build_coach_settings(raw: dict[str, Any] | None) -> "CoachSettings":
+    payload = dict(raw or {})
+    overrides = payload.get("coach_overrides", {}) or {}
+    templates = payload.get("coach_prompt_templates", get_default_coach_templates())
+    return CoachSettings(
+        **{
+            **payload,
+            "coach_overrides": CoachPromptOverrides(**overrides),
+            "coach_prompt_templates": [
+                CoachPromptTemplateSettings(**template) for template in templates
+            ],
+        }
+    )
+
 __all__ = [
     "GeneralSettings",
     "TranscriptionSettings",
     "RefinerSettings",
     "AudioSettings",
     "HotkeySettings",
+    "CoachSettings",
+    "HistorySettings",
+    "DictionarySettings",
+    "SnippetsSettings",
+    "StyleSettings",
     "AdvancedSettings",
     "ModeSpecificSettings",
     "SettingsState",
@@ -161,6 +182,12 @@ class TranscriptionSettings:
         default_factory=lambda: get_setting("system_asr_model_id").default
     )
     refinement_mode: str = field(default_factory=lambda: get_setting("refinement_mode").default)
+    refinement_profile: str = field(
+        default_factory=lambda: get_setting("refinement_profile").default
+    )
+    transcription_mode: str = field(
+        default_factory=lambda: get_setting("transcription_mode").default
+    )
     compute_type: str = field(default_factory=lambda: get_setting("compute_type").default)
     chunk_duration: float = field(default_factory=lambda: get_setting("chunk_duration").default)
     overlap_ratio: float = field(default_factory=lambda: get_setting("overlap_ratio").default)
@@ -211,6 +238,9 @@ class AudioSettings:
     noiseFiltering: bool = field(default_factory=lambda: get_setting("noiseFiltering").default)
     echoCancellation: bool = field(default_factory=lambda: get_setting("echoCancellation").default)
     autoGainControl: bool = field(default_factory=lambda: get_setting("autoGainControl").default)
+    mute_transcripta_audio_during_dictation: bool = field(
+        default_factory=lambda: get_setting("mute_transcripta_audio_during_dictation").default
+    )
 
 
 @dataclass
@@ -245,6 +275,12 @@ class HotkeySettings:
     finish_mode_default: str = field(
         default_factory=lambda: get_setting("finish_mode_default").default
     )
+    enable_refiner_on_stop: bool = field(
+        default_factory=lambda: get_setting("enable_refiner_on_stop").default
+    )
+    save_debug_wav: bool = field(
+        default_factory=lambda: get_setting("save_debug_wav").default
+    )
     show_floating_window: bool = field(
         default_factory=lambda: get_setting("show_floating_window").default
     )
@@ -257,6 +293,121 @@ class HotkeySettings:
         default_factory=lambda: get_setting("copy_to_clipboard").default
     )
 
+
+@dataclass
+class CoachPromptOverrides:
+    """Stable prompt override values for the English Coach."""
+
+    tone: str = field(default_factory=lambda: get_setting("coach_overrides").default["tone"])
+    aggressiveness: str = field(
+        default_factory=lambda: get_setting("coach_overrides").default["aggressiveness"]
+    )
+    filler_removal: bool = field(
+        default_factory=lambda: get_setting("coach_overrides").default["filler_removal"]
+    )
+    keep_slang: bool = field(
+        default_factory=lambda: get_setting("coach_overrides").default["keep_slang"]
+    )
+    target_style: str = field(
+        default_factory=lambda: get_setting("coach_overrides").default["target_style"]
+    )
+
+
+@dataclass
+class CoachPromptTemplateSettings:
+    """Editable coach prompt template."""
+
+    id: str
+    name: str
+    version: int
+    system: str
+    user_template: str
+    enabled: bool = True
+    built_in: bool = False
+
+
+@dataclass
+class CoachSettings:
+    """English Coach settings."""
+
+    coach_enabled: bool = field(default_factory=lambda: get_setting("coach_enabled").default)
+    coach_show_live_hints: bool = field(
+        default_factory=lambda: get_setting("coach_show_live_hints").default
+    )
+    coach_detail_level: str = field(
+        default_factory=lambda: get_setting("coach_detail_level").default
+    )
+    copy_polished_by_default: bool = field(
+        default_factory=lambda: get_setting("copy_polished_by_default").default
+    )
+    show_diff_view: bool = field(default_factory=lambda: get_setting("show_diff_view").default)
+    coach_template_id_mic: str = field(
+        default_factory=lambda: get_setting("coach_template_id_mic").default
+    )
+    coach_template_id_system: str = field(
+        default_factory=lambda: get_setting("coach_template_id_system").default
+    )
+    coach_prompt_custom_enabled: bool = field(
+        default_factory=lambda: get_setting("coach_prompt_custom_enabled").default
+    )
+    coach_prompt_custom_text: str = field(
+        default_factory=lambda: get_setting("coach_prompt_custom_text").default
+    )
+    coach_overrides: CoachPromptOverrides = field(default_factory=CoachPromptOverrides)
+    privacy_mode: str = field(default_factory=lambda: get_setting("privacy_mode").default)
+    show_floating_coach_result: bool = field(
+        default_factory=lambda: get_setting("show_floating_coach_result").default
+    )
+    coach_prompt_templates: list[CoachPromptTemplateSettings] = field(
+        default_factory=lambda: [
+            CoachPromptTemplateSettings(**template) for template in get_default_coach_templates()
+        ]
+    )
+
+
+@dataclass
+class HistorySettings:
+    """Transcript history settings."""
+
+    retention_days: int = field(default_factory=lambda: get_setting("retention_days").default)
+    persist_audio: bool = field(default_factory=lambda: get_setting("persist_audio").default)
+    allow_retry: bool = field(default_factory=lambda: get_setting("allow_retry").default)
+    default_analytics_range_days: int | str = field(
+        default_factory=lambda: get_setting("default_analytics_range_days").default
+    )
+
+
+@dataclass
+class DictionarySettings:
+    """Dictionary pipeline settings."""
+
+    dictionary_enabled: bool = field(
+        default_factory=lambda: get_setting("dictionary_enabled").default
+    )
+
+
+@dataclass
+class SnippetsSettings:
+    """Snippet pipeline settings."""
+
+    snippets_enabled: bool = field(
+        default_factory=lambda: get_setting("snippets_enabled").default
+    )
+    snippets_quick_insert: bool = field(
+        default_factory=lambda: get_setting("snippets_quick_insert").default
+    )
+
+
+@dataclass
+class StyleSettings:
+    """Style pipeline settings."""
+
+    style_default_profile: str = field(
+        default_factory=lambda: get_setting("style_default_profile").default
+    )
+    style_apply_enabled: bool = field(
+        default_factory=lambda: get_setting("style_apply_enabled").default
+    )
 
 @dataclass
 class AdvancedSettings:
@@ -319,6 +470,11 @@ class SettingsState:
     refiner: RefinerSettings = field(default_factory=RefinerSettings)
     audio: AudioSettings = field(default_factory=AudioSettings)
     hotkey: HotkeySettings = field(default_factory=HotkeySettings)
+    coach: CoachSettings = field(default_factory=CoachSettings)
+    history: HistorySettings = field(default_factory=HistorySettings)
+    dictionary: DictionarySettings = field(default_factory=DictionarySettings)
+    snippets: SnippetsSettings = field(default_factory=SnippetsSettings)
+    style: StyleSettings = field(default_factory=StyleSettings)
     advanced: AdvancedSettings = field(default_factory=AdvancedSettings)
     modes: ModeSpecificSettings = field(default_factory=ModeSpecificSettings)
     version: int = CURRENT_SETTINGS_VERSION
@@ -387,6 +543,11 @@ class SettingsManager:
                 refiner=RefinerSettings(**data.get("refiner", {})),
                 audio=AudioSettings(**data.get("audio", {})),
                 hotkey=HotkeySettings(**data.get("hotkey", {})),
+                coach=_build_coach_settings(data.get("coach")),
+                history=HistorySettings(**data.get("history", {})),
+                dictionary=DictionarySettings(**data.get("dictionary", {})),
+                snippets=SnippetsSettings(**data.get("snippets", {})),
+                style=StyleSettings(**data.get("style", {})),
                 advanced=AdvancedSettings(**data.get("advanced", {})),
                 version=data.get("version", self.CURRENT_VERSION),
             )
@@ -669,6 +830,11 @@ class SettingsManager:
                         refiner=RefinerSettings(**legacy.get("refiner", {})),
                         audio=AudioSettings(**legacy.get("audio", {})),
                         hotkey=HotkeySettings(**legacy.get("hotkey", {})),
+                        coach=_build_coach_settings(legacy.get("coach")),
+                        history=HistorySettings(**legacy.get("history", {})),
+                        dictionary=DictionarySettings(**legacy.get("dictionary", {})),
+                        snippets=SnippetsSettings(**legacy.get("snippets", {})),
+                        style=StyleSettings(**legacy.get("style", {})),
                         advanced=AdvancedSettings(**legacy.get("advanced", {})),
                         version=legacy.get("version", self.CURRENT_VERSION),
                     )
@@ -734,7 +900,7 @@ class SettingsManager:
         try:
             with self._lock:
                 # Validate required categories
-                required = ["general", "transcription", "refiner", "audio", "hotkey", "advanced"]
+                required = ["general", "transcription", "refiner", "audio", "hotkey", "coach", "history", "dictionary", "snippets", "style", "advanced"]
                 for cat in required:
                     if cat not in data:
                         data[cat] = {}
@@ -753,6 +919,11 @@ class SettingsManager:
                     refiner=RefinerSettings(**data.get("refiner", {})),
                     audio=AudioSettings(**data.get("audio", {})),
                     hotkey=HotkeySettings(**data.get("hotkey", {})),
+                    coach=_build_coach_settings(data.get("coach")),
+                    history=HistorySettings(**data.get("history", {})),
+                    dictionary=DictionarySettings(**data.get("dictionary", {})),
+                    snippets=SnippetsSettings(**data.get("snippets", {})),
+                    style=StyleSettings(**data.get("style", {})),
                     advanced=AdvancedSettings(**data.get("advanced", {})),
                     version=data.get("version", self.CURRENT_VERSION),
                 )
@@ -795,3 +966,8 @@ def reset_settings_manager() -> None:
     global _settings_manager
     with _settings_lock:
         _settings_manager = None
+
+
+
+
+

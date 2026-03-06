@@ -151,12 +151,12 @@ class UIConstants:
 
     DEFAULT_THEME = "light"
     DEFAULT_LANGUAGE = "auto"
-    SETTINGS_VERSION = 3
+    SETTINGS_VERSION = 5
     AUTO_SAVE_INTERVAL_SECONDS = 30
     MAX_LOG_FILES = 10
 
     # Valid themes
-    VALID_THEMES = {"light", "dark", "cyber", "dracula"}
+    VALID_THEMES = {"light", "dark", "cyber", "dracula", "ocean", "sunset", "forest"}
 
     # Hotkey defaults
     DEFAULT_HOTKEY = "Ctrl+Shift+T"
@@ -362,6 +362,14 @@ class RefinerConstants:
     VALID_ENGINES = {"llamacpp", "ollama"}
     DEFAULT_REFINEMENT_MODE = "off"
     VALID_REFINEMENT_MODES = {"off", "strict", "polished"}
+    DEFAULT_REFINEMENT_PROFILE = "raw"
+    VALID_REFINEMENT_PROFILES = {
+        "raw",
+        "clean_dictation",
+        "professional",
+        "student_notes",
+        "code_logs",
+    }
 
 
 # ============================================

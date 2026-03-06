@@ -59,6 +59,7 @@ def _v1_to_v2(settings: dict[str, Any]) -> dict[str, Any]:
 
     # Add refinement settings
     transcription.setdefault("refinement_mode", "off")
+    transcription.setdefault("refinement_profile", "raw")
     refiner.setdefault("selected_model_id", "qwen2.5-3b-instruct")
     refiner.setdefault("runtime_enabled", False)
     refiner.setdefault("engine_preference", "llamacpp")
@@ -120,6 +121,19 @@ def _v3_to_v4(settings: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _v4_to_v5(settings: dict[str, Any]) -> dict[str, Any]:
+    """Migration from v4 to v5.
+
+    - Adds coach settings defaults and built-in prompt templates
+    """
+    result = dict(settings)
+    coach = dict(result.get("coach", {}))
+    for key, value in get_category_defaults("coach").items():
+        coach.setdefault(key, value)
+    result["coach"] = coach
+    return result
+
+
 # ============================================
 # Migration Registry
 # ============================================
@@ -128,6 +142,7 @@ MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     2: _v1_to_v2,
     3: _v2_to_v3,
     4: _v3_to_v4,
+    5: _v4_to_v5,
 }
 
 

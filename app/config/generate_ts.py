@@ -58,6 +58,7 @@ from app.config.text import (
     OPTIMIZATION_PRESET_LABELS,
     PRESET_DESCRIPTIONS,
     REFINEMENT_MODE_LABELS,
+    REFINEMENT_PROFILE_LABELS,
     REFINER_ENGINE_LABELS,
     TAB_LABELS,
     SECTION_HEADERS,
@@ -73,6 +74,11 @@ def to_camel_case(snake_str: str) -> str:
     """Convert snake_case to camelCase."""
     components = snake_str.split("_")
     return components[0] + "".join(x.capitalize() for x in components[1:])
+
+
+def ts_literal(value: Any) -> str:
+    """Render a Python value as a valid TypeScript literal."""
+    return json.dumps(value, ensure_ascii=False)
 
 
 def generate_constants_ts() -> str:
@@ -195,7 +201,7 @@ def generate_constants_ts() -> str:
         f"  DEFAULT_HOTKEY: '{UIConstants.DEFAULT_HOTKEY}',",
         "} as const;",
         "",
-        "export const VALID_THEMES = ['light', 'dark', 'cyber', 'dracula'] as const;",
+        "export const VALID_THEMES = " + json.dumps(sorted(UIConstants.VALID_THEMES)) + " as const;",
         "export const VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;",
         "",
         "// ============================================",
@@ -497,6 +503,13 @@ def generate_text_ts() -> str:
         + " as const;",
         "",
         "// ============================================",
+        "// Refinement Profile Labels",
+        "// ============================================",
+        "export const REFINEMENT_PROFILE_LABELS = "
+        + json.dumps(REFINEMENT_PROFILE_LABELS, indent=2)
+        + " as const;",
+        "",
+        "// ============================================",
         "// Refiner Engine Labels",
         "// ============================================",
         "export const REFINER_ENGINE_LABELS = "
@@ -569,7 +582,7 @@ def generate_settings_ts() -> str:
         "// ============================================",
         "// Setting Definition Types",
         "// ============================================",
-        "export type SettingType = 'string' | 'number' | 'boolean' | 'enum' | 'range';",
+        "export type SettingType = 'string' | 'number' | 'boolean' | 'enum' | 'range' | 'object' | 'array';",
         "",
         "export interface SettingDefinition {",
         "  name: string;",
@@ -596,38 +609,23 @@ def generate_settings_ts() -> str:
     for name, defn in sorted(SETTINGS_REGISTRY.items()):
         options_str = ""
         if defn.options:
-            opts = []
-            for opt in defn.options:
-                if isinstance(opt, str):
-                    opts.append(f"'{opt}'")
-                else:
-                    opts.append(str(opt))
-            options_str = f"\n    options: [{', '.join(opts)}],"
+            options_str = f"\n    options: {ts_literal(defn.options)},"
 
         min_str = f"\n    min: {defn.min}," if defn.min is not None else ""
         max_str = f"\n    max: {defn.max}," if defn.max is not None else ""
         step_str = f"\n    step: {defn.step}," if defn.step is not None else ""
-        suffix_str = f"\n    suffix: '{defn.suffix}'," if defn.suffix else ""
-
-        default_val = defn.default
-        if isinstance(default_val, str):
-            default_str = f"'{default_val}'"
-        elif isinstance(default_val, bool):
-            default_str = str(default_val).lower()
-        elif isinstance(default_val, (int, float)):
-            default_str = str(default_val)
-        else:
-            default_str = str(default_val)
+        suffix_str = f"\n    suffix: {ts_literal(defn.suffix)}," if defn.suffix else ""
+        default_str = ts_literal(defn.default)
 
         lines.extend(
             [
                 f"  {name}: {{",
-                f"    name: '{defn.name}',",
-                f"    category: '{defn.category}',",
-                f"    type: '{defn.type}',",
+                f"    name: {ts_literal(defn.name)},",
+                f"    category: {ts_literal(defn.category)},",
+                f"    type: {ts_literal(defn.type)},",
                 f"    default: {default_str},",
-                f"    label: '{defn.label}',",
-                f"    description: '{defn.description}',{options_str}{min_str}{max_str}{step_str}{suffix_str}",
+                f"    label: {ts_literal(defn.label)},",
+                f"    description: {ts_literal(defn.description)},{options_str}{min_str}{max_str}{step_str}{suffix_str}",
                 f"    isFake: {str(defn.is_fake).lower()},",
                 f"    isAdvanced: {str(defn.is_advanced).lower()},",
                 "  },",
@@ -733,6 +731,16 @@ def generate_settings_ts() -> str:
             "    case 'enum':",
             "      if (defn.options && !defn.options.includes(value as string | number)) {",
             "        return { isValid: false, error: `Invalid value. Must be one of: ${defn.options.join(', ')}` };",
+            "      }",
+            "      break;",
+            "    case 'object':",
+            "      if (typeof value !== 'object' || value === null || Array.isArray(value)) {",
+            "        return { isValid: false, error: `Expected object, got ${Array.isArray(value) ? 'array' : typeof value}` };",
+            "      }",
+            "      break;",
+            "    case 'array':",
+            "      if (!Array.isArray(value)) {",
+            "        return { isValid: false, error: `Expected array, got ${typeof value}` };",
             "      }",
             "      break;",
             "  }",
