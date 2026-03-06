@@ -41,6 +41,7 @@ class RefinementQueue:
         session_id: str,
         segment: dict[str, Any],
         refinement_mode: str,
+        refinement_profile: str = "raw",
         model_id: str | None,
         runtime_enabled: bool,
         language_hint: str,
@@ -61,6 +62,7 @@ class RefinementQueue:
                 "revision": next_revision,
                 "segment": dict(segment),
                 "refinement_mode": refinement_mode,
+                "refinement_profile": refinement_profile,
                 "model_id": model_id,
                 "runtime_enabled": runtime_enabled,
                 "language_hint": language_hint,
@@ -82,6 +84,7 @@ class RefinementQueue:
                 return
             segment = dict(job["segment"])
             refinement_mode = str(job["refinement_mode"])
+            refinement_profile = str(job.get("refinement_profile", "raw"))
             model_id = job["model_id"]
             runtime_enabled = bool(job["runtime_enabled"])
             language_hint = str(job["language_hint"])
@@ -90,6 +93,7 @@ class RefinementQueue:
         result = self._refiner.refine_text(
             segment.get("text", ""),
             mode=refinement_mode,
+            profile=refinement_profile,
             model_id=model_id,
             runtime_enabled=runtime_enabled,
             language_hint=language_hint,

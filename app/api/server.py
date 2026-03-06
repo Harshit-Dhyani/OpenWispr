@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import json
 import logging
+import os
 import wave
 import time
 import uuid
@@ -18,14 +19,43 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.json_utils import make_json_safe
+from app.api.coach_service import CoachRequestContext, CoachResult, CoachService
+import app.api.deps as api_deps
+from app.api.deps import get_history_service, get_hotkey_service, get_service
+from app.api.route_utils import (
+    apply_runtime_log_levels,
+    log_endpoint,
+    resolve_log_level_from_settings_payload,
+    resolve_runtime_log_level,
+)
+from app.api.routes import (
+    dictionary_router,
+    history_router,
+    models_router,
+    session_router,
+    settings_router,
+    snippets_router,
+    style_router,
+    system_router,
+)
+from app.api.schemas import (
+    AttachPdfRequest,
+    ModelSelectionRequest,
+    PreloadModelRequest,
+    RefinementModeRequest,
+    StartSessionRequest,
+)
+from app.api.strings.en import API_STRINGS
 from app.api.service import BackendService
 from app.api.refiner_service import RefinerService, is_llama_cpp_available
+from app.api.services import DictionaryService, SnippetService, StyleService, TranscriptHistoryService
+from app.storage.history_db import HistoryDatabase
 from app.audio.capture import LoopbackAudioSource
 from app.audio.devices import list_audio_devices
 from app.core.config import AppSettings
@@ -33,11 +63,18 @@ from app.core.model_catalog import runtime_name_for_model
 from app.core.system_profiler import SystemProfiler
 from app.core.auto_optimizer import AutoOptimizer, get_recommended_settings
 from app.stt.dictation_cleanup import (
-    clean_final_text_from_segments,
+    TranscriptComposer,
+    clean_final_text,
+    compose_transcript_text,
     merge_segment_texts,
     normalize_dictation_text,
     stabilize_partial_text,
 )
+from app.stt.deterministic_postprocess import (
+    postprocess_final_text,
+    postprocess_live_text,
+)
+from app.stt.utterance_aggregator import UtteranceAggregator
 from app.core.settings_manager import (
     SettingsManager,
     SettingsState,
@@ -58,9 +95,11 @@ from app.api.settings_sync import (
     get_settings_synchronizer,
 )
 from app.stt.stability import PartialStabilizer, build_stream_payload
+from app.api.session_resolution import (
+    resolve_capture_source_setting,
+    resolve_input_device_for_source,
+)
 
-service: BackendService | None = None
-hotkey_service: "HotkeyTranscriptionService | None" = None
 _sse_client_count = 0
 _sse_lock = asyncio.Lock()
 _sse_metrics: dict[str, int] = {
@@ -74,60 +113,36 @@ _sse_metrics: dict[str, int] = {
 _ws_manager: WebSocketManager | None = None
 _settings_sync: SettingsSynchronizer | None = None
 _health_broadcast_task: asyncio.Task | None = None
+_HOTKEY_REFINER_TIMEOUT_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_REFINER_TIMEOUT_SECONDS", "0.75")
+)
+_HOTKEY_COACH_TIMEOUT_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_COACH_TIMEOUT_SECONDS", "0.5")
+)
+_HOTKEY_STOP_PROCESSING_WAIT_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_STOP_PROCESSING_WAIT_SECONDS", "0.9")
+)
+_HOTKEY_STOP_DRAIN_WAIT_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_STOP_DRAIN_WAIT_SECONDS", "0.45")
+)
+_HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS", "0.2")
+)
+_HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS = float(
+    os.getenv("TRANSCRIPTA_HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS", "0.1")
+)
 
-
-def _resolve_log_level_from_settings_payload(settings_payload: dict[str, Any]) -> str:
-    advanced = settings_payload.get("advanced", {})
-    configured = str(advanced.get("logLevel", "INFO") or "INFO").upper()
-    valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-    return configured if configured in valid_levels else "INFO"
-
-
-def _apply_runtime_log_levels(log_level: str) -> None:
-    resolved = str(log_level or "INFO").upper()
-    if resolved not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
-        resolved = "INFO"
-    logging.getLogger().setLevel(getattr(logging, resolved))
-    logger.setLevel(getattr(logging, resolved))
-    quiet_level = logging.DEBUG if resolved == "DEBUG" else logging.WARNING
-    logging.getLogger("httpx").setLevel(quiet_level)
-    logging.getLogger("httpcore").setLevel(quiet_level)
+# Compatibility aliases for refactored helpers.
+# Keep these while server.py still contains internal call sites that predate the extraction.
+_resolve_log_level_from_settings_payload = resolve_log_level_from_settings_payload
+_resolve_runtime_log_level = resolve_runtime_log_level
+_apply_runtime_log_levels = apply_runtime_log_levels
+_resolve_capture_source_setting = resolve_capture_source_setting
+_resolve_input_device_for_source = resolve_input_device_for_source
 
 
 def _make_json_safe(value: Any) -> Any:
     return make_json_safe(value)
-
-
-class StartSessionRequest(BaseModel):
-    title: str
-    output_root: str
-    model_name: str
-    language_mode: str
-    capture_source: Literal["microphone", "system"] | None = None
-    device_id: str | None = None
-    live_mode: str = "balanced"
-    execution_mode: str = "auto"
-    vad_threshold: float | None = None
-    vad_min_silence_ms: int | None = None
-    vad_speech_pad_ms: int | None = None
-
-
-class AttachPdfRequest(BaseModel):
-    path: str
-
-
-class PreloadModelRequest(BaseModel):
-    model_name: str
-    execution_mode: str = "auto"
-
-
-class ModelSelectionRequest(BaseModel):
-    category: str
-    model_id: str
-
-
-class RefinementModeRequest(BaseModel):
-    mode: str
 
 
 # Hotkey-specific request/response models
@@ -139,6 +154,7 @@ class HotkeyStartRequest(BaseModel):
     model_name: str | None = None
     language_mode: str = "auto"
     execution_mode: str = "auto"
+    transcription_mode: Literal["dictation", "literal", "session_paragraph"] = "dictation"
 
 
 class HotkeyStartResponse(BaseModel):
@@ -148,9 +164,23 @@ class HotkeyStartResponse(BaseModel):
 
 
 class HotkeyStopResponse(BaseModel):
+    session_id: str | None = None
+    status: str = "idle"
+    transcription_mode: Literal["dictation", "literal", "session_paragraph"] = "dictation"
+    composed_text: str = ""
     final_transcription: str
+    aggregated_raw_text: str = ""
+    aggregated_clean_text: str = ""
+    postprocessed_text: str = ""
+    paste_text: str = ""
+    live_paste_text: str = ""
+    final_cleanup_applied: bool = False
     raw_transcription: str = ""
     refined_transcription: str | None = None
+    coach_result: CoachResult | None = None
+    coach_status: Literal["disabled", "queued", "running", "failed", "fallback", "cache_hit", "generated", "success"] = "disabled"
+    coach_error: str | None = None
+    coach_cache_hit: bool = False
     debug_wav_path: str | None = None
     duration_ms: int
     segment_count: int
@@ -158,6 +188,7 @@ class HotkeyStopResponse(BaseModel):
     language_used: str = "auto"
     refinement_mode: str = "off"
     refiner_model_id: str | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class HotkeyStatusResponse(BaseModel):
@@ -182,61 +213,24 @@ class HotkeyInjectResponse(BaseModel):
     message: str = ""
 
 
-def _resolve_capture_source_setting(
-    capture_source: Literal["microphone", "system"] | None,
-) -> Literal["microphone", "system"]:
-    if capture_source in {"microphone", "system"}:
-        return capture_source
-    settings = get_settings_manager().get_settings()
-    return "system" if settings.audio.default_capture_source == "system" else "microphone"
-
-
-def _resolve_input_device_for_source(
-    capture_source: Literal["microphone", "system"] | None,
-    device_id: str | None,
-) -> str | None:
-    source = _resolve_capture_source_setting(capture_source)
-    normalized_device_id = device_id if device_id not in {None, "", "default"} else None
-    devices = list_audio_devices()
-
-    if source == "system":
-        loopback_devices = [
-            device for device in devices if device.is_loopback or device.supports_loopback
-        ]
-        if not loopback_devices:
-            return normalized_device_id
-        if normalized_device_id:
-            selected = next(
-                (device for device in loopback_devices if device.id == normalized_device_id),
-                None,
-            )
-            if selected is not None:
-                return selected.id
-        settings = get_settings_manager().get_settings()
-        preferred_id = settings.audio.defaultDeviceId
-        selected = next((device for device in loopback_devices if device.id == preferred_id), None)
-        return selected.id if selected is not None else loopback_devices[0].id
-
-    microphones = [
-        device
-        for device in devices
-        if device.is_input and not (device.is_loopback or device.supports_loopback)
-    ]
-    if not microphones:
-        return normalized_device_id
-    if normalized_device_id:
-        selected = next((device for device in microphones if device.id == normalized_device_id), None)
-        if selected is not None:
-            return selected.id
-    return microphones[0].id
+class CoachPromptPreviewRequest(BaseModel):
+    capture_source: Literal["microphone", "system"] = "microphone"
+    original_text: str = ""
+    language_mode: str = "auto"
+    detail_level: Literal["compact", "standard", "deep"] = "compact"
+    template_id: str = "default_english_coach"
+    custom_user_template: str = ""
+    overrides: dict[str, Any] = Field(default_factory=dict)
+    privacy_mode: Literal["local_only", "allow_llm"] = "local_only"
+    templates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class HotkeyConfig(BaseModel):
-    chunk_seconds: float = 1.4
-    overlap_seconds: float = 0.25
+    chunk_seconds: float = 2.4
+    overlap_seconds: float = 0.32
     vad_threshold_db: float = -40.0
-    vad_min_silence_ms: int = 200
-    vad_speech_pad_ms: int = 200
+    vad_min_silence_ms: int = 250
+    vad_speech_pad_ms: int = 240
     confidence_threshold: float = 0.35
     enable_filler_filter: bool = False
 
@@ -270,6 +264,8 @@ class HotkeySession:
     language_mode: str
     execution_mode: str
     started_at: float
+    transcription_mode: Literal["dictation", "literal", "session_paragraph"] = "dictation"
+    refinement_profile: str = "raw"
     audio_source: LoopbackAudioSource | None = None
     transcriber: Any = None
     state: Literal["starting", "recording", "stopping", "error"] = "starting"
@@ -278,6 +274,18 @@ class HotkeySession:
     raw_partial_text: str = ""
     display_partial_text: str = ""
     final_segments: list[dict[str, Any]] = field(default_factory=list)
+    aggregator: UtteranceAggregator = field(default_factory=UtteranceAggregator)
+    composer: TranscriptComposer = field(default_factory=TranscriptComposer)
+    raw_composed_text: str = ""
+    composed_text: str = ""
+    aggregated_raw_text: str = ""
+    aggregated_clean_text: str = ""
+    postprocessed_text: str = ""
+    paste_text: str = ""
+    latest_live_buffer_text: str = ""
+    coach_result: CoachResult | None = None
+    coach_cache_hit: bool = False
+    coach_error: str | None = None
     audio_level: float = 0.0
     source_backend: str = "unknown"
     language_used: str = "auto"
@@ -294,7 +302,15 @@ class HotkeySession:
     debug_audio_chunks: list[np.ndarray] = field(default_factory=list)
     debug_wav_path: str | None = None
     debug_last_audio_log_at: float = 0.0
+    backlog_warning_at: float = 0.0
     skipped_silent_chunks: int = 0
+    silence_skip_streak: int = 0
+    adaptive_silence_gate_relaxed: bool = False
+    submitted_audio_seconds: float = 0.0
+    finalize_task: asyncio.Task | None = None
+    final_response: HotkeyStopResponse | None = None
+    finalization_error: str | None = None
+    stop_websockets: set[WebSocket] = field(default_factory=set)
 
     @property
     def duration_ms(self) -> int:
@@ -319,6 +335,7 @@ class HotkeyTranscriptionService:
         self._config = HotkeyConfig()
         self._event_loop: asyncio.AbstractEventLoop | None = None
         self._refiner_service: RefinerService | None = None
+        self._coach_service: CoachService | None = None
         self._websockets: set[WebSocket] = set()
 
     async def start_session(
@@ -328,6 +345,7 @@ class HotkeyTranscriptionService:
         model_name: str | None,
         language_mode: str,
         execution_mode: str,
+        transcription_mode: Literal["dictation", "literal", "session_paragraph"] = "dictation",
     ) -> HotkeyStartResponse:
         """Start a new hotkey transcription session."""
         async with self._lock:
@@ -336,18 +354,27 @@ class HotkeyTranscriptionService:
                 logger.debug("Hotkey session already active, stopping previous")
                 await self._stop_internal()
 
+            user_settings = get_settings_manager().get_settings()
             capture_source = self._resolve_capture_source(capture_source)
             requested_model_name = model_name
             model_name = self._resolve_hotkey_model_name(capture_source, model_name)
             session_id = f"hotkey-{uuid.uuid4().hex[:12]}"
             logger.debug(
-                "Starting hotkey session: id=%s, source=%s, resolved_asr_model_id=%s, runtime_model_name=%s, lang=%s, device=%s",
+                "Starting hotkey session: id=%s, source=%s, resolved_asr_model_id=%s, runtime_model_name=%s, lang=%s, mode=%s, device=%s",
                 session_id,
                 capture_source,
                 requested_model_name or ("system" if capture_source == "system" else "microphone"),
                 model_name,
                 language_mode,
+                transcription_mode,
                 device_id or "default",
+            )
+            logger.info(
+                "Hotkey language resolved: session=%s requested=%s effective=%s capture_source=%s",
+                session_id,
+                language_mode,
+                language_mode,
+                capture_source,
             )
 
             session = HotkeySession(
@@ -357,6 +384,8 @@ class HotkeyTranscriptionService:
                 model_name=model_name,
                 language_mode=language_mode,
                 execution_mode=execution_mode,
+                transcription_mode=transcription_mode,
+                refinement_profile=getattr(user_settings.transcription, "refinement_profile", "raw"),
                 started_at=time.time(),
                 is_recording=True,
                 state="starting",
@@ -431,7 +460,7 @@ class HotkeyTranscriptionService:
                 return HotkeyStartResponse(
                     session_id=session_id,
                     status=session.state,
-                    message="Hotkey session started",
+                    message=API_STRINGS.messages.hotkey_started,
                 )
 
             except Exception as exc:
@@ -455,44 +484,46 @@ class HotkeyTranscriptionService:
         self, *, mode: Literal["finish", "finish_and_paste", "cancel"] = "finish_and_paste"
     ) -> HotkeyStopResponse:
         """Stop the current hotkey session and return transcription."""
+        session: HotkeySession | None = None
+        finalize_task: asyncio.Task | None = None
         async with self._lock:
-            if self._session is None or not self._session.is_recording:
-                return HotkeyStopResponse(
-                    final_transcription="",
-                    raw_transcription="",
-                    refined_transcription=None,
-                    duration_ms=0,
-                    segment_count=0,
-                    source_backend="unknown",
-                    language_used="auto",
-                    refinement_mode="off",
-                    refiner_model_id=None,
-                )
-            return await self._stop_internal(mode=mode)
+            if self._session is None:
+                return self._build_empty_stop_response()
+            session = self._session
+            if self._session.state == "stopping":
+                finalize_task = self._session.finalize_task
+            elif not self._session.is_recording:
+                return self._build_stop_response_from_session(self._session)
+            else:
+                finalize_task = self._stop_internal(mode=mode)
 
-    async def _stop_internal(
+        if finalize_task is not None:
+            try:
+                await finalize_task
+            except Exception as exc:
+                logger.debug("Hotkey finalize task failed while stopping: %s", exc)
+
+        return self._build_stop_response_from_session(session)
+
+    def _stop_internal(
         self, *, mode: Literal["finish", "finish_and_paste", "cancel"] = "finish_and_paste"
-    ) -> HotkeyStopResponse:
+    ) -> asyncio.Task | None:
         """Internal stop method - assumes lock is held."""
         session = self._session
         if session is None:
-            return HotkeyStopResponse(
-                final_transcription="",
-                raw_transcription="",
-                refined_transcription=None,
-                duration_ms=0,
-                segment_count=0,
-                source_backend="unknown",
-                language_used="auto",
-                refinement_mode="off",
-                refiner_model_id=None,
-            )
+            return None
 
         session.is_recording = False
         session.state = "stopping"
         session.cancel_requested = mode == "cancel"
         session.stop_requested_at = time.time()
         session.stop_ack_at = time.time()
+        session.suppress_stream_events = True
+        session.stop_websockets = set(self._websockets)
+        session.audio_level = 0.0
+        session.partial_text = ""
+        session.raw_partial_text = ""
+        session.display_partial_text = ""
         duration_ms = session.duration_ms
         self._publish_event(
             "hotkey_stop_ack",
@@ -515,100 +546,514 @@ class HotkeyTranscriptionService:
             },
         )
         self._publish_status(session)
+        if session.finalize_task is None or session.finalize_task.done():
+            session.finalize_task = asyncio.create_task(self._finalize_stopped_session(session))
 
-        if session.processing_task is not None:
-            try:
-                await asyncio.wait_for(session.processing_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                logger.debug("Timed out waiting for hotkey processing loop to stop")
-            except Exception as exc:
-                logger.debug("Error waiting for hotkey processing task: %s", exc)
+        return session.finalize_task
 
-        logger.debug(
-            "Stopping hotkey session: id=%s, duration=%dms, segments=%d",
-            session.session_id,
-            duration_ms,
-            len(session.final_segments),
-        )
-
-        if session.cancel_requested:
-            final_text = ""
-            raw_text = ""
-        else:
-            cleaned = clean_final_text_from_segments(
-                [seg.get("raw_text") or seg.get("text", "") for seg in session.final_segments]
-            )
-            final_text = cleaned.clean_final_text
-            raw_text = cleaned.raw_final_text
-            self._log_hotkey_debug_text(
-                "Hotkey ASR aggregate",
-                session=session,
-                text=raw_text or final_text,
-            )
-        refined_text: str | None = None
-        refinement_mode = "off"
-        refiner_model_id: str | None = None
-
-        try:
-            user_settings = get_settings_manager().get_settings()
-            refinement_mode = user_settings.transcription.refinement_mode
-            refiner_model_id = user_settings.refiner.selected_model_id
-            if not session.cancel_requested:
-                refiner_result = await self._refine_final_text(
-                    text=final_text,
-                    language_hint=session.language_used,
-                    refinement_mode=refinement_mode,
-                    refiner_model_id=refiner_model_id,
-                    runtime_enabled=user_settings.refiner.runtime_enabled,
-                    cleanup_instructions=user_settings.refiner.cleanup_instructions,
-                )
-                if refiner_result and refiner_result.used_runtime and refiner_result.text:
-                    refined_text = refiner_result.text
-                    final_text = refiner_result.text
-        except Exception as exc:
-            logger.debug("Hotkey refiner fallback engaged: %s", exc)
-
-        session.suppress_stream_events = True
-        if self._should_collect_hotkey_audio_debug():
-            session.debug_wav_path = self._write_hotkey_debug_wav(session)
-        self._publish_event(
-            "hotkey_stopped",
-            {
-                "session_id": session.session_id,
-                "duration_ms": duration_ms,
-                "final_transcription": final_text,
-                "raw_transcription": raw_text,
-                "refined_transcription": refined_text,
-                "segment_count": len(session.final_segments),
-                "source_backend": session.source_backend,
-                "language_used": session.language_used,
-                "refinement_mode": refinement_mode,
-                "refiner_model_id": refiner_model_id,
-                "debug_wav_path": session.debug_wav_path,
-                "cancelled": session.cancel_requested,
-                "state": "idle",
-                "is_recording": False,
-            },
-        )
-
-        self._log_hotkey_metrics(session, duration_ms)
-        await self._cleanup_session(session)
-        self._session = None
-        self._publish_status(None)
-        await self._close_websockets(code=1000, reason="hotkey-session-stopped")
-
+    def _build_empty_stop_response(
+        self,
+        *,
+        session: HotkeySession | None = None,
+        status: str = "idle",
+    ) -> HotkeyStopResponse:
         return HotkeyStopResponse(
-            final_transcription=final_text,
-            raw_transcription=raw_text,
-            refined_transcription=refined_text,
+            session_id=session.session_id if session is not None else None,
+            status=status,
+            composed_text="",
+            final_transcription="",
+            transcription_mode=getattr(session, "transcription_mode", "dictation"),
+            aggregated_raw_text="",
+            aggregated_clean_text="",
+            postprocessed_text="",
+            paste_text="",
+            live_paste_text="",
+            final_cleanup_applied=False,
+            raw_transcription="",
+            refined_transcription=None,
+            coach_result=None,
+            coach_status="disabled",
+            coach_error=None,
+            coach_cache_hit=False,
+            debug_wav_path=getattr(session, "debug_wav_path", None),
+            duration_ms=session.duration_ms if session is not None else 0,
+            segment_count=len(session.final_segments) if session is not None else 0,
+            source_backend=session.source_backend if session is not None else "unknown",
+            language_used=session.language_used if session is not None else "auto",
+            refinement_mode="off",
+            refiner_model_id=None,
+            warnings=[],
+        )
+
+    def _build_stop_response_from_session(
+        self,
+        session: HotkeySession | None,
+        *,
+        status: str | None = None,
+    ) -> HotkeyStopResponse:
+        if session is None:
+            return self._build_empty_stop_response(status=status or "idle")
+
+        if session.final_response is not None and status is None:
+            return session.final_response
+
+        warnings = [session.finalization_error] if session.finalization_error else []
+        return HotkeyStopResponse(
+            session_id=session.session_id,
+            status=status or ("stopping" if session.finalize_task and not session.finalize_task.done() else "idle"),
+            transcription_mode=getattr(session, "transcription_mode", "dictation"),
+            composed_text=session.composed_text or "",
+            final_transcription=session.composed_text or "",
+            aggregated_raw_text=session.aggregated_raw_text or session.raw_composed_text or "",
+            aggregated_clean_text=session.aggregated_clean_text or session.composed_text or "",
+            postprocessed_text=session.postprocessed_text or session.composed_text or "",
+            paste_text=session.paste_text or session.postprocessed_text or session.composed_text or "",
+            live_paste_text=(
+                ""
+                if session.cancel_requested
+                else (
+                    session.latest_live_buffer_text
+                    or session.paste_text
+                    or session.postprocessed_text
+                    or session.composed_text
+                    or ""
+                )
+            ),
+            final_cleanup_applied=bool(session.postprocessed_text or session.composed_text),
+            raw_transcription=session.raw_composed_text or "",
+            refined_transcription=None,
+            coach_result=session.coach_result,
+            coach_status="cache_hit" if session.coach_cache_hit else ("success" if session.coach_result else "disabled"),
+            coach_error=session.coach_error,
+            coach_cache_hit=session.coach_cache_hit,
             debug_wav_path=session.debug_wav_path,
-            duration_ms=duration_ms,
+            duration_ms=session.duration_ms,
             segment_count=len(session.final_segments),
             source_backend=session.source_backend,
             language_used=session.language_used,
-            refinement_mode=refinement_mode,
-            refiner_model_id=refiner_model_id,
+            refinement_mode="off",
+            refiner_model_id=None,
+            warnings=warnings,
         )
+
+    async def _wait_for_hotkey_transcriber_drain(
+        self,
+        session: HotkeySession,
+        *,
+        timeout_seconds: float = 1.5,
+        settle_iterations: int = 2,
+    ) -> None:
+        transcriber = session.transcriber
+        if transcriber is None:
+            return
+
+        stable_iterations = 0
+        previous_segments = len(session.final_segments)
+        deadline = time.perf_counter() + timeout_seconds
+        while time.perf_counter() < deadline:
+            queue_depth = None
+            try:
+                stats = getattr(transcriber, "stats", None)
+                if isinstance(stats, dict):
+                    queue_depth = stats.get("queue_depth")
+            except Exception:
+                queue_depth = None
+
+            if queue_depth is None:
+                return
+
+            current_segments = len(session.final_segments)
+            if queue_depth == 0 and current_segments == previous_segments:
+                stable_iterations += 1
+                if stable_iterations >= settle_iterations:
+                    return
+            else:
+                stable_iterations = 0
+
+            previous_segments = current_segments
+            await asyncio.sleep(0.05)
+
+    async def _finalize_stopped_session(self, session: HotkeySession) -> None:
+        duration_ms = session.duration_ms
+        try:
+            has_live_text = bool(
+                session.final_segments
+                or session.raw_composed_text
+                or session.partial_text
+                or session.raw_partial_text
+                or session.display_partial_text
+            )
+            processing_timeout = (
+                _HOTKEY_STOP_PROCESSING_WAIT_SECONDS
+                if has_live_text
+                else _HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS
+            )
+            drain_timeout = (
+                _HOTKEY_STOP_DRAIN_WAIT_SECONDS
+                if has_live_text
+                else _HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS
+            )
+
+            if session.processing_task is not None:
+                try:
+                    await asyncio.wait_for(session.processing_task, timeout=processing_timeout)
+                except asyncio.TimeoutError:
+                    logger.debug(
+                        "Timed out waiting for hotkey processing loop to stop after %.2fs",
+                        processing_timeout,
+                    )
+                except Exception as exc:
+                    logger.debug("Error waiting for hotkey processing task: %s", exc)
+
+            await self._wait_for_hotkey_transcriber_drain(
+                session,
+                timeout_seconds=drain_timeout,
+            )
+
+            logger.debug(
+                "Finalizing hotkey session: id=%s, duration=%dms, segments=%d, composed_chars=%d",
+                session.session_id,
+                duration_ms,
+                len(session.final_segments),
+                len(session.raw_composed_text or ""),
+            )
+
+            if session.cancel_requested:
+                final_text = ""
+                raw_text = ""
+                aggregated_raw_text = ""
+                aggregated_clean_text = ""
+                session.latest_live_buffer_text = ""
+            else:
+                aggregated = session.aggregator.finalize()
+                aggregated_raw_text = aggregated.aggregated_raw_text
+                aggregated_clean_text = aggregated.aggregated_clean_text
+                session.aggregated_raw_text = aggregated_raw_text
+                session.aggregated_clean_text = aggregated_clean_text
+                if not session.raw_composed_text and session.final_segments:
+                    rebuilt = ""
+                    for segment in session.final_segments:
+                        rebuilt = compose_transcript_text(
+                            rebuilt,
+                            segment.get("raw_text") or segment.get("text", ""),
+                        )
+                    session.raw_composed_text = rebuilt
+
+                raw_text = normalize_dictation_text(session.raw_composed_text)
+                transcription_mode = getattr(session, "transcription_mode", "dictation")
+                base_text = (
+                    aggregated_raw_text or raw_text
+                    if transcription_mode == "literal"
+                    else aggregated_clean_text or aggregated_raw_text or raw_text
+                )
+                final_text = postprocess_final_text(base_text, mode=transcription_mode)
+                session.raw_composed_text = raw_text
+                session.composed_text = final_text
+                self._log_hotkey_debug_text(
+                    "Hotkey ASR aggregate",
+                    session=session,
+                    text=raw_text or final_text,
+                )
+
+            refined_text: str | None = None
+            refinement_mode = "off"
+            refiner_model_id: str | None = None
+            coach_result: CoachResult | None = None
+            coach_status: Literal["disabled", "queued", "running", "failed", "fallback", "cache_hit", "generated", "success"] = "disabled"
+            coach_error: str | None = None
+            coach_cache_hit = False
+            user_settings = get_settings_manager().get_settings()
+            hotkey_settings = getattr(user_settings, "hotkey", None)
+            coach_settings = getattr(user_settings, "coach", None)
+            transcription_mode = getattr(session, "transcription_mode", "dictation")
+            should_refine_on_stop = bool(
+                getattr(hotkey_settings, "enable_refiner_on_stop", False)
+            )
+            should_write_debug_wav = bool(getattr(hotkey_settings, "save_debug_wav", False))
+            response_warnings = list(getattr(aggregated, "warnings", [])) if not session.cancel_requested else []
+            final_text_present = bool((final_text or "").strip())
+
+            try:
+                if (
+                    should_refine_on_stop
+                    and not session.cancel_requested
+                    and getattr(session, "refinement_profile", "raw") != "raw"
+                    and final_text_present
+                ):
+                    refinement_mode = user_settings.transcription.refinement_mode
+                    refiner_model_id = user_settings.refiner.selected_model_id
+                    try:
+                        refiner_result = await asyncio.wait_for(
+                            self._refine_final_text(
+                                text=final_text,
+                                language_hint=session.language_used,
+                                refinement_mode=refinement_mode,
+                                refinement_profile=getattr(session, "refinement_profile", "raw"),
+                                refiner_model_id=refiner_model_id,
+                                runtime_enabled=user_settings.refiner.runtime_enabled,
+                                cleanup_instructions=user_settings.refiner.cleanup_instructions,
+                            ),
+                            timeout=_HOTKEY_REFINER_TIMEOUT_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.debug(
+                            "Hotkey refiner timed out after %.2fs",
+                            _HOTKEY_REFINER_TIMEOUT_SECONDS,
+                        )
+                        response_warnings.append("refiner_timeout")
+                        refiner_result = None
+                    if refiner_result and refiner_result.used_runtime and refiner_result.text:
+                        refined_text = refiner_result.text
+                        final_text = refiner_result.text
+            except Exception as exc:
+                logger.debug("Hotkey refiner fallback engaged: %s", exc)
+
+            session.composed_text = final_text
+            session.postprocessed_text = final_text
+            session.latest_live_buffer_text = (
+                session.latest_live_buffer_text
+                or postprocess_live_text(
+                    aggregated_raw_text or raw_text or final_text,
+                    mode=transcription_mode,
+                )
+                or final_text
+            )
+
+            if not session.cancel_requested and final_text_present:
+                try:
+                    coach_enabled = bool(getattr(coach_settings, "coach_enabled", True))
+                    if not coach_enabled:
+                        coach_status = "disabled"
+                        coach_error = None
+                    else:
+                        privacy_mode = getattr(coach_settings, "privacy_mode", "local_only")
+                        detail_level = getattr(coach_settings, "coach_detail_level", "compact")
+                        template_id = getattr(
+                            coach_settings,
+                            (
+                                "coach_template_id_system"
+                                if session.capture_source == "system"
+                                else "coach_template_id_mic"
+                            ),
+                            "default_english_coach",
+                        )
+                        prompt_overrides = getattr(coach_settings, "coach_overrides", None)
+                        prompt_templates = getattr(coach_settings, "coach_prompt_templates", None)
+                        custom_prompt_enabled = bool(
+                            getattr(coach_settings, "coach_prompt_custom_enabled", False)
+                        )
+                        custom_prompt_text = (
+                            getattr(coach_settings, "coach_prompt_custom_text", "")
+                            if custom_prompt_enabled
+                            else ""
+                        )
+
+                        context = CoachRequestContext(
+                            text=aggregated_clean_text or final_text,
+                            language_mode=session.language_used or session.language_mode,
+                            detail_level=detail_level,
+                            capture_source=(
+                                "system" if session.capture_source == "system" else "microphone"
+                            ),
+                            template_id=template_id,
+                            overrides=(
+                                prompt_overrides.__dict__
+                                if hasattr(prompt_overrides, "__dict__")
+                                else dict(prompt_overrides or {})
+                            ),
+                            privacy_mode=privacy_mode,
+                            runtime_enabled=bool(getattr(user_settings.refiner, "runtime_enabled", False)),
+                            model_id=getattr(user_settings.refiner, "selected_model_id", None),
+                            custom_user_template=custom_prompt_text,
+                            templates=[
+                                template.__dict__ if hasattr(template, "__dict__") else dict(template)
+                                for template in (prompt_templates or [])
+                            ],
+                        )
+                        coach_status = "queued"
+                        logger.info(
+                            "Coach queued: session=%s source=%s template=%s detail=%s privacy=%s",
+                            session.session_id,
+                            session.capture_source,
+                            template_id,
+                            detail_level,
+                            privacy_mode,
+                        )
+                        try:
+                            coach_status = "running"
+                            logger.info(
+                                "Coach running: session=%s model=%s runtime_enabled=%s",
+                                session.session_id,
+                                getattr(user_settings.refiner, "selected_model_id", None),
+                                bool(getattr(user_settings.refiner, "runtime_enabled", False)),
+                            )
+                            raw_coach_result = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    self._get_coach_service().generate,
+                                    context,
+                                    fallback_text=final_text,
+                                ),
+                                timeout=_HOTKEY_COACH_TIMEOUT_SECONDS,
+                            )
+                        except asyncio.TimeoutError:
+                            logger.debug(
+                                "Coach generation timed out after %.2fs",
+                                _HOTKEY_COACH_TIMEOUT_SECONDS,
+                            )
+                            coach_status = "failed"
+                            coach_error = "coach_timeout"
+                            raw_coach_result = None
+
+                        if raw_coach_result is not None:
+                            coach_cache_hit = bool(raw_coach_result.meta.cache_hit)
+                            coach_status = (
+                                "cache_hit"
+                                if raw_coach_result.meta.cache_hit
+                                else (
+                                    "success"
+                                    if raw_coach_result.meta.provider in {"local_llm", "cache"}
+                                    else "fallback"
+                                )
+                            )
+                            if raw_coach_result.meta.provider.startswith("fallback") or raw_coach_result.meta.provider.startswith("disabled"):
+                                coach_error = raw_coach_result.meta.provider
+                                coach_result = None
+                                logger.warning(
+                                    "Coach fallback provider: session=%s provider=%s",
+                                    session.session_id,
+                                    raw_coach_result.meta.provider,
+                                )
+                            else:
+                                coach_result = raw_coach_result
+                                logger.info(
+                                    "Coach success: session=%s provider=%s cache_hit=%s",
+                                    session.session_id,
+                                    raw_coach_result.meta.provider,
+                                    coach_cache_hit,
+                                )
+                        session.coach_result = coach_result
+                        session.coach_cache_hit = coach_cache_hit
+                        session.coach_error = coach_error
+                except Exception as exc:
+                    coach_status = "failed"
+                    coach_error = str(exc)
+                    session.coach_error = coach_error
+                    logger.warning("Coach failed: session=%s error=%s", session.session_id, exc)
+
+            paste_text = final_text
+            if coach_result is not None and bool(getattr(coach_settings, "copy_polished_by_default", True)):
+                paste_text = coach_result.polished or final_text
+            logger.info(
+                "Hotkey finalize paste source: session=%s coach_status=%s selected=%s",
+                session.session_id,
+                coach_status,
+                "coach_polished" if coach_result is not None and bool(getattr(coach_settings, "copy_polished_by_default", True)) else "postprocessed",
+            )
+
+            session.paste_text = paste_text
+
+            if should_write_debug_wav:
+                session.debug_wav_path = await asyncio.to_thread(
+                    self._write_hotkey_debug_wav, session
+                )
+
+            if coach_error:
+                response_warnings.append(coach_error)
+
+            session.final_response = HotkeyStopResponse(
+                session_id=session.session_id,
+                status="idle",
+                transcription_mode=transcription_mode,
+                composed_text=final_text,
+                final_transcription=final_text,
+                aggregated_raw_text=aggregated_raw_text,
+                aggregated_clean_text=aggregated_clean_text,
+                postprocessed_text=final_text,
+                paste_text=paste_text,
+                live_paste_text="" if session.cancel_requested else (session.latest_live_buffer_text or paste_text),
+                final_cleanup_applied=not session.cancel_requested,
+                raw_transcription=raw_text,
+                refined_transcription=refined_text,
+                coach_result=coach_result,
+                coach_status=coach_status,
+                coach_error=coach_error,
+                coach_cache_hit=coach_cache_hit,
+                debug_wav_path=session.debug_wav_path,
+                duration_ms=duration_ms,
+                segment_count=len(session.final_segments),
+                source_backend=session.source_backend,
+                language_used=session.language_used,
+                refinement_mode=refinement_mode,
+                refiner_model_id=refiner_model_id,
+                warnings=response_warnings,
+            )
+
+            self._publish_event(
+                "hotkey_stopped",
+                {
+                    "session_id": session.session_id,
+                    "transcription_mode": transcription_mode,
+                    "duration_ms": duration_ms,
+                    "composed_text": final_text,
+                    "final_transcription": final_text,
+                    "aggregated_raw_text": aggregated_raw_text,
+                    "aggregated_clean_text": aggregated_clean_text,
+                    "postprocessed_text": final_text,
+                    "paste_text": paste_text,
+                    "live_paste_text": "" if session.cancel_requested else (session.latest_live_buffer_text or paste_text),
+                    "final_cleanup_applied": not session.cancel_requested,
+                    "raw_transcription": raw_text,
+                    "refined_transcription": refined_text,
+                    "coach_result": coach_result.model_dump(by_alias=True) if coach_result else None,
+                    "coach_status": coach_status,
+                    "coach_error": coach_error,
+                    "coach_cache_hit": coach_cache_hit,
+                    "segment_count": len(session.final_segments),
+                    "source_backend": session.source_backend,
+                    "language_used": session.language_used,
+                    "refinement_mode": refinement_mode,
+                    "refiner_model_id": refiner_model_id,
+                    "debug_wav_path": session.debug_wav_path,
+                    "cancelled": session.cancel_requested,
+                    "state": "idle",
+                    "is_recording": False,
+                },
+            )
+            self._publish_event(
+                "final_text",
+                {
+                    "session_id": session.session_id,
+                    "mode": transcription_mode,
+                    "text": final_text,
+                    "final_text": final_text,
+                    "paste_text": paste_text,
+                    "segment_count": len(session.final_segments),
+                    "cancelled": session.cancel_requested,
+                },
+            )
+            self._log_hotkey_metrics(session, duration_ms)
+        except Exception as exc:
+            session.finalization_error = str(exc)
+            logger.exception("Failed to finalize hotkey session")
+            self._publish_event(
+                "hotkey_error",
+                {
+                    "session_id": session.session_id,
+                    "error": str(exc),
+                    "state": "error",
+                },
+            )
+        finally:
+            await self._cleanup_session(session)
+            async with self._lock:
+                if self._session is session:
+                    self._session = None
+            self._publish_status(None)
+            await self._close_websockets(
+                code=1000,
+                reason="hotkey-session-stopped",
+                targets=session.stop_websockets,
+            )
 
     async def _refine_final_text(
         self,
@@ -616,6 +1061,7 @@ class HotkeyTranscriptionService:
         text: str,
         language_hint: str,
         refinement_mode: str,
+        refinement_profile: str,
         refiner_model_id: str | None,
         runtime_enabled: bool,
         cleanup_instructions: str = "",
@@ -628,8 +1074,9 @@ class HotkeyTranscriptionService:
 
         if self._is_debug_mode_enabled():
             logger.debug(
-                "Hotkey refiner input: mode=%s model_id=%s language=%s chars=%d text=%s",
+                "Hotkey refiner input: mode=%s profile=%s model_id=%s language=%s chars=%d text=%s",
                 refinement_mode,
+                refinement_profile,
                 refiner_model_id or "none",
                 language_hint,
                 len(text),
@@ -640,6 +1087,7 @@ class HotkeyTranscriptionService:
             self._refiner_service.refine_text,
             text,
             mode=refinement_mode,
+            profile=refinement_profile,
             model_id=refiner_model_id,
             runtime_enabled=runtime_enabled,
             language_hint=language_hint,
@@ -656,6 +1104,15 @@ class HotkeyTranscriptionService:
                 self._preview_debug_text(result.text),
             )
         return result
+
+    def _get_coach_service(self) -> CoachService:
+        if self._coach_service is None:
+            settings_manager = get_settings_manager()
+            self._coach_service = CoachService(
+                self.settings.download_root,
+                settings_manager.settings_path.parent / "coach_cache.json",
+            )
+        return self._coach_service
 
     async def _cleanup_session(self, session: HotkeySession) -> None:
         """Clean up session resources."""
@@ -712,12 +1169,21 @@ class HotkeyTranscriptionService:
     def unregister_websocket(self, websocket: WebSocket) -> None:
         self._websockets.discard(websocket)
 
-    async def _close_websockets(self, *, code: int, reason: str) -> None:
+    async def _close_websockets(
+        self,
+        *,
+        code: int,
+        reason: str,
+        targets: set[WebSocket] | None = None,
+    ) -> None:
         if not self._websockets:
             return
 
         await asyncio.sleep(0.05)
-        active_websockets = list(self._websockets)
+        if targets is None:
+            active_websockets = list(self._websockets)
+        else:
+            active_websockets = [websocket for websocket in list(targets) if websocket in self._websockets]
         for websocket in active_websockets:
             try:
                 await websocket.close(code=code, reason=reason)
@@ -821,8 +1287,8 @@ class HotkeyTranscriptionService:
         from app.stt.fast_engine import FastTranscriber
         from app.core.config import resolve_live_profile
 
-        # Get hotkey-optimized settings
-        profile = resolve_live_profile("low_latency", self.settings)
+        # Resolve the profile so low-latency defaults stay aligned with settings.
+        resolve_live_profile("low_latency", self.settings)
 
         # Determine device
         device = self.settings.device
@@ -843,9 +1309,9 @@ class HotkeyTranscriptionService:
             compute_type=self.settings.compute_type,
             language_mode=language_mode,
             execution_mode=execution_mode,
-            beam_size=max(3, self.settings.beam_size),
-            best_of=max(3, self.settings.best_of),
-            temperature=min(self.settings.temperature, 0.2),
+            beam_size=1,
+            best_of=1,
+            temperature=0.0,
             # Hotkey capture is already press-to-talk scoped. Disabling backend VAD
             # here avoids dropping short first-utterance chunks.
             vad_filter=False,
@@ -887,32 +1353,34 @@ class HotkeyTranscriptionService:
                     # Update audio level for visualizer
                     session.audio_level = self._calculate_audio_level(chunk)
 
-                    # Publish audio level update for real-time visualization
-                    # Send every 50ms for smooth animation
-                    self._publish_event(
-                        "hotkey_audio_level",
-                        {
-                            "session_id": session.session_id,
-                            "audio_level": session.audio_level,
-                            "levels": self._calculate_frequency_levels(chunk, num_bars=36),
-                            "peak": float(
-                                np.max(
-                                    np.abs(
-                                        np.nan_to_num(
-                                            np.clip(
-                                                chunk.astype(np.float32, copy=False), -1.0, 1.0
-                                            ),
-                                            nan=0.0,
-                                            posinf=1.0,
-                                            neginf=-1.0,
+                    if session.is_recording and not session.suppress_stream_events:
+                        # Publish audio level update for real-time visualization.
+                        self._publish_event(
+                            "hotkey_audio_level",
+                            {
+                                "session_id": session.session_id,
+                                "audio_level": session.audio_level,
+                                "levels": self._calculate_frequency_levels(chunk, num_bars=36),
+                                "peak": float(
+                                    np.max(
+                                        np.abs(
+                                            np.nan_to_num(
+                                                np.clip(
+                                                    chunk.astype(np.float32, copy=False),
+                                                    -1.0,
+                                                    1.0,
+                                                ),
+                                                nan=0.0,
+                                                posinf=1.0,
+                                                neginf=-1.0,
+                                            )
                                         )
                                     )
                                 )
-                            )
-                            if len(chunk) > 0
-                            else 0.0,
-                        },
-                    )
+                                if len(chunk) > 0
+                                else 0.0,
+                            },
+                        )
 
                     # Accumulate audio
                     audio_buffer = np.concatenate([audio_buffer, chunk])
@@ -1033,27 +1501,49 @@ class HotkeyTranscriptionService:
         try:
             from app.stt.chunker import AudioChunk
 
+            chunk_duration = len(audio) / float(self.settings.sample_rate)
+            started_at = float(getattr(session, "submitted_audio_seconds", 0.0) or 0.0)
+            setattr(session, "submitted_audio_seconds", started_at + chunk_duration)
+            ended_at = started_at + chunk_duration
+
             if self._should_collect_hotkey_audio_debug():
                 session.debug_audio_chunks.append(
                     np.asarray(audio, dtype=np.float32, order="C").copy()
                 )
-            should_skip, chunk_stats = self._should_skip_silent_hotkey_chunk(audio)
+            should_skip, chunk_stats = self._should_skip_silent_hotkey_chunk(
+                audio,
+                relaxed=session.adaptive_silence_gate_relaxed,
+            )
             if should_skip:
                 session.skipped_silent_chunks += 1
+                session.silence_skip_streak = int(
+                    getattr(session, "silence_skip_streak", 0) or 0
+                ) + 1
+                if (
+                    getattr(session, "capture_source", "microphone") == "microphone"
+                    and not getattr(session, "final_segments", [])
+                    and not getattr(session, "adaptive_silence_gate_relaxed", False)
+                    and session.silence_skip_streak >= 3
+                ):
+                    session.adaptive_silence_gate_relaxed = True
+                    logger.info(
+                        "Hotkey silence gate relaxed after repeated empty skips: session=%s skipped=%d",
+                        session.session_id,
+                        session.skipped_silent_chunks,
+                    )
                 if self._should_collect_hotkey_audio_debug():
                     logger.info(
-                        "Hotkey chunk skipped by silence gate: session=%s rms=%.6f peak=%.6f duration_ms=%.1f skipped=%d",
+                        "Hotkey chunk skipped by silence gate: session=%s start=%.2f end=%.2f rms=%.6f peak=%.6f duration_ms=%.1f skipped=%d",
                         session.session_id,
+                        started_at,
+                        ended_at,
                         chunk_stats["rms"],
                         chunk_stats["peak"],
                         chunk_stats["duration_ms"],
                         session.skipped_silent_chunks,
                     )
                 return
-
-            chunk_duration = len(audio) / float(self.settings.sample_rate)
-            ended_at = session.duration_ms / 1000.0
-            started_at = max(0.0, ended_at - chunk_duration)
+            session.silence_skip_streak = 0
             chunk = AudioChunk(
                 started_at=started_at,
                 samples=audio,
@@ -1075,7 +1565,26 @@ class HotkeyTranscriptionService:
                 return
 
             queue_depth = getattr(status, "queue_depth", None)
-            logger.debug("Chunk submitted: queue_depth=%s", queue_depth)
+            estimated_backlog = float(
+                getattr(status, "estimated_backlog_seconds", 0.0) or 0.0
+            )
+            logger.debug(
+                "Chunk submitted: queue_depth=%s backlog=%.2fs",
+                queue_depth,
+                estimated_backlog,
+            )
+            if (
+                queue_depth is not None
+                and queue_depth >= 3
+                and (time.time() - session.backlog_warning_at) >= 5.0
+            ):
+                session.backlog_warning_at = time.time()
+                logger.warning(
+                    "Hotkey backlog warning: session=%s queue_depth=%s backlog=%.2fs",
+                    session.session_id,
+                    queue_depth,
+                    estimated_backlog,
+                )
 
         except Exception as exc:
             logger.exception("Transcription error: %s", exc)
@@ -1084,23 +1593,27 @@ class HotkeyTranscriptionService:
         """Capture completed hotkey segments for the floating window and stop payload."""
         if (
             session.cancel_requested
-            or session.suppress_stream_events
             or self._session is not session
         ):
             return
 
-        if getattr(segment, "suppressed", False):
+        raw_text = normalize_dictation_text(getattr(segment, "text", "") or "")
+        if getattr(segment, "suppressed", False) and not self._should_keep_hotkey_segment(
+            session,
+            segment,
+            raw_text,
+        ):
             if self._should_collect_hotkey_audio_debug():
                 logger.info(
-                    "Hotkey ASR segment suppressed before aggregation: session=%s reasons=%s text=%r",
+                    "Hotkey ASR segment suppressed before aggregation: session=%s confidence=%.3f reasons=%s text=%r",
                     session.session_id,
+                    float(getattr(segment, "confidence", 0.0) or 0.0),
                     getattr(segment, "suppression_reasons", [])
                     or getattr(segment, "review_reasons", []),
                     getattr(segment, "text", "") or "",
                 )
             return
 
-        raw_text = normalize_dictation_text(getattr(segment, "text", "") or "")
         display_source = getattr(segment, "display_text", None) or raw_text
         display_text = stabilize_partial_text(session.display_partial_text, display_source)
         if not raw_text and not display_text:
@@ -1123,13 +1636,7 @@ class HotkeyTranscriptionService:
         session.raw_partial_text = raw_text or display_text
         session.display_partial_text = display_text
         session.partial_text = display_text
-        self._log_hotkey_debug_text(
-            "Hotkey ASR final",
-            session=session,
-            text=raw_text or display_text,
-            start=payload["start"],
-            end=payload["end"],
-        )
+        session.silence_skip_streak = 0
         prior_last_text = (
             normalize_dictation_text(
                 session.final_segments[-1].get("raw_text")
@@ -1149,28 +1656,82 @@ class HotkeyTranscriptionService:
                 return
         else:
             session.final_segments.append(payload)
-        draft_state = session.draft_stabilizer.consume_final_text(
-            payload["text"],
+        try:
+            session.aggregator.add_segment(
+                segment_id=payload["id"],
+                text=raw_text or display_text,
+                display_text=display_text,
+                start=payload["start"],
+                end=payload["end"],
+                confidence=payload["confidence"],
+                suppressed=False,
+                suppression_reasons=[],
+            )
+        except Exception as exc:
+            logger.exception(
+                "Hotkey aggregation failed: session=%s segment=%s error=%s",
+                session.session_id,
+                payload["id"],
+                exc,
+            )
+            session.finalization_error = f"aggregation_error:{exc}"
+        try:
+            session.raw_composed_text = session.composer.add_final_segment(
+                raw_text or display_text,
+                start=payload["start"],
+                end=payload["end"],
+                confidence=payload["confidence"],
+            )
+            session.latest_live_buffer_text = postprocess_final_text(
+                session.raw_composed_text or payload["raw_text"] or payload["text"],
+                mode=getattr(session, "transcription_mode", "dictation"),
+            )
+        except Exception as exc:
+            logger.exception(
+                "Hotkey composer failed: session=%s segment=%s error=%s",
+                session.session_id,
+                payload["id"],
+                exc,
+            )
+        self._log_hotkey_debug_text(
+            "Hotkey ASR final",
+            session=session,
+            text=raw_text or display_text,
             start=payload["start"],
             end=payload["end"],
-        ) if session.draft_stabilizer else None
-        if draft_state is not None:
-            self._publish_event(
-                "hotkey_commit_final",
-                {
-                    **build_stream_payload(
-                        session_id=session.session_id,
-                        segment_id=payload["id"],
-                        revision=draft_state.revision,
-                        stream_id=draft_state.stream_id,
-                        text=payload["text"],
-                        start=payload["start"],
-                        end=payload["end"],
+        )
+        if self._is_debug_mode_enabled():
+            logger.debug(
+                "Hotkey ASR composed: session=%s chars=%d text=%s",
+                session.session_id,
+                len(session.raw_composed_text),
+                self._preview_debug_text(session.raw_composed_text),
+            )
+        if not session.suppress_stream_events:
+            draft_state = session.draft_stabilizer.consume_final_text(
+                payload["text"],
+                start=payload["start"],
+                end=payload["end"],
+            ) if session.draft_stabilizer else None
+            if draft_state is not None and getattr(session, "transcription_mode", "dictation") != "session_paragraph":
+                self._publish_event(
+                    "hotkey_commit_final",
+                    {
+                        **build_stream_payload(
+                            session_id=session.session_id,
+                            segment_id=payload["id"],
+                            revision=draft_state.revision,
+                            stream_id=draft_state.stream_id,
+                            text=payload["text"],
+                            start=payload["start"],
+                            end=payload["end"],
                         committed_text=draft_state.committed_text,
                     ),
-                    "segment": payload,
-                },
-            )
+                    "live_buffer_text": session.latest_live_buffer_text,
+                    "transcription_mode": getattr(session, "transcription_mode", "dictation"),
+                        "segment": payload,
+                    },
+                )
 
     def _on_partial_transcription(
         self,
@@ -1290,7 +1851,13 @@ class HotkeyTranscriptionService:
         )
 
     def _should_collect_hotkey_audio_debug(self) -> bool:
-        return self._is_debug_mode_enabled()
+        try:
+            hotkey_settings = getattr(get_settings_manager().get_settings(), "hotkey", None)
+        except Exception:
+            hotkey_settings = None
+        return self._is_debug_mode_enabled() or bool(
+            getattr(hotkey_settings, "save_debug_wav", False)
+        )
 
     @staticmethod
     def _audio_chunk_diagnostics(audio: np.ndarray, sample_rate: int) -> dict[str, float]:
@@ -1318,12 +1885,53 @@ class HotkeyTranscriptionService:
             "clipping_ratio": clipping_ratio,
         }
 
+    def _should_keep_hotkey_segment(
+        self,
+        session: HotkeySession,
+        segment: Any,
+        raw_text: str,
+    ) -> bool:
+        if session.capture_source != "microphone":
+            return False
+        if not raw_text:
+            return False
+
+        reasons = {
+            str(reason)
+            for reason in (
+                getattr(segment, "suppression_reasons", None)
+                or getattr(segment, "review_reasons", None)
+                or []
+            )
+            if reason
+        }
+        if not reasons:
+            return False
+        if not reasons.issubset({"empty", "low-value-filler"}):
+            return False
+
+        confidence = float(getattr(segment, "confidence", 0.0) or 0.0)
+        keep_segment = confidence >= 0.55 and len(raw_text) >= 4
+        if keep_segment and self._should_collect_hotkey_audio_debug():
+            logger.info(
+                "Hotkey ASR segment kept despite soft suppression: session=%s confidence=%.3f reasons=%s text=%r",
+                session.session_id,
+                confidence,
+                sorted(reasons),
+                raw_text,
+            )
+        return keep_segment
+
     def _should_skip_silent_hotkey_chunk(
         self,
         audio: np.ndarray,
+        *,
+        relaxed: bool = False,
     ) -> tuple[bool, dict[str, float]]:
         stats = self._audio_chunk_diagnostics(audio, self.settings.sample_rate)
-        should_skip = stats["rms"] < 0.001 and stats["peak"] < 0.015
+        rms_threshold = 0.00012 if relaxed else 0.00025
+        peak_threshold = 0.003 if relaxed else 0.006
+        should_skip = stats["rms"] < rms_threshold and stats["peak"] < peak_threshold
         return should_skip, stats
 
     def _log_hotkey_audio_chunk(
@@ -1426,177 +2034,8 @@ class HotkeyTranscriptionService:
             except Exception:
                 continue
 
-
-def log_endpoint(func):
-    """Decorator to log API endpoint invocations with timing."""
-
-    @wraps(func)
-    async def async_wrapper(*args, **kwargs):
-        return await _log_endpoint_call_async(func, args, kwargs)
-
-    @wraps(func)
-    def sync_wrapper(*args, **kwargs):
-        return _log_endpoint_call_sync(func, args, kwargs)
-
-    if asyncio.iscoroutinefunction(func):
-        return async_wrapper
-    return sync_wrapper
-
-
-def _get_request_info(kwargs: dict) -> dict:
-    """Extract sanitized request info from kwargs."""
-    request_info = {}
-    for key, value in kwargs.items():
-        if key == "request" and hasattr(value, "dict"):
-            try:
-                req_dict = value.dict()
-                # Sanitize: exclude sensitive fields
-                request_info = {
-                    k: v
-                    for k, v in req_dict.items()
-                    if k not in ("password", "token", "secret", "api_key")
-                }
-            except Exception:
-                request_info = {"type": type(value).__name__}
-        elif key in ("device_id", "model_name", "duration"):
-            request_info[key] = str(value)
-    return request_info
-
-
-def _log_endpoint_call_sync(func, args, kwargs):
-    """Internal helper to log sync endpoint calls."""
-    start_time = time.perf_counter()
-    endpoint_name = func.__name__
-    endpoint_path = getattr(func, "__endpoint_path__", "unknown")
-    http_method = getattr(func, "__http_method__", "unknown")
-    request_info = _get_request_info(kwargs)
-    client_info = _get_client_info()
-
-    logger.debug(
-        "API endpoint invoked: %s %s (func=%s) | client=%s | params=%s",
-        http_method,
-        endpoint_path,
-        endpoint_name,
-        client_info,
-        request_info,
-    )
-
-    try:
-        result = func(*args, **kwargs)
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-        status_code = 200
-        response_size = 0
-        if hasattr(result, "status_code"):
-            status_code = result.status_code
-        if hasattr(result, "body"):
-            response_size = len(result.body) if result.body else 0
-        elif isinstance(result, dict):
-            response_size = len(str(result))
-
-        logger.debug(
-            "API endpoint completed: %s %s | status=%s | size=%s bytes | time=%.2fms",
-            http_method,
-            endpoint_path,
-            status_code,
-            response_size,
-            elapsed_ms,
-        )
-        return result
-    except HTTPException as exc:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint error: %s %s | status=%s | detail=%s | time=%.2fms",
-            http_method,
-            endpoint_path,
-            exc.status_code,
-            exc.detail,
-            elapsed_ms,
-        )
-        raise
-    except Exception as exc:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint exception: %s %s | error=%s | time=%.2fms",
-            http_method,
-            endpoint_path,
-            str(exc),
-            elapsed_ms,
-        )
-        raise
-
-
-async def _log_endpoint_call_async(func, args, kwargs):
-    """Internal helper to log async endpoint calls."""
-    start_time = time.perf_counter()
-    endpoint_name = func.__name__
-    endpoint_path = getattr(func, "__endpoint_path__", "unknown")
-    http_method = getattr(func, "__http_method__", "unknown")
-    request_info = _get_request_info(kwargs)
-    client_info = _get_client_info()
-
-    logger.debug(
-        "API endpoint invoked: %s %s (func=%s) | client=%s | params=%s",
-        http_method,
-        endpoint_path,
-        endpoint_name,
-        client_info,
-        request_info,
-    )
-
-    try:
-        result = await func(*args, **kwargs)
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-        status_code = 200
-        response_size = 0
-        if hasattr(result, "status_code"):
-            status_code = result.status_code
-        if hasattr(result, "body"):
-            response_size = len(result.body) if result.body else 0
-        elif isinstance(result, dict):
-            response_size = len(str(result))
-
-        logger.debug(
-            "API endpoint completed: %s %s | status=%s | size=%s bytes | time=%.2fms",
-            http_method,
-            endpoint_path,
-            status_code,
-            response_size,
-            elapsed_ms,
-        )
-        return result
-    except HTTPException as exc:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint error: %s %s | status=%s | detail=%s | time=%.2fms",
-            http_method,
-            endpoint_path,
-            exc.status_code,
-            exc.detail,
-            elapsed_ms,
-        )
-        raise
-    except Exception as exc:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint exception: %s %s | error=%s | time=%.2fms",
-            http_method,
-            endpoint_path,
-            str(exc),
-            elapsed_ms,
-        )
-        raise
-
-
-def _get_client_info() -> str:
-    """Get client identifier (placeholder for client IP/user agent)."""
-    return "local"
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global service, hotkey_service
     start_time = time.perf_counter()
 
     try:
@@ -1605,12 +2044,23 @@ async def lifespan(_: FastAPI):
         # Configure logging based on user settings
         manager = get_settings_manager()
         user_settings = manager.get_settings_dict()
-        log_level = _resolve_log_level_from_settings_payload(user_settings)
-        _apply_runtime_log_levels(log_level)
+        log_level = resolve_runtime_log_level(user_settings)
+        apply_runtime_log_levels(log_level)
 
         logger.debug("Lifespan startup: initializing service")
-        service = BackendService(settings)
-        hotkey_service = HotkeyTranscriptionService(settings)
+        api_deps.service = BackendService(settings)
+        api_deps.hotkey_service = HotkeyTranscriptionService(settings)
+        history_db_path = Path.cwd() / ".transcripta" / "history.db"
+        api_deps.history_db = HistoryDatabase(history_db_path)
+        api_deps.dictionary_service = DictionaryService(api_deps.history_db)
+        api_deps.snippet_service = SnippetService(api_deps.history_db)
+        api_deps.style_service = StyleService(api_deps.history_db)
+        api_deps.history_service = TranscriptHistoryService(
+            api_deps.history_db,
+            dictionary_service=api_deps.dictionary_service,
+            snippet_service=api_deps.snippet_service,
+            style_service=api_deps.style_service,
+        )
         if not is_llama_cpp_available():
             logger.warning(
                 "Refiner runtime unavailable at startup: llama-cpp-python is not installed. "
@@ -1626,9 +2076,9 @@ async def lifespan(_: FastAPI):
 
     logger.debug("Lifespan shutdown: stopping service")
     shutdown_start = time.perf_counter()
-    if service is not None:
+    if api_deps.service is not None:
         try:
-            service.stop_session()
+            api_deps.service.stop_session()
             elapsed_ms = (time.perf_counter() - shutdown_start) * 1000
             logger.debug("Lifespan shutdown complete: session stopped in %.2fms", elapsed_ms)
         except Exception as exc:
@@ -1637,11 +2087,23 @@ async def lifespan(_: FastAPI):
         logger.debug("Lifespan shutdown: no service to stop")
 
     # Cleanup hotkey service
-    if hotkey_service is not None:
+    if api_deps.hotkey_service is not None:
         try:
-            await hotkey_service.stop_session()
+            await api_deps.hotkey_service.stop_session()
         except Exception as exc:
             logger.debug("Hotkey service shutdown error: %s", str(exc))
+
+    if api_deps.history_service is not None:
+        try:
+            api_deps.history_service.close()
+        except Exception as exc:
+            logger.debug("History service shutdown error: %s", str(exc))
+
+    if api_deps.history_db is not None:
+        try:
+            api_deps.history_db.close()
+        except Exception as exc:
+            logger.debug("History db shutdown error: %s", str(exc))
 
 
 _app_settings = AppSettings()
@@ -1657,20 +2119,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-def get_service() -> BackendService:
-    if service is None:
-        logger.debug("Service dependency check failed: service not ready")
-        raise HTTPException(status_code=503, detail="Service not ready")
-    return service
-
-
-def get_hotkey_service() -> HotkeyTranscriptionService:
-    if hotkey_service is None:
-        logger.debug("Hotkey service dependency check failed: service not ready")
-        raise HTTPException(status_code=503, detail="Hotkey service not ready")
-    return hotkey_service
+app.include_router(system_router)
+app.include_router(models_router)
+app.include_router(session_router)
+app.include_router(settings_router)
+app.include_router(history_router)
+app.include_router(dictionary_router)
+app.include_router(snippets_router)
+app.include_router(style_router)
 
 
 # ============================================================================
@@ -1693,10 +2149,11 @@ async def hotkey_start(
     hotkey_start.__http_method__ = "POST"
 
     logger.debug(
-        "Hotkey start: source=%s, model=%s, lang=%s, device=%s, exec=%s",
+        "Hotkey start: source=%s, model=%s, lang=%s, mode=%s, device=%s, exec=%s",
         request.capture_source or "default",
         request.model_name,
         request.language_mode,
+        request.transcription_mode,
         request.device_id or "default",
         request.execution_mode,
     )
@@ -1707,6 +2164,7 @@ async def hotkey_start(
         model_name=request.model_name,
         language_mode=request.language_mode,
         execution_mode=request.execution_mode,
+        transcription_mode=request.transcription_mode,
     )
 
 
@@ -1715,6 +2173,7 @@ async def hotkey_start(
 async def hotkey_stop(
     request: HotkeyStopRequest | None = None,
     svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
+    history_svc: TranscriptHistoryService = Depends(get_history_service),
 ) -> HotkeyStopResponse:
     """Stop hotkey transcription and return final transcription."""
     hotkey_stop.__endpoint_path__ = "/api/transcription/hotkey/stop"
@@ -1728,11 +2187,42 @@ async def hotkey_stop(
         "Hotkey stop complete: duration=%dms, segments=%d, text_length=%d, backend=%s",
         result.duration_ms,
         result.segment_count,
-        len(result.final_transcription),
+        len(result.composed_text or result.final_transcription),
         result.source_backend,
     )
 
+    try:
+        history_svc.ingest_hotkey_result(result, settings_snapshot=get_settings_manager().get_settings_dict())
+    except Exception as exc:
+        logger.warning("History ingest failed for hotkey stop: %s", exc)
+
     return result
+
+
+@app.post("/api/coach/prompt-preview")
+@log_endpoint
+async def coach_prompt_preview(
+    request: CoachPromptPreviewRequest,
+    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
+) -> dict[str, Any]:
+    """Compile the effective coach prompt for preview in settings."""
+    coach_prompt_preview.__endpoint_path__ = "/api/coach/prompt-preview"
+    coach_prompt_preview.__http_method__ = "POST"
+
+    context = CoachRequestContext(
+        text=request.original_text,
+        language_mode=request.language_mode,
+        detail_level=request.detail_level,
+        capture_source=request.capture_source,
+        template_id=request.template_id,
+        overrides=request.overrides,
+        privacy_mode=request.privacy_mode,
+        runtime_enabled=False,
+        model_id=None,
+        custom_user_template=request.custom_user_template,
+        templates=request.templates,
+    )
+    return svc._get_coach_service().prompt_preview(context)
 
 
 @app.get("/api/transcription/hotkey/status")
@@ -1806,7 +2296,7 @@ def hotkey_inject(
 
     return HotkeyInjectResponse(
         success=True,
-        message="Text ready for injection (handled by Electron)",
+        message=API_STRINGS.messages.hotkey_inject_ready,
     )
 
 
@@ -1845,7 +2335,7 @@ def update_hotkey_config(
     return HotkeyConfigResponse(
         success=True,
         config=svc._config,
-        message="Hotkey configuration updated",
+        message=API_STRINGS.messages.hotkey_config_updated,
     )
 
 
@@ -2030,489 +2520,6 @@ async def hotkey_events(
             "X-Accel-Buffering": "no",
         },
     )
-
-
-# ============================================================================
-# Existing Endpoints
-# ============================================================================
-
-
-@app.get("/api/health")
-@log_endpoint
-def health(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    health.__endpoint_path__ = "/api/health"
-    health.__http_method__ = "GET"
-    start_time = time.perf_counter()
-    logger.debug("Health check: requesting snapshot from service")
-
-    snapshot = svc.get_snapshot()
-    model_cache = getattr(snapshot, "model_cache", {})
-    cached_count = len(model_cache) if isinstance(model_cache, dict) else 0
-
-    # Include hotkey service status
-    hotkey_status_data = None
-    if hotkey_service is not None:
-        hs = hotkey_service.get_status()
-        hotkey_status_data = {
-            "is_recording": hs.is_recording,
-            "session_id": hs.session_id,
-            "duration_ms": hs.duration_ms,
-        }
-
-    # Ensure estimated_backlog_seconds is included in health
-    health_dict = snapshot.health
-    if isinstance(health_dict, dict) and "estimated_backlog_seconds" not in health_dict:
-        health_dict["estimated_backlog_seconds"] = 0.0
-
-    response = {
-        "ok": True,
-        "health": health_dict,
-        "meter_value": snapshot.meter_value,
-        "model_cache": model_cache,
-        "hotkey": hotkey_status_data,
-    }
-
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-    logger.debug(
-        "Health check complete: health=%s, meter=%.2f, cached_models=%d, time=%.2fms",
-        snapshot.health,
-        snapshot.meter_value,
-        cached_count,
-        elapsed_ms,
-    )
-    return response
-
-
-@app.get("/api/devices")
-@log_endpoint
-def devices(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    devices.__endpoint_path__ = "/api/devices"
-    devices.__http_method__ = "GET"
-    start_time = time.perf_counter()
-    logger.debug("List devices: requesting device list from service")
-
-    device_list = svc.list_devices()
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    logger.debug(
-        "List devices complete: found %d devices, time=%.2fms", len(device_list), elapsed_ms
-    )
-    return {"devices": device_list}
-
-
-@app.get("/api/devices/{device_id}/probe")
-@log_endpoint
-def probe_device_endpoint(
-    device_id: str,
-    duration: float = 3.0,
-    svc: BackendService = Depends(get_service),
-) -> dict[str, Any]:
-    """Probe a device to check if it's working and capture audio stats."""
-    probe_device_endpoint.__endpoint_path__ = "/api/devices/{device_id}/probe"
-    probe_device_endpoint.__http_method__ = "GET"
-    actual_device_id = device_id if device_id != "default" else None
-    logger.debug(
-        "Probe device: device_id=%s (raw=%s), duration=%.1fs",
-        actual_device_id or "default",
-        device_id,
-        duration,
-    )
-
-    start_time = time.perf_counter()
-    result = svc.probe_device(actual_device_id, duration=duration)
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    logger.debug(
-        "Probe device complete: device_id=%s, success=%s, time=%.2fms",
-        actual_device_id or "default",
-        result.get("ok", False),
-        elapsed_ms,
-    )
-    return result
-
-
-@app.post("/api/models/preload")
-@log_endpoint
-def preload_model(
-    request: PreloadModelRequest,
-    svc: BackendService = Depends(get_service),
-) -> dict[str, Any]:
-    """Preload a model into cache for instant session start.
-
-    Progress events are emitted via SSE on the /api/events endpoint
-    with event type "preload_progress".
-    """
-    preload_model.__endpoint_path__ = "/api/models/preload"
-    preload_model.__http_method__ = "POST"
-    logger.debug(
-        "Preload model: model_name=%s, execution_mode=%s",
-        request.model_name,
-        request.execution_mode,
-    )
-
-    start_time = time.perf_counter()
-    result = svc.preload_model(
-        model_name=request.model_name,
-        execution_mode=request.execution_mode,
-    )
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    logger.debug(
-        "Preload model complete: model_name=%s, status=%s, time=%.2fms",
-        request.model_name,
-        result.get("status", "unknown"),
-        elapsed_ms,
-    )
-    return result
-
-
-@app.get("/api/models/cache")
-@log_endpoint
-def get_model_cache(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    """Get current model cache status."""
-    get_model_cache.__endpoint_path__ = "/api/models/cache"
-    get_model_cache.__http_method__ = "GET"
-    start_time = time.perf_counter()
-    logger.debug("Model cache status: requesting snapshot")
-
-    snapshot = svc.get_snapshot()
-    cached_models = getattr(snapshot, "model_cache", {})
-    cached_count = len(cached_models) if isinstance(cached_models, dict) else 0
-    available_count = len(snapshot.available_models) if hasattr(snapshot, "available_models") else 0
-
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-    logger.debug(
-        "Model cache status complete: cached=%d, available=%d, time=%.2fms",
-        cached_count,
-        available_count,
-        elapsed_ms,
-    )
-    return {
-        "cached_models": cached_models,
-        "available_models": snapshot.available_models,
-    }
-
-
-@app.delete("/api/models/cache")
-@log_endpoint
-def clear_model_cache(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    """Clear all cached models to free memory."""
-    clear_model_cache.__endpoint_path__ = "/api/models/cache"
-    clear_model_cache.__http_method__ = "DELETE"
-    logger.debug("Clear model cache: requesting cache clear")
-
-    start_time = time.perf_counter()
-    result = svc.clear_model_cache()
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    logger.debug(
-        "Clear model cache complete: status=%s, cleared=%d models, time=%.2fms",
-        result.get("status", "unknown"),
-        result.get("cleared", 0),
-        elapsed_ms,
-    )
-    return result
-
-
-@app.get("/api/models/catalog")
-@log_endpoint
-def get_model_catalog(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    get_model_catalog.__endpoint_path__ = "/api/models/catalog"
-    get_model_catalog.__http_method__ = "GET"
-    return svc.get_model_catalog_payload()
-
-
-@app.get("/api/models/state")
-@log_endpoint
-def get_model_state(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    get_model_state.__endpoint_path__ = "/api/models/state"
-    get_model_state.__http_method__ = "GET"
-    return {"installed": svc.get_model_install_state()}
-
-
-@app.post("/api/models/select")
-@log_endpoint
-def select_model(request: ModelSelectionRequest) -> dict[str, Any]:
-    select_model.__endpoint_path__ = "/api/models/select"
-    select_model.__http_method__ = "POST"
-    manager = get_settings_manager()
-    settings = manager.get_settings()
-
-    if request.category == "asr":
-        settings.transcription.default_asr_model_id = request.model_id
-    elif request.category == "refiner":
-        settings.refiner.selected_model_id = request.model_id
-    else:
-        raise HTTPException(status_code=400, detail="Unknown model category")
-
-    manager.update_settings(settings)
-    return {
-        "ok": True,
-        "selected_asr_model_id": settings.transcription.default_asr_model_id,
-        "selected_refiner_model_id": settings.refiner.selected_model_id,
-    }
-
-
-@app.post("/api/models/refinement-mode")
-@log_endpoint
-def set_refinement_mode(request: RefinementModeRequest) -> dict[str, Any]:
-    set_refinement_mode.__endpoint_path__ = "/api/models/refinement-mode"
-    set_refinement_mode.__http_method__ = "POST"
-    if request.mode not in {"off", "strict", "polished"}:
-        raise HTTPException(status_code=400, detail="Unsupported refinement mode")
-    manager = get_settings_manager()
-    settings = manager.get_settings()
-    settings.transcription.refinement_mode = request.mode
-    manager.update_settings(settings)
-    return {"ok": True, "refinement_mode": settings.transcription.refinement_mode}
-
-
-@app.get("/api/session")
-@log_endpoint
-def session_snapshot(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    session_snapshot.__endpoint_path__ = "/api/session"
-    session_snapshot.__http_method__ = "GET"
-    start_time = time.perf_counter()
-    logger.debug("Session snapshot: requesting payload")
-
-    result = svc.get_snapshot_payload()
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    has_session = result.get("session") is not None
-    logger.debug("Session snapshot complete: has_session=%s, time=%.2fms", has_session, elapsed_ms)
-    return result
-
-
-@app.get("/api/metrics/streaming")
-@log_endpoint
-def streaming_metrics(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    streaming_metrics.__endpoint_path__ = "/api/metrics/streaming"
-    streaming_metrics.__http_method__ = "GET"
-    return svc.get_streaming_metrics()
-
-
-@app.post("/api/session/start")
-@log_endpoint
-def start_session(
-    request: StartSessionRequest,
-    svc: BackendService = Depends(get_service),
-) -> dict[str, Any]:
-    start_session.__endpoint_path__ = "/api/session/start"
-    start_session.__http_method__ = "POST"
-    resolved_capture_source = _resolve_capture_source_setting(request.capture_source)
-    resolved_device_id = _resolve_input_device_for_source(
-        resolved_capture_source,
-        request.device_id,
-    )
-    logger.debug(
-        "Start session: title=%s, resolved_asr_model_id=%s, runtime_model_name=%s, lang=%s, source=%s, device=%s, mode=%s, exec=%s",
-        request.title,
-        request.model_name,
-        runtime_name_for_model(request.model_name) or request.model_name,
-        request.language_mode,
-        resolved_capture_source,
-        resolved_device_id or "default",
-        request.live_mode,
-        request.execution_mode,
-    )
-    logger.debug(
-        "Start session VAD params: threshold=%s, min_silence=%s, speech_pad=%s",
-        request.vad_threshold,
-        request.vad_min_silence_ms,
-        request.vad_speech_pad_ms,
-    )
-
-    try:
-        start_time = time.perf_counter()
-        vad_params = {
-            "vad_threshold": request.vad_threshold,
-            "vad_min_silence_ms": request.vad_min_silence_ms,
-            "vad_speech_pad_ms": request.vad_speech_pad_ms,
-        }
-        session = svc.start_session(
-            title=request.title,
-            output_root=request.output_root,
-            model_name=request.model_name,
-            language_mode=request.language_mode,
-            device_id=resolved_device_id,
-            live_mode=request.live_mode,
-            execution_mode=request.execution_mode,
-            vad_params=vad_params,
-        )
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-        logger.debug(
-            "Start session complete: session_id=%s, time=%.2fms",
-            session.get("id", "unknown") if isinstance(session, dict) else "unknown",
-            elapsed_ms,
-        )
-        return {"session": session}
-    except RuntimeError as exc:
-        logger.debug("Start session failed: error=%s", str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@app.post("/api/session/stop")
-@log_endpoint
-def stop_session(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
-    stop_session.__endpoint_path__ = "/api/session/stop"
-    stop_session.__http_method__ = "POST"
-    logger.debug("Stop session: requesting session stop")
-
-    start_time = time.perf_counter()
-    session = svc.stop_session()
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    logger.debug(
-        "Stop session complete: was_active=%s, time=%.2fms", session is not None, elapsed_ms
-    )
-    return {"session": session}
-
-
-@app.get("/api/system/profile")
-def get_system_profile() -> dict:
-    """Get current system hardware profile."""
-    profiler = SystemProfiler()
-    return profiler.get_summary()
-
-
-@app.get("/api/system/optimize")
-def get_optimized_settings(
-    mode: str = Query(
-        "balanced", description="Optimization mode: maximum, balanced, speed, low_memory"
-    ),
-    hotkey: bool = Query(False, description="Optimize for hotkey/push-to-talk mode"),
-) -> dict:
-    """Get auto-optimized settings for current hardware."""
-    settings = get_recommended_settings(mode=mode, hotkey=hotkey)
-
-    return {
-        "settings": {
-            "model_name": settings.model_name,
-            "compute_type": settings.compute_type,
-            "chunk_duration": settings.chunk_duration,
-            "overlap_ratio": settings.overlap_ratio,
-            "vad_enabled": settings.vad_enabled,
-            "vad_threshold_db": settings.vad_threshold_db,
-            "confidence_threshold": settings.confidence_threshold,
-            "enable_filler_filter": settings.enable_filler_filter,
-            "enable_hallucination_filter": settings.enable_hallucination_filter,
-            "min_segment_length": settings.min_segment_length,
-            "max_workers": settings.max_workers,
-            "use_parallel_processing": settings.use_parallel_processing,
-            "preload_model": settings.preload_model,
-            "hotkey_optimized": settings.hotkey_optimized,
-        },
-        "metadata": {
-            "quality_level": settings.quality_level,
-            "optimization_reason": settings.optimization_reason,
-            "estimated_vram_usage_gb": settings.estimated_vram_usage_gb,
-            "estimated_latency_ms": settings.estimated_latency_ms,
-        },
-        "mode": mode,
-        "hotkey_mode": hotkey,
-    }
-
-
-@app.get("/api/system/presets")
-def get_preset_settings() -> dict:
-    """Get all preset configurations."""
-    optimizer = AutoOptimizer()
-
-    presets = {}
-    for preset_name in [
-        "maximum_quality",
-        "balanced",
-        "maximum_speed",
-        "low_memory",
-        "hotkey_mode",
-    ]:
-        settings = optimizer.get_preset_settings(preset_name)
-        presets[preset_name] = {
-            "model_name": settings.model_name,
-            "compute_type": settings.compute_type,
-            "chunk_duration": settings.chunk_duration,
-            "confidence_threshold": settings.confidence_threshold,
-            "estimated_vram_usage_gb": settings.estimated_vram_usage_gb,
-            "estimated_latency_ms": settings.estimated_latency_ms,
-            "optimization_reason": settings.optimization_reason,
-        }
-
-    return {"presets": presets}
-
-
-# ============================================================================
-# Settings Endpoints
-# ============================================================================
-
-
-@app.get("/api/settings")
-@log_endpoint
-def get_settings() -> dict[str, Any]:
-    """Get all user settings."""
-    get_settings.__endpoint_path__ = "/api/settings"
-    get_settings.__http_method__ = "GET"
-
-    manager = get_settings_manager()
-    return manager.get_settings_dict()
-
-
-@app.post("/api/settings")
-@log_endpoint
-def save_settings(request: dict[str, Any]) -> dict[str, Any]:
-    """Save all user settings."""
-    save_settings.__endpoint_path__ = "/api/settings"
-    save_settings.__http_method__ = "POST"
-
-    manager = get_settings_manager()
-    success = manager.import_settings(request)
-
-    if success:
-        # Update logging level when advanced.logLevel changes.
-        log_level = _resolve_log_level_from_settings_payload(request)
-        _apply_runtime_log_levels(log_level)
-
-        return {"success": True, "message": "Settings saved successfully"}
-    else:
-        raise HTTPException(status_code=400, detail="Failed to save settings")
-
-
-@app.post("/api/settings/reset")
-@log_endpoint
-def reset_settings() -> dict[str, Any]:
-    """Reset all settings to defaults."""
-    reset_settings.__endpoint_path__ = "/api/settings/reset"
-    reset_settings.__http_method__ = "POST"
-
-    manager = get_settings_manager()
-    manager.reset_to_defaults()
-
-    return {"success": True, "message": "Settings reset to defaults"}
-
-
-@app.post("/api/session/attach-pdf")
-@log_endpoint
-def attach_pdf(
-    request: AttachPdfRequest,
-    svc: BackendService = Depends(get_service),
-) -> dict[str, Any]:
-    attach_pdf.__endpoint_path__ = "/api/session/attach-pdf"
-    attach_pdf.__http_method__ = "POST"
-    logger.debug("Attach PDF: path=%s", request.path)
-
-    start_time = time.perf_counter()
-    session = svc.attach_pdf(request.path)
-    elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-    pdf_info = session.get("pdf", {}) if isinstance(session, dict) else {}
-    logger.debug(
-        "Attach PDF complete: path=%s, pdf_pages=%s, pdf_title=%s, time=%.2fms",
-        request.path,
-        pdf_info.get("pages") if isinstance(pdf_info, dict) else None,
-        pdf_info.get("title") if isinstance(pdf_info, dict) else None,
-        elapsed_ms,
-    )
-    return {"session": session}
 
 
 @app.get("/api/events")
@@ -2715,16 +2722,16 @@ async def _broadcast_health_metrics() -> None:
         try:
             await asyncio.sleep(5.0)  # Broadcast every 5 seconds
 
-            if service is None or manager.connection_count == 0:
+            if api_deps.service is None or manager.connection_count == 0:
                 continue
 
-            snapshot = service.get_snapshot()
+            snapshot = api_deps.service.get_snapshot()
             health = snapshot.health if hasattr(snapshot, "health") else {}
 
             # Get hotkey status
             hotkey_data = None
-            if hotkey_service is not None:
-                hs = hotkey_service.get_status()
+            if api_deps.hotkey_service is not None:
+                hs = api_deps.hotkey_service.get_status()
                 hotkey_data = {
                     "is_recording": hs.is_recording,
                     "session_id": hs.session_id,
@@ -2793,16 +2800,16 @@ async def websocket_main(websocket: WebSocket):
         return
 
     # Register transcription event callback
-    if service is not None:
-        service.register_event_callback(_handle_transcription_event)
+    if api_deps.service is not None:
+        api_deps.service.register_event_callback(_handle_transcription_event)
 
     try:
         # Send initial connection success
         await connection.send(MessageType.AUTH_SUCCESS, {"connected": True})
 
         # Send current session state if available
-        if service is not None:
-            snapshot = service.get_snapshot_payload()
+        if api_deps.service is not None:
+            snapshot = api_deps.service.get_snapshot_payload()
             await connection.send(MessageType.SESSION_STARTED, snapshot)
 
         # Send current settings
@@ -2843,8 +2850,8 @@ async def websocket_main(websocket: WebSocket):
         settings_sync = get_settings_sync()
         settings_sync.unsubscribe_connection(connection.connection_id)
 
-        if service is not None:
-            service.unregister_event_callback(_handle_transcription_event)
+        if api_deps.service is not None:
+            api_deps.service.unregister_event_callback(_handle_transcription_event)
 
         await connection.close()
 
@@ -2951,8 +2958,8 @@ async def websocket_audio(websocket: WebSocket):
         await connection.send_audio_level(level, peak, levels)
 
     # Register audio event callback
-    if service is not None:
-        service.register_event_callback(handle_audio_event)
+    if api_deps.service is not None:
+        api_deps.service.register_event_callback(handle_audio_event)
 
     try:
         await connection.send(MessageType.AUTH_SUCCESS, {"stream": "audio"})
@@ -2974,8 +2981,8 @@ async def websocket_audio(websocket: WebSocket):
                 break
 
     finally:
-        if service is not None:
-            service.unregister_event_callback(handle_audio_event)
+        if api_deps.service is not None:
+            api_deps.service.unregister_event_callback(handle_audio_event)
         await connection.close()
 
 
@@ -3042,3 +3049,9 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
+
+
+
+
+

@@ -11,9 +11,11 @@ from threading import Lock
 from typing import Any
 
 from app.core.model_catalog import get_model_catalog_entry
+from app.stt.prompts import build_refiner_prompt
 
 logger = logging.getLogger(__name__)
 LLAMA_CPP_AVAILABLE = find_spec("llama_cpp") is not None
+PLACEHOLDER_TOKEN_RE = re.compile(r"\[\[KEEP_TOKEN_(\d{4})\]\]")
 
 
 def is_llama_cpp_available() -> bool:
@@ -27,6 +29,12 @@ class RefinerResult:
     model_id: str | None
     used_runtime: bool
     error: str | None = None
+
+
+@dataclass(slots=True)
+class ProtectedText:
+    protected_text: str
+    placeholders: dict[str, str]
 
 
 class RefinerService:
@@ -49,6 +57,7 @@ class RefinerService:
         text: str,
         *,
         mode: str,
+        profile: str = "raw",
         model_id: str | None,
         runtime_enabled: bool,
         language_hint: str = "auto",
@@ -56,19 +65,19 @@ class RefinerService:
     ) -> RefinerResult:
         start_time = time.perf_counter()
         normalized = (text or "").strip()
-        if not normalized or mode == "off":
+        if not normalized or mode == "off" or profile == "raw":
             result = RefinerResult(
                 text=normalized,
-                mode="off",
+                mode="off" if mode == "off" else profile,
                 model_id=model_id,
                 used_runtime=False,
             )
             logger.info(
                 "Refiner skipped: mode=%s model=%s used_runtime=%s reason=%s latency_ms=%.1f",
-                "off",
+                mode if mode == "off" else profile,
                 result.model_id,
                 result.used_runtime,
-                "mode_off_or_empty",
+                "mode_off_profile_raw_or_empty",
                 (time.perf_counter() - start_time) * 1000.0,
             )
             return result
@@ -129,9 +138,11 @@ class RefinerService:
             )
             return result
 
-        prompt = self._build_prompt(
-            normalized,
+        protected = self._protect_sensitive_tokens(normalized)
+        prompt = build_refiner_prompt(
+            protected.protected_text,
             mode=mode,
+            profile=profile,
             language_hint=language_hint,
             cleanup_instructions=cleanup_instructions,
         )
@@ -184,7 +195,27 @@ class RefinerService:
             )
             return result
 
-        if self._is_unsafe_rewrite(normalized, refined):
+        if not self._placeholders_intact(refined, protected.placeholders):
+            result = RefinerResult(
+                text=normalized,
+                mode=mode,
+                model_id=model_id,
+                used_runtime=False,
+                error="Refiner output did not preserve protected placeholders; using original text.",
+            )
+            logger.info(
+                "Refiner fallback: mode=%s model=%s used_runtime=%s reason=%s latency_ms=%.1f",
+                mode,
+                result.model_id,
+                result.used_runtime,
+                result.error,
+                (time.perf_counter() - start_time) * 1000.0,
+            )
+            return result
+
+        restored = self._restore_sensitive_tokens(refined, protected.placeholders)
+
+        if self._is_unsafe_rewrite(normalized, restored):
             result = RefinerResult(
                 text=normalized,
                 mode=mode,
@@ -203,7 +234,7 @@ class RefinerService:
             return result
 
         result = RefinerResult(
-            text=refined,
+            text=restored,
             mode=mode,
             model_id=model_id,
             used_runtime=True,
@@ -269,44 +300,6 @@ class RefinerService:
             return gguf_candidates[0]
         return None
 
-    def _build_prompt(
-        self, text: str, *, mode: str, language_hint: str, cleanup_instructions: str = ""
-    ) -> str:
-        if mode == "strict":
-            instruction = (
-                "Correct punctuation, capitalization, spacing, and paragraphing only. "
-                "Do not change meaning. Do not summarize, add, remove, or reorder facts. "
-                "Preserve numbers, units, formulas, code tokens, identifiers, filenames, product names, and technical terms exactly."
-            )
-        else:
-            instruction = (
-                "Polish the transcript for readability while preserving meaning exactly. "
-                "Do not summarize, add, remove, or reorder facts. "
-                "Preserve numbers, units, formulas, code tokens, identifiers, filenames, product names, and technical terms exactly."
-            )
-
-        extra_instructions = cleanup_instructions.strip()
-
-        prompt = (
-            "You are a transcript refiner.\n"
-            f"Language hint: {language_hint}.\n"
-            f"Task: {instruction}\n"
-            "Return only the refined transcript text.\n"
-            "If the transcript already looks correct, return it unchanged.\n"
-        )
-        if extra_instructions:
-            prompt += (
-                "Additional cleanup instructions for final text only:\n"
-                f"{extra_instructions}\n"
-            )
-        prompt += (
-            "<TRANSCRIPT>\n"
-            f"{text}\n"
-            "</TRANSCRIPT>\n"
-            "<REFINED_TEXT>\n"
-        )
-        return prompt
-
     def _extract_refined_text(self, text: str) -> str:
         candidate = (text or "").strip()
         if not candidate:
@@ -335,6 +328,55 @@ class RefinerService:
             return True
 
         return False
+
+    def _protect_sensitive_tokens(self, text: str) -> ProtectedText:
+        patterns = [
+            re.compile(r"\b\d+\.\d+(?:\.\d+)+\b"),
+            re.compile(r"\b\d+\.\d+\b"),
+            re.compile(r"\b\d+%\b"),
+            re.compile(r"\b(?:Ctrl|Alt|Shift|Win|Meta|Cmd|CommandOrControl)(?:\+[A-Za-z0-9]+)+\b", re.IGNORECASE),
+            re.compile(r"\b[A-Z]{2,}(?:[A-Z0-9._-]*[A-Z0-9])?\b"),
+            re.compile(r"\b[a-zA-Z0-9._/-]{3,}\b"),
+        ]
+        placeholders: dict[str, str] = {}
+        protected_text = text
+
+        def replace_matches(pattern: re.Pattern[str], current_text: str) -> str:
+            def _replacement(match: re.Match[str]) -> str:
+                token = match.group(0)
+                if PLACEHOLDER_TOKEN_RE.search(token):
+                    return token
+                for placeholder, existing_token in placeholders.items():
+                    if existing_token == token:
+                        return placeholder
+                placeholder = f"[[KEEP_TOKEN_{len(placeholders):04d}]]"
+                placeholders[placeholder] = token
+                return placeholder
+
+            parts = PLACEHOLDER_TOKEN_RE.split(current_text)
+            rebuilt: list[str] = []
+            for index, part in enumerate(parts):
+                if index % 2 == 1:
+                    rebuilt.append(f"[[KEEP_TOKEN_{part}]]")
+                else:
+                    rebuilt.append(pattern.sub(_replacement, part))
+            return "".join(rebuilt)
+
+        for pattern in patterns:
+            protected_text = replace_matches(pattern, protected_text)
+
+        return ProtectedText(protected_text=protected_text, placeholders=placeholders)
+
+    def _placeholders_intact(self, text: str, placeholders: dict[str, str]) -> bool:
+        if not placeholders:
+            return True
+        return all(text.count(placeholder) == 1 for placeholder in placeholders)
+
+    def _restore_sensitive_tokens(self, text: str, placeholders: dict[str, str]) -> str:
+        restored = text
+        for placeholder, token in placeholders.items():
+            restored = restored.replace(placeholder, token)
+        return restored
 
     def _protected_tokens(self, text: str) -> list[str]:
         return [
