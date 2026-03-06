@@ -29,6 +29,7 @@
       "main/windows/**/*",
       "main/ipc/**/*",
       "main/services/**/*",
+      "strings/**/*",
       "floating-window.html",
       "quick-settings.html",
       "renderer/dist/**/*",

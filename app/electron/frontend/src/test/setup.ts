@@ -27,9 +27,12 @@ export type MockElectronAPI = {
   getApiOrigin: ReturnType<typeof vi.fn>;
   hotkey: {
     getState: ReturnType<typeof vi.fn>;
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
     toggle: ReturnType<typeof vi.fn>;
     updateConfig: ReturnType<typeof vi.fn>;
     onStateChange: ReturnType<typeof vi.fn>;
+    onTranscriptEvent: ReturnType<typeof vi.fn>;
     removeStateChangeListener: ReturnType<typeof vi.fn>;
   };
   models: {
@@ -48,6 +51,18 @@ export type MockFloatingAPI = {
   onRecordingState: ReturnType<typeof vi.fn>;
   onTranscription: ReturnType<typeof vi.fn>;
   onAudioVisualizer: ReturnType<typeof vi.fn>;
+  onCoachResult: ReturnType<typeof vi.fn>;
+  onCoachResultClear: ReturnType<typeof vi.fn>;
+  cancelRecording: ReturnType<typeof vi.fn>;
+  finishRecording: ReturnType<typeof vi.fn>;
+  finishAndPaste: ReturnType<typeof vi.fn>;
+  dismissResult: ReturnType<typeof vi.fn>;
+  strings: {
+    status: Record<string, string>;
+    waitingForSpeech: string;
+    actions: Record<string, string>;
+    resultMeta: Record<string, string>;
+  };
 };
 
 declare global {
@@ -68,9 +83,12 @@ function createMockElectronAPI(): MockElectronAPI {
     getApiOrigin: vi.fn(() => Promise.resolve('http://127.0.0.1:8765')),
     hotkey: {
       getState: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
       toggle: vi.fn(),
       updateConfig: vi.fn(),
       onStateChange: vi.fn(() => vi.fn()),
+      onTranscriptEvent: vi.fn(() => vi.fn()),
       removeStateChangeListener: vi.fn(),
     },
     models: {
@@ -91,6 +109,34 @@ function createMockFloatingAPI(): MockFloatingAPI {
     onRecordingState: vi.fn(() => vi.fn()),
     onTranscription: vi.fn(() => vi.fn()),
     onAudioVisualizer: vi.fn(() => vi.fn()),
+    onCoachResult: vi.fn(() => vi.fn()),
+    onCoachResultClear: vi.fn(() => vi.fn()),
+    cancelRecording: vi.fn(),
+    finishRecording: vi.fn(),
+    finishAndPaste: vi.fn(),
+    dismissResult: vi.fn(),
+    strings: {
+      status: {
+        idle: 'Ready',
+        listening: 'Listening',
+        processing: 'Finishing',
+        result: 'Transcript ready',
+        coachResult: 'Coach Result',
+        error: 'Error',
+      },
+      waitingForSpeech: 'Waiting for speech...',
+      actions: {
+        cancel: 'Cancel',
+        finish: 'Finish',
+        close: 'Close',
+        copyPolished: 'Copy Polished',
+        copyFinal: 'Copy Final',
+      },
+      resultMeta: {
+        transcriptReady: 'Transcript ready',
+        coachUnavailable: 'Coach unavailable',
+      },
+    },
   };
 }
 

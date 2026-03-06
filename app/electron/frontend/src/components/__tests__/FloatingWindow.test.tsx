@@ -1,194 +1,434 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { FloatingWindow } from '../FloatingWindow';
+import type { HotkeyStopResponse } from '../../types/api';
 
-describe('FloatingWindow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    
-    // Reset transcriptaFloating mock
-    Object.defineProperty(window, 'transcriptaFloating', {
-      writable: true,
-      value: {
-        onRecordingState: vi.fn(() => vi.fn()),
-        onTranscription: vi.fn(() => vi.fn()),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
+type RecordingHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onRecordingState']>[0];
+type TranscriptHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onTranscription']>[0];
+type AudioHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onAudioVisualizer']>[0];
+type CoachResultHandler = NonNullable<Window['transcriptaFloating']>['onCoachResult'] extends (
+  callback: infer T,
+) => () => void
+  ? T
+  : never;
+type CoachResultClearHandler = NonNullable<Window['transcriptaFloating']>['onCoachResultClear'] extends (
+  callback: infer T,
+) => () => void
+  ? T
+  : never;
+
+interface FloatingMockContext {
+  recordingHandler: RecordingHandler | null;
+  transcriptHandler: TranscriptHandler | null;
+  audioHandler: AudioHandler | null;
+  coachResultHandler: CoachResultHandler | null;
+  coachResultClearHandler: CoachResultClearHandler | null;
+  cancelRecording: ReturnType<typeof vi.fn>;
+  finishRecording: ReturnType<typeof vi.fn>;
+  dismissResult: ReturnType<typeof vi.fn>;
+}
+
+function installFloatingMock(): FloatingMockContext {
+  const context: FloatingMockContext = {
+    recordingHandler: null,
+    transcriptHandler: null,
+    audioHandler: null,
+    coachResultHandler: null,
+    coachResultClearHandler: null,
+    cancelRecording: vi.fn(),
+    finishRecording: vi.fn(),
+    dismissResult: vi.fn(),
+  };
+
+  Object.defineProperty(window, 'transcriptaFloating', {
+    writable: true,
+    value: {
+      onRecordingState: vi.fn((handler: RecordingHandler) => {
+        context.recordingHandler = handler;
+        return vi.fn();
+      }),
+      onTranscription: vi.fn((handler: TranscriptHandler) => {
+        context.transcriptHandler = handler;
+        return vi.fn();
+      }),
+      onAudioVisualizer: vi.fn((handler: AudioHandler) => {
+        context.audioHandler = handler;
+        return vi.fn();
+      }),
+      onCoachResult: vi.fn((handler: CoachResultHandler) => {
+        context.coachResultHandler = handler;
+        return vi.fn();
+      }),
+      onCoachResultClear: vi.fn((handler: CoachResultClearHandler) => {
+        context.coachResultClearHandler = handler;
+        return vi.fn();
+      }),
+      onHotkeyEvent: vi.fn(() => vi.fn()),
+      cancelRecording: context.cancelRecording,
+      finishRecording: context.finishRecording,
+      dismissResult: context.dismissResult,
+      platform: 'win32',
+      strings: {
+        status: {
+          idle: 'Ready',
+          listening: 'Listening',
+          transcribing: 'Transcribing',
+          processing: 'Finishing',
+          result: 'Transcript ready',
+          error: 'Error',
+        },
+        waitingForSpeech: 'Waiting for speech...',
+        actions: {
+          cancel: 'Cancel',
+          finish: 'Finish',
+          close: 'Close',
+        },
+        resultMeta: {
+          transcriptReady: 'Transcript ready',
+          livePartialHint: 'Live transcript updates during recording.',
+          sessionParagraphHint: 'Live partials stay temporary until stop.',
+          genericError: 'Something went wrong.',
+        },
       },
-    });
+      debugEnabled: true,
+    },
   });
 
-  it('renders floating window component', () => {
+  return context;
+}
+
+describe('FloatingWindow', () => {
+  let now = 0;
+
+  beforeEach(() => {
+    now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('renders idle state by default', () => {
+    installFloatingMock();
     render(<FloatingWindow />);
-    
+
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('00:00')).toBeInTheDocument();
     expect(screen.getByText('Waiting for speech...')).toBeInTheDocument();
   });
 
-  it('shows listening state when recording starts', async () => {
-    let stateHandler: ((state: { isRecording: boolean; processing?: boolean; finished?: boolean }) => void) | null = null;
-    
+  it('transitions through listening, transcribing, finalizing, and done', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        processing: false,
+        finished: false,
+        sessionId: 'session-1',
+        mode: 'dictation',
+      });
+    });
+    expect(screen.getByText('Listening')).toBeInTheDocument();
+
+    act(() => {
+      ctx.transcriptHandler?.({
+        text: 'Testing a live partial',
+        partialText: 'Testing a live partial',
+        committedText: '',
+        isPartial: true,
+        sessionId: 'session-1',
+        mode: 'dictation',
+      });
+    });
+    expect(screen.getByText('Transcribing')).toBeInTheDocument();
+    expect(screen.getByText('Testing a live partial')).toBeInTheDocument();
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: true,
+        finished: false,
+        sessionId: 'session-1',
+        mode: 'dictation',
+      });
+    });
+    expect(screen.getByText('Finishing')).toBeInTheDocument();
+
+    act(() => {
+      ctx.transcriptHandler?.({
+        text: 'Final transcript paragraph',
+        committedText: 'Final transcript paragraph',
+        partialText: '',
+        isPartial: false,
+        sessionId: 'session-1',
+        mode: 'dictation',
+      });
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: false,
+        finished: true,
+        sessionId: 'session-1',
+        mode: 'dictation',
+      });
+    });
+
+    expect(screen.getAllByText('Transcript ready').length).toBeGreaterThan(0);
+    expect(screen.getByText('Final transcript paragraph')).toBeInTheDocument();
+  });
+
+  it('hydrates from cached preload events', () => {
     Object.defineProperty(window, 'transcriptaFloating', {
       writable: true,
       value: {
-        onRecordingState: vi.fn((handler) => {
-          stateHandler = handler;
+        onRecordingState: vi.fn((handler: RecordingHandler) => {
+          handler({
+            isRecording: true,
+            processing: false,
+            finished: false,
+            sessionId: 'session-2',
+            mode: 'dictation',
+          });
           return vi.fn();
         }),
-        onTranscription: vi.fn(() => vi.fn()),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
+        onTranscription: vi.fn((handler: TranscriptHandler) => {
+          handler({
+            text: 'Cached transcript text',
+            committedText: 'Cached transcript text',
+            partialText: '',
+            isPartial: false,
+            sessionId: 'session-2',
+            mode: 'dictation',
+          });
+          return vi.fn();
+        }),
+        onAudioVisualizer: vi.fn((handler: AudioHandler) => {
+          handler({ levels: new Array(36).fill(0.25), peak: 0.25 });
+          return vi.fn();
+        }),
+        onHotkeyEvent: vi.fn(() => vi.fn()),
+        platform: 'win32',
+        strings: {
+          status: { idle: 'Ready', listening: 'Listening', transcribing: 'Transcribing', processing: 'Finishing', result: 'Transcript ready', error: 'Error' },
+          waitingForSpeech: 'Waiting for speech...',
+          actions: { cancel: 'Cancel', finish: 'Finish', close: 'Close' },
+          resultMeta: {
+            transcriptReady: 'Transcript ready',
+            livePartialHint: 'Live transcript updates during recording.',
+            sessionParagraphHint: 'Live partials stay temporary until stop.',
+            genericError: 'Something went wrong.',
+          },
+        },
       },
     });
 
     render(<FloatingWindow />);
-    
-    // Wait for effect to register handlers
-    await waitFor(() => {
-      expect(window.transcriptaFloating.onRecordingState).toHaveBeenCalled();
-    });
 
-    // Simulate recording start
-    if (stateHandler) {
-      stateHandler({ isRecording: true });
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText('Listening...')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Transcribing')).toBeInTheDocument();
+    expect(screen.getByText('Cached transcript text')).toBeInTheDocument();
   });
 
-  it('shows processing state', async () => {
-    let stateHandler: ((state: { isRecording: boolean; processing?: boolean; finished?: boolean }) => void) | null = null;
-    
-    Object.defineProperty(window, 'transcriptaFloating', {
-      writable: true,
-      value: {
-        onRecordingState: vi.fn((handler) => {
-          stateHandler = handler;
-          return vi.fn();
-        }),
-        onTranscription: vi.fn(() => vi.fn()),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
+  it('shows only live partials until stop in session paragraph mode', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        sessionId: 'session-3',
+        mode: 'session_paragraph',
+      });
+      ctx.transcriptHandler?.({
+        text: 'Live paragraph preview',
+        partialText: 'Live paragraph preview',
+        committedText: '',
+        isPartial: true,
+        sessionId: 'session-3',
+        mode: 'session_paragraph',
+      });
+    });
+
+    expect(screen.getByText('Live paragraph preview')).toBeInTheDocument();
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: true,
+        sessionId: 'session-3',
+        mode: 'session_paragraph',
+      });
+      ctx.transcriptHandler?.({
+        text: 'One final whole paragraph.',
+        committedText: 'One final whole paragraph.',
+        partialText: '',
+        isPartial: false,
+        sessionId: 'session-3',
+        mode: 'session_paragraph',
+      });
+      ctx.recordingHandler?.({
+        isRecording: false,
+        finished: true,
+        sessionId: 'session-3',
+        mode: 'session_paragraph',
+      });
+    });
+
+    expect(screen.getByText('One final whole paragraph.')).toBeInTheDocument();
+  });
+
+  it('keeps one timer per session and freezes it at the stop result', () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        sessionId: 'session-4',
+        mode: 'dictation',
+      });
+    });
+
+    act(() => {
+      now = 2500;
+      vi.advanceTimersByTime(2500);
+    });
+
+    const activeTimerValue = screen.getAllByText(/\d{2}:\d{2}/)[0].textContent;
+    expect(activeTimerValue).not.toBe('00:00');
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: true,
+        finished: false,
+        sessionId: 'session-4',
+        mode: 'dictation',
+      });
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: false,
+        finished: true,
+        sessionId: 'session-4',
+        mode: 'dictation',
+      });
+      now = 5200;
+      vi.advanceTimersByTime(2700);
+    });
+
+    expect(screen.getAllByText(/\d{2}:\d{2}/)[0].textContent).toBe(activeTimerValue);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        sessionId: 'session-7',
+        mode: 'dictation',
+      });
+    });
+
+    expect(screen.getByText('00:00')).toBeInTheDocument();
+  });
+
+  it('wires cancel, finish, and close controls', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        sessionId: 'session-5',
+        mode: 'dictation',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(ctx.cancelRecording).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText('Finish'));
+    expect(ctx.finishRecording).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: false,
+        finished: true,
+        sessionId: 'session-5',
+        mode: 'dictation',
+      });
+      ctx.transcriptHandler?.({
+        text: 'Completed transcript',
+        committedText: 'Completed transcript',
+        partialText: '',
+        isPartial: false,
+        sessionId: 'session-5',
+        mode: 'dictation',
+      });
+    });
+
+    fireEvent.click(screen.getByText('Close'));
+    expect(ctx.dismissResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('tracks transcript scrolling in a real scroll container', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        sessionId: 'session-6',
+        mode: 'dictation',
+      });
+      ctx.transcriptHandler?.({
+        text: 'Line one.\nLine two.\nLine three.',
+        committedText: 'Line one.\nLine two.\nLine three.',
+        partialText: '',
+        isPartial: false,
+        sessionId: 'session-6',
+        mode: 'dictation',
+      });
+    });
+
+    const container = screen.getByTestId('floating-transcript-scroll');
+    expect(container).toHaveStyle({ overflowY: 'auto' });
+  });
+
+  it('shows the floating coach result payload when the stop flow emits it', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    const payload: HotkeyStopResponse = {
+      session_id: 'session-7',
+      final_transcription: 'raw final',
+      paste_text: 'paste final',
+      coach_result: {
+        original: 'raw final',
+        polished: 'polished final',
+        diff: [],
+        tips: ['Keep it concise'],
+        mistakes: [],
+        practice: { prompt: '', answer: '', focus: [] },
+        meta: { tone: 'neutral', intent: 'dictation', confidence: 1 },
       },
+      coach_status: 'generated',
+      duration_ms: 1500,
+      segment_count: 2,
+    };
+
+    act(() => {
+      ctx.coachResultHandler?.(payload);
     });
 
-    render(<FloatingWindow />);
-    
-    await waitFor(() => {
-      expect(window.transcriptaFloating.onRecordingState).toHaveBeenCalled();
+    expect(screen.getByText('polished final')).toBeInTheDocument();
+    expect(screen.getAllByText('Transcript ready').length).toBeGreaterThan(0);
+
+    act(() => {
+      ctx.coachResultClearHandler?.();
     });
 
-    if (stateHandler) {
-      stateHandler({ isRecording: false, processing: true });
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText(/Processing/i)).toBeInTheDocument();
-    });
-  });
-
-  it('displays transcription text when received', async () => {
-    let transcriptionHandler: ((data: { text?: string; isPartial?: boolean } | string) => void) | null = null;
-    
-    Object.defineProperty(window, 'transcriptaFloating', {
-      writable: true,
-      value: {
-        onRecordingState: vi.fn(() => vi.fn()),
-        onTranscription: vi.fn((handler) => {
-          transcriptionHandler = handler;
-          return vi.fn();
-        }),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
-      },
-    });
-
-    render(<FloatingWindow />);
-    
-    await waitFor(() => {
-      expect(window.transcriptaFloating.onTranscription).toHaveBeenCalled();
-    });
-
-    if (transcriptionHandler) {
-      transcriptionHandler({ text: 'Hello world', isPartial: false });
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText('Hello world')).toBeInTheDocument();
-    });
-  });
-
-  it('displays string transcription directly', async () => {
-    let transcriptionHandler: ((data: { text?: string; isPartial?: boolean } | string) => void) | null = null;
-    
-    Object.defineProperty(window, 'transcriptaFloating', {
-      writable: true,
-      value: {
-        onRecordingState: vi.fn(() => vi.fn()),
-        onTranscription: vi.fn((handler) => {
-          transcriptionHandler = handler;
-          return vi.fn();
-        }),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
-      },
-    });
-
-    render(<FloatingWindow />);
-    
-    await waitFor(() => {
-      expect(window.transcriptaFloating.onTranscription).toHaveBeenCalled();
-    });
-
-    if (transcriptionHandler) {
-      transcriptionHandler('Direct text transcription');
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText('Direct text transcription')).toBeInTheDocument();
-    });
-  });
-
-  it('renders waveform visualization', () => {
-    render(<FloatingWindow />);
-    
-    // Should render 36 waveform bars
-    const bars = document.querySelectorAll('[class*="waveform-bar"]');
-    expect(bars.length).toBe(36);
-  });
-
-  it('updates timer when recording', async () => {
-    vi.useFakeTimers();
-    
-    let stateHandler: ((state: { isRecording: boolean; processing?: boolean; finished?: boolean }) => void) | null = null;
-    
-    Object.defineProperty(window, 'transcriptaFloating', {
-      writable: true,
-      value: {
-        onRecordingState: vi.fn((handler) => {
-          stateHandler = handler;
-          return vi.fn();
-        }),
-        onTranscription: vi.fn(() => vi.fn()),
-        onAudioVisualizer: vi.fn(() => vi.fn()),
-      },
-    });
-
-    render(<FloatingWindow />);
-    
-    await waitFor(() => {
-      expect(window.transcriptaFloating.onRecordingState).toHaveBeenCalled();
-    });
-
-    if (stateHandler) {
-      stateHandler({ isRecording: true });
-    }
-
-    // Advance timer by 5 seconds
-    vi.advanceTimersByTime(5000);
-
-    await waitFor(() => {
-      expect(screen.getByText('00:05')).toBeInTheDocument();
-    });
-
-    vi.useRealTimers();
+    expect(screen.getByText('Waiting for speech...')).toBeInTheDocument();
   });
 });

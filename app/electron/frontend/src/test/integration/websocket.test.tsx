@@ -93,7 +93,7 @@ describe('useWebSocket Integration', () => {
 
     const testMessage = {
       type: 'transcription',
-      payload: { text: 'Hello world' },
+      payload: { text: 'Project status update' },
       timestamp: new Date().toISOString(),
     };
 

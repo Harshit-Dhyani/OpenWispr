@@ -69,12 +69,14 @@ Test multiple components and systems working together.
 
 ## Coverage Targets
 
-| Category | Target | Current |
-|----------|--------|---------|
-| Components | >80% | TBD |
-| Hooks | >90% | TBD |
-| Utils | >95% | TBD |
-| Critical Paths | 100% | TBD |
+| Category | Target |
+|----------|--------|
+| Branches | 80% |
+| Functions | 80% |
+| Lines | 80% |
+| Statements | 80% |
+
+Configured in `vitest.config.ts`. Run `npm run test:coverage` to generate reports.
 
 ## Test Utilities
 
@@ -100,10 +102,13 @@ const segment = createMockSegment({
 Mock Electron and browser APIs:
 
 ```typescript
-import { createMockElectronAPI, createMockMediaDevices } from '@/test';
+import { createMockElectronAPI, createMockMediaDevices, createMockFloatingAPI } from '@/test';
 
 // Mock Electron API
 window.transcriptaDesktop = createMockElectronAPI();
+
+// Mock floating window API
+window.floatingAPI = createMockFloatingAPI();
 
 // Mock media devices
 navigator.mediaDevices = createMockMediaDevices();
@@ -112,16 +117,22 @@ navigator.mediaDevices = createMockMediaDevices();
 ### Async Helpers
 
 ```typescript
-import { waitFor, flushPromises, actAndFlush } from '@/test';
+import { waitFor, waitForCondition, flushPromises, actAndFlush, waitForPromises } from '@/test';
 
-// Wait for condition
+// Wait for expectation (from @testing-library/react)
 await waitFor(() => expect(element).toBeInTheDocument());
+
+// Wait for custom condition (polls until callback returns true)
+await waitForCondition(() => element.isConnected);
 
 // Flush promises
 await flushPromises();
 
 // Act and flush
 await actAndFlush(() => fireEvent.click(button));
+
+// Wait for multiple promise cycles
+await waitForPromises(3);
 ```
 
 ## Writing Tests
@@ -176,14 +187,13 @@ describe('useMyHook', () => {
 
 ## CI/CD Integration
 
-Tests run automatically on:
-- Push to main/develop branches
-- Pull requests
-- Scheduled nightly runs
+Tests run automatically via:
+- Local pre-commit hooks
+- Manual quality gate with `npm run test`
 
 ### GitHub Actions
 
-See `.github/workflows/frontend-tests.yml` for CI configuration.
+No automated frontend test workflow currently configured. Run tests locally before committing.
 
 ### Coverage Reporting
 

@@ -1,21 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import App from '../App';
+import App from '../../App';
 import {
   createMockSettings,
   createMockSnapshot,
   createMockSegment,
+  createMockHealth,
   createMockDevice,
   MOCK_DEVICES,
   MOCK_MODELS,
 } from '../../test/factories';
 
 // Mock the useEventSource hook
-vi.mock('../hooks/useEventSource', () => ({
+vi.mock('../../hooks/useEventSource', () => ({
   useEventSource: vi.fn(),
 }));
 
-import { useEventSource } from '../hooks/useEventSource';
+import { useEventSource } from '../../hooks/useEventSource';
 
 const mockedUseEventSource = vi.mocked(useEventSource);
 
@@ -82,6 +83,8 @@ describe('App', () => {
     });
 
     expect(screen.getByText('Transcripta')).toBeInTheDocument();
+    expect(screen.getByText('Microphone')).toBeInTheDocument();
+    expect(screen.getByText('System Audio')).toBeInTheDocument();
   });
 
   it('displays loading state initially', async () => {
@@ -89,7 +92,8 @@ describe('App', () => {
       render(<App />);
     });
 
-    expect(screen.getByText(/connecting|ready/i)).toBeInTheDocument();
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
   });
 
   it('loads and displays settings', async () => {
@@ -109,7 +113,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith('/api/settings', expect.any(Object));
+      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith('/api/settings', undefined);
     });
   });
 
@@ -163,7 +167,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     });
   });
 
@@ -185,9 +189,7 @@ describe('App', () => {
       render(<App />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/ready/i)).toBeInTheDocument();
-    });
+    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
   });
 
   it('applies theme from settings', async () => {
@@ -211,14 +213,16 @@ describe('App', () => {
     });
   });
 
-  it('handles snapshot events', async () => {
+  it('stays stable when snapshot events arrive during bootstrap', async () => {
     const mockSegment = createMockSegment({ text: 'Test segment' });
 
     mockedUseEventSource.mockReturnValue({
       status: 'connected',
       lastEvent: {
-        type: 'segment',
-        payload: mockSegment,
+        type: 'state',
+        payload: createMockSnapshot({
+          transcript: [mockSegment],
+        }),
         timestamp: new Date().toISOString(),
       },
       reconnectAttempts: 0,
@@ -230,8 +234,12 @@ describe('App', () => {
       render(<App />);
     });
 
+    act(() => {
+      fireEvent.click(screen.getByText('System Audio'));
+    });
+
     await waitFor(() => {
-      expect(screen.getByText('Test segment')).toBeInTheDocument();
+      expect(screen.getByText('Long-form transcription')).toBeInTheDocument();
     });
   });
 
@@ -286,6 +294,106 @@ describe('App', () => {
     });
   });
 
+  it('lets the dictation button start and stop multiple times', async () => {
+    let hotkeyStateListener:
+      | ((event: unknown, state: {
+          config: { enabled: boolean; key_combination: string };
+          session: {
+            session_id: string;
+            is_recording: boolean;
+            status: 'idle' | 'listening' | 'processing' | 'error';
+            lifecycle_state?: 'idle' | 'starting' | 'recording' | 'stopping' | 'error';
+            last_activated_at: string | null;
+            total_activations: number;
+            current_text: string;
+            duration_ms: number;
+          } | null;
+          is_registered: boolean;
+          error: string | null;
+        } | null | undefined) => void)
+      | undefined;
+
+    window.transcriptaDesktop.hotkey.onStateChange.mockImplementation((handler) => {
+      hotkeyStateListener = handler;
+      return vi.fn();
+    });
+
+    window.transcriptaDesktop.hotkey.start.mockResolvedValue({ success: true });
+    window.transcriptaDesktop.hotkey.stop.mockResolvedValue({ success: true });
+
+    await act(async () => {
+      render(<App />);
+    });
+
+    act(() => {
+      fireEvent.click(screen.getByText('Microphone'));
+    });
+
+    const startButton = await screen.findByRole('button', { name: 'Start Dictation' });
+
+    act(() => {
+      fireEvent.click(startButton);
+    });
+
+    await waitFor(() => {
+      expect(window.transcriptaDesktop.hotkey.start).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      hotkeyStateListener?.(null, {
+        config: { enabled: true, key_combination: 'Ctrl+Shift+Space' },
+        session: {
+          session_id: 'dictation-1',
+          is_recording: true,
+          status: 'listening',
+          lifecycle_state: 'recording',
+          last_activated_at: null,
+          total_activations: 1,
+          current_text: '',
+          duration_ms: 1000,
+        },
+        is_registered: true,
+        error: null,
+      });
+    });
+
+    const stopButton = await screen.findByRole('button', { name: 'Stop Dictation' });
+    act(() => {
+      fireEvent.click(stopButton);
+    });
+
+    await waitFor(() => {
+      expect(window.transcriptaDesktop.hotkey.stop).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      hotkeyStateListener?.(null, {
+        config: { enabled: true, key_combination: 'Ctrl+Shift+Space' },
+        session: {
+          session_id: '',
+          is_recording: false,
+          status: 'idle',
+          lifecycle_state: 'idle',
+          last_activated_at: null,
+          total_activations: 1,
+          current_text: '',
+          duration_ms: 0,
+        },
+        is_registered: true,
+        error: null,
+      });
+    });
+
+    const startAgainButton = await screen.findByRole('button', { name: 'Start Dictation' });
+    act(() => {
+      fireEvent.click(startAgainButton);
+    });
+
+    await waitFor(() => {
+      expect(window.transcriptaDesktop.hotkey.start).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('handles PDF attachment', async () => {
     window.transcriptaDesktop.choosePdf.mockResolvedValue('/path/to/file.pdf');
 
@@ -320,7 +428,36 @@ describe('App', () => {
     expect(mockDisconnect).toHaveBeenCalled();
   });
 
-  it('displays error messages from backend', async () => {
+  it('stays stable when backend health reports an error', async () => {
+    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+      switch (true) {
+        case path === '/api/settings':
+          return Promise.resolve(createMockSettings());
+        case path === '/api/devices':
+          return Promise.resolve({ devices: MOCK_DEVICES });
+        case path === '/api/session':
+          return Promise.resolve(createMockSnapshot({
+            health: createMockHealth({ last_error: 'Test error message' }),
+          }));
+        case path === '/api/system/profile':
+          return Promise.resolve({
+            gpu: { available: true, name: 'RTX 4090', vram_gb: 24 },
+            cpu: { cores: 16, ram_gb: 64 },
+            storage: { free_gb: 500 },
+          });
+        case path === '/api/models/catalog':
+          return Promise.resolve({
+            catalog: MOCK_MODELS,
+            installed: [],
+            selected_asr_model_id: 'small',
+            refinement_mode: 'off',
+            recommendations: ['small'],
+          });
+        default:
+          return Promise.resolve({});
+      }
+    });
+
     mockedUseEventSource.mockReturnValue({
       status: 'connected',
       lastEvent: {
@@ -340,8 +477,12 @@ describe('App', () => {
       render(<App />);
     });
 
+    act(() => {
+      fireEvent.click(screen.getByText('System Audio'));
+    });
+
     await waitFor(() => {
-      expect(screen.getByText('Test error message')).toBeInTheDocument();
+      expect(screen.getByText('Long-form transcription')).toBeInTheDocument();
     });
   });
 });

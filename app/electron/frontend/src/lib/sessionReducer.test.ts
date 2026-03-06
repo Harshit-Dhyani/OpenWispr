@@ -164,22 +164,22 @@ describe('sessionReducer', () => {
 
     it('updates an existing segment when refinement arrives', () => {
       const current = buildInitialSnapshot();
-      const original = createMockSegment({ id: 'seg-1', text: 'hello world', display_text: 'hello world' });
+      const original = createMockSegment({ id: 'seg-1', text: 'project status update', display_text: 'project status update' });
       const withOriginal = applySegmentEvent(current, original);
 
       const refined = createMockSegment({
         id: 'seg-1',
-        text: 'hello world',
-        display_text: 'Hello world.',
-        raw_text: 'hello world',
-        refined_text: 'Hello world.',
+        text: 'project status update',
+        display_text: 'Project status update.',
+        raw_text: 'project status update',
+        refined_text: 'Project status update.',
         was_refined: true,
       });
 
       const result = applyRefinedSegmentEvent(withOriginal, refined);
 
       expect(result.transcript).toHaveLength(1);
-      expect(result.transcript[0].display_text).toBe('Hello world.');
+      expect(result.transcript[0].display_text).toBe('Project status update.');
       expect(result.transcript[0].was_refined).toBe(true);
     });
   });
@@ -313,11 +313,11 @@ describe('sessionReducer', () => {
       expect(state.transcript[0].is_partial).toBe(true);
 
       // Finalize segment
-      const final = createMockSegment({ text: 'Hello world', is_partial: false });
+      const final = createMockSegment({ text: 'Project status update', is_partial: false });
       state = applySegmentEvent(state, final);
 
       expect(state.transcript[0].is_partial).toBe(false);
-      expect(state.transcript[0].text).toBe('Hello world');
+      expect(state.transcript[0].text).toBe('Project status update');
 
       // Update health
       state = applyHealthEvent(state, {

@@ -1,6 +1,6 @@
 // Test utilities exports
 export * from './factories';
-export * from './utils';
+export { flushPromises, actAndFlush, waitForPromises, sleep, waitFor as waitForCondition } from './utils';
 
 // Re-export for convenience
 export { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';

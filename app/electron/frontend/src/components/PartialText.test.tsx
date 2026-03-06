@@ -4,9 +4,9 @@ import { PartialText } from './PartialText';
 
 describe('PartialText', () => {
   it('renders partial text content', () => {
-    render(<PartialText text="Hello world" />);
+    render(<PartialText text="Project status update" />);
     
-    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.getByText('Project status update')).toBeInTheDocument();
   });
 
   it('renders as draft by default', () => {

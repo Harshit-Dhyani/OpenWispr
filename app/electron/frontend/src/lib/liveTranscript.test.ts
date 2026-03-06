@@ -21,11 +21,11 @@ describe('liveTranscript', () => {
       segment_id: 'seg-1',
       revision: 3,
       stream_id: 'stream-1',
-      text: 'hello world',
+      text: 'project status update',
       start: 0,
       end: 1,
-      committed_text: 'hello',
-      draft_suffix: 'world',
+      committed_text: 'project',
+      draft_suffix: 'status update',
     });
 
     expect(shouldIgnoreLegacyPartial(draft, 'session-a')).toBe(true);
@@ -38,11 +38,11 @@ describe('liveTranscript', () => {
       segment_id: 'seg-1',
       revision: 1,
       stream_id: 'stream-1',
-      text: 'hello world',
+      text: 'project status update',
       start: 0,
       end: 1,
       committed_text: '',
-      draft_suffix: 'hello world',
+      draft_suffix: 'project status update',
     });
 
     const staleCommit = {
@@ -50,12 +50,12 @@ describe('liveTranscript', () => {
       segment_id: 'seg-1',
       revision: 2,
       stream_id: 'stream-1',
-      text: 'hello world',
+      text: 'project status update',
       start: 0,
       end: 1,
-      committed_text: 'hello world',
+      committed_text: 'project status update',
       draft_suffix: '',
-      segment: createMockSegment({ id: 'seg-1', text: 'hello world' }),
+      segment: createMockSegment({ id: 'seg-1', text: 'project status update' }),
     };
     const activeCommit = {
       ...staleCommit,
@@ -96,17 +96,17 @@ describe('liveTranscript', () => {
       segment: createMockSegment({ id: 'seg-1', text }),
     });
 
-    current = activeDraft(1, 'hello');
-    expect(current?.draftSuffix).toBe('hello');
+    current = activeDraft(1, 'project');
+    expect(current?.draftSuffix).toBe('project');
 
-    current = activeDraft(2, 'hello world', 'hello', 'world');
-    expect(current?.committedText).toBe('hello');
-    expect(current?.draftSuffix).toBe('world');
+    current = activeDraft(2, 'project status update', 'project', 'status update');
+    expect(current?.committedText).toBe('project');
+    expect(current?.draftSuffix).toBe('status update');
 
     current = clearLiveDraftForCommit(current, activeSessionId, makeCommit('session-b', 3, 'stale'));
-    expect(current?.draftSuffix).toBe('world');
+    expect(current?.draftSuffix).toBe('status update');
 
-    current = clearLiveDraftForCommit(current, activeSessionId, makeCommit(activeSessionId, 4, 'hello world'));
+    current = clearLiveDraftForCommit(current, activeSessionId, makeCommit(activeSessionId, 4, 'project status update'));
     expect(current).toBeNull();
 
     current = activeDraft(5, 'next chunk');

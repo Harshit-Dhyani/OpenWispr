@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SettingsPanel } from '../components/SettingsPanel';
-import { createMockSettings, createMockSystemProfile, createMockModelCatalogEntry } from './factories';
+import { SettingsPanel } from '../SettingsPanel';
+import { createMockSettings, createMockSystemProfile, createMockModelCatalogEntry } from '../../test/factories';
 
 describe('SettingsPanel', () => {
   const defaultProps = {
@@ -77,6 +77,10 @@ describe('SettingsPanel', () => {
     expect(screen.getByText('Transcription')).toBeInTheDocument();
     expect(screen.getByText('Audio')).toBeInTheDocument();
     expect(screen.getByText('Hotkey')).toBeInTheDocument();
+    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByText('Dictionary')).toBeInTheDocument();
+    expect(screen.getByText('Snippets')).toBeInTheDocument();
+    expect(screen.getByText('Style')).toBeInTheDocument();
     expect(screen.getByText('Advanced')).toBeInTheDocument();
   });
 
@@ -102,5 +106,58 @@ describe('SettingsPanel', () => {
     
     // Hardware profile should be passed to ModelSection
     expect(defaultProps.hardwareProfile).toBeDefined();
+  });
+
+  it('renders a keyboard-focusable scroll container for settings content', () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    const scrollContainer = screen.getByTestId('settings-scroll-container');
+    expect(scrollContainer).toHaveClass('overflow-y-auto');
+    expect(scrollContainer).toHaveAttribute('tabindex', '0');
+    expect(scrollContainer).toHaveAttribute('role', 'region');
+  });
+
+  it('shows the mic dictation language control under Transcription instead of Hotkey', () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Transcription'));
+    expect(screen.getByText('Mic Dictation Language')).toBeInTheDocument();
+    expect(screen.getByText('Transcription Mode')).toBeInTheDocument();
+    expect(screen.getByText('Refinement Profile')).toBeInTheDocument();
+    expect(screen.getByText('Finish Action')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Hotkey'));
+    expect(screen.queryByText('Mic Dictation Language')).not.toBeInTheDocument();
+    expect(screen.queryByText('Transcription Mode')).not.toBeInTheDocument();
+    expect(screen.queryByText('Refinement Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Finish Action')).not.toBeInTheDocument();
+  });
+
+  it('keeps model downloads/runtime controls under Models only', () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Models'));
+    expect(screen.getByText('Enable Local Refiner Runtime')).toBeInTheDocument();
+    expect(screen.queryByText('Refinement Profile')).not.toBeInTheDocument();
+  });
+
+  it('uses the app name instead of Electron in application info', () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Advanced'));
+    expect(screen.getByText('Transcripta')).toBeInTheDocument();
+    expect(screen.queryByText('Electron')).not.toBeInTheDocument();
+  });
+
+  it('shows mute-app-audio toggle under Audio settings', () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Audio\b/i }));
+
+    expect(
+      screen.getByText(
+        /Mute app audio during transcription|Mute App Audio During Dictation|Mute Transcripta renderer audio while microphone dictation is active/i,
+      ),
+    ).toBeInTheDocument();
   });
 });

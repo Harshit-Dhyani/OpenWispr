@@ -252,11 +252,11 @@ describe('useHotkey', () => {
     // Simulate state change with new text
     act(() => {
       if (stateChangeHandler) {
-        stateChangeHandler({}, createMockHotkeyState({ session: { current_text: 'Hello world' } }));
+        stateChangeHandler({}, createMockHotkeyState({ session: { current_text: 'Project status update' } }));
       }
     });
 
-    expect(onTextReady).toHaveBeenCalledWith('Hello world');
+    expect(onTextReady).toHaveBeenCalledWith('Project status update');
   });
 
   it('triggers onError callback when error occurs', async () => {

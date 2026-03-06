@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { HotkeyRecorder } from '../settings/HotkeyRecorder';
+import {
+  formatHotkeyCombo,
+  HotkeyRecorder,
+  normalizeAcceleratorFromKeyboardEvent,
+} from '../HotkeyRecorder';
 
 describe('HotkeyRecorder', () => {
   const defaultProps = {
-    value: 'Ctrl+Shift+Space',
+    value: 'CommandOrControl+Shift+Space',
     onChange: vi.fn(),
   };
 
@@ -12,59 +16,84 @@ describe('HotkeyRecorder', () => {
     vi.clearAllMocks();
   });
 
-  it('renders hotkey recorder with current value', () => {
+  it('renders normalized hotkeys with friendly labels', () => {
     render(<HotkeyRecorder {...defaultProps} />);
-    
+
     expect(screen.getByText('Ctrl+Shift+Space')).toBeInTheDocument();
+  });
+
+  it('shows None when no hotkey is configured', () => {
+    render(<HotkeyRecorder value="" onChange={vi.fn()} />);
+
+    expect(screen.getByText('None')).toBeInTheDocument();
   });
 
   it('enters recording mode when clicked', () => {
     render(<HotkeyRecorder {...defaultProps} />);
-    
-    const button = screen.getByRole('button');
-    fireEvent.click(button);
-    
-    expect(screen.getByText(/Press keys/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(screen.getByText(/Press key combination/i)).toBeInTheDocument();
   });
 
-  it('captures key combination when recording', () => {
+  it('captures Electron-compatible accelerators for modifier combos', () => {
     render(<HotkeyRecorder {...defaultProps} />);
-    
-    const button = screen.getByRole('button');
-    fireEvent.click(button);
-    
-    // Simulate key press
-    fireEvent.keyDown(button, { key: 'F1', code: 'F1', ctrlKey: true });
-    
-    expect(defaultProps.onChange).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.keyDown(window, { key: 't', ctrlKey: true, shiftKey: true });
+
+    expect(defaultProps.onChange).toHaveBeenCalledWith('CommandOrControl+Shift+T');
   });
 
-  it('clears value when clear button is clicked', () => {
+  it('captures function keys without modifiers', () => {
     render(<HotkeyRecorder {...defaultProps} />);
-    
-    // Look for clear button (typically has an X or "Clear" text)
-    const buttons = screen.getAllByRole('button');
-    const clearButton = buttons.find(btn => 
-      btn.textContent?.toLowerCase().includes('clear') ||
-      btn.getAttribute('aria-label')?.toLowerCase().includes('clear')
-    );
-    
-    if (clearButton) {
-      fireEvent.click(clearButton);
-      expect(defaultProps.onChange).toHaveBeenCalledWith('');
-    }
+
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.keyDown(window, { key: 'F9' });
+
+    expect(defaultProps.onChange).toHaveBeenCalledWith('F9');
   });
 
   it('disables interaction when disabled prop is true', () => {
-    render(<HotkeyRecorder {...defaultProps} disabled={true} />);
-    
-    const button = screen.getByRole('button');
-    expect(button).toBeDisabled();
+    render(<HotkeyRecorder {...defaultProps} disabled />);
+
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+});
+
+describe('normalizeAcceleratorFromKeyboardEvent', () => {
+  it('normalizes browser modifier names to Electron accelerators', () => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'y',
+      ctrlKey: true,
+      altKey: true,
+    });
+
+    expect(normalizeAcceleratorFromKeyboardEvent(event)).toBe('CommandOrControl+Alt+Y');
   });
 
-  it('shows placeholder when no value', () => {
-    render(<HotkeyRecorder value="" onChange={vi.fn()} />);
-    
-    expect(screen.getByText(/Click to record/i)).toBeInTheDocument();
+  it('treats space as a valid accelerator key', () => {
+    const event = new KeyboardEvent('keydown', {
+      key: ' ',
+      ctrlKey: true,
+      shiftKey: true,
+    });
+
+    expect(normalizeAcceleratorFromKeyboardEvent(event)).toBe('CommandOrControl+Shift+Space');
+  });
+
+  it('ignores modifier-only key presses', () => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'Control',
+      ctrlKey: true,
+    });
+
+    expect(normalizeAcceleratorFromKeyboardEvent(event)).toBeNull();
+  });
+});
+
+describe('formatHotkeyCombo', () => {
+  it('formats stored accelerators for display', () => {
+    expect(formatHotkeyCombo('CommandOrControl+Super+T')).toBe('Ctrl+Win+T');
   });
 });
