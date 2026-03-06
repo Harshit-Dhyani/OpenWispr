@@ -95,6 +95,7 @@ export const SETTING_LABELS = {
   "noiseFiltering": "Noise Filtering",
   "echoCancellation": "Echo Cancellation",
   "autoGainControl": "Auto Gain Control",
+  "mute_transcripta_audio_during_dictation": "Mute App Audio During Dictation",
   "enabled": "Enable Global Hotkey",
   "key_combination": "Key Combination",
   "hold_mode": "Hold Mode",
@@ -158,6 +159,7 @@ export const SETTING_DESCRIPTIONS = {
   "noiseFiltering": "Reduce background noise",
   "echoCancellation": "Remove echo from speakers",
   "autoGainControl": "Automatically adjust input volume",
+  "mute_transcripta_audio_during_dictation": "Mute Transcripta renderer audio while microphone dictation is active",
   "enabled": "Activate transcription from anywhere using a hotkey",
   "key_combination": "Press the button to record a new hotkey",
   "hold_mode": "Record while holding the hotkey",
@@ -188,7 +190,10 @@ export const THEME_LABELS = {
   "light": "Light (Lawn)",
   "dark": "Dark (Night)",
   "cyber": "Cyberpunk",
-  "dracula": "Dracula"
+  "dracula": "Dracula",
+  "ocean": "Ocean",
+  "sunset": "Sunset",
+  "forest": "Forest"
 } as const;
 
 // ============================================
@@ -234,7 +239,8 @@ export const SAMPLE_RATE_LABELS: Record<string, string> = {
 // ============================================
 export const FINISH_ACTION_LABELS = {
   "finish": "Finish Only",
-  "finish_and_paste": "Finish & Paste"
+  "finish_and_paste": "Finish & Paste",
+  "cancel": "Cancel"
 } as const;
 
 // ============================================
@@ -282,6 +288,17 @@ export const REFINEMENT_MODE_LABELS = {
   "off": "Off (No refinement)",
   "strict": "Strict (Minor corrections)",
   "polished": "Polished (Full rewrite)"
+} as const;
+
+// ============================================
+// Refinement Profile Labels
+// ============================================
+export const REFINEMENT_PROFILE_LABELS = {
+  "raw": "Raw",
+  "clean_dictation": "Clean Dictation",
+  "professional": "Professional",
+  "student_notes": "Student Notes",
+  "code_logs": "Code / Logs Mode"
 } as const;
 
 // ============================================
@@ -462,6 +479,8 @@ export const SETTINGS_SECTION_TEXT = {
     "audio_backend_description": "Choose which Windows capture backend Transcripta should prefer",
     "sample_rate_title": "Sample Rate",
     "sample_rate_description": "Audio sample rate - 16kHz is recommended for speech recognition",
+    "mute_during_dictation_title": "Mute App Audio During Dictation",
+    "mute_during_dictation_description": "Silence Transcripta window audio while microphone dictation is active",
     "vad_group_title": "Voice Activity Detection",
     "vad_toggle_title": "Enable VAD",
     "vad_toggle_description": "Automatically detect speech vs silence",
@@ -515,7 +534,21 @@ export const SETTINGS_SECTION_TEXT = {
     "hotkey_optimized_description": "Optimize for quick hotkey-triggered sessions",
     "max_workers_title": "Max Workers",
     "max_workers_description": "Number of parallel transcription workers",
-    "not_installed_suffix": " (not installed)"
+    "not_installed_suffix": " (not installed)",
+    "refinement_mode_title": "Refinement Intensity",
+    "refinement_mode_description": "Off keeps deterministic cleanup only. Strict keeps wording locked. Polished allows more finish-time cleanup.",
+    "refinement_profile_title": "Refinement Profile",
+    "refinement_profile_description": "Choose how optional finish-time cleanup should shape the final transcript when the local refiner is enabled.",
+    "refinement_toggle_title": "Enable Finish-time Refiner",
+    "refinement_toggle_description": "Run the optional local refiner after the deterministic final transcript is built.",
+    "cleanup_instructions_title": "Cleanup Instructions",
+    "cleanup_instructions_description": "Optional extra instructions for finish-time cleanup. Applied only after final transcription, never to live partials.",
+    "finish_mode_title": "Finish Action",
+    "finish_mode_description": "Choose what happens when hotkey dictation stops.",
+    "hotkey_summary_title": "Hotkey Shortcuts",
+    "hotkey_summary_description": "Current microphone and system shortcuts used to start or stop dictation.",
+    "profile_summary_title": "Active Profile Summary",
+    "profile_summary_description": "The currently active transcription profile combines preset tuning, language, finish action, and refinement behavior."
   },
   "models": {
     "title": "Model Manager",

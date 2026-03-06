@@ -148,7 +148,7 @@ export function ModelCatalogBlock({
                             : 'Calculating…'}
                         </span>
                       </div>
-                      <div className="h-2 border border-lawn-border bg-white overflow-hidden">
+                      <div className="h-2 border border-lawn-border bg-lawn-bg overflow-hidden">
                         <div
                           className="h-full bg-lawn-accent transition-all"
                           style={{

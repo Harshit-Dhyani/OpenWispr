@@ -3,8 +3,8 @@ import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
 import { Toggle, Slider, Select } from '../controls';
 import type { SectionProps } from '../types';
-import { isFakeSetting } from '../../../lib/settingsSchema';
 import { SETTINGS_SECTION_TEXT, CAPTURE_MODE_LABELS, AUDIO_BACKEND_LABELS, SAMPLE_RATE_LABELS } from '../../../config/text';
+import { RENDERER_STRINGS } from '../../../strings/en';
 
 export function AudioSection({
   settings,
@@ -14,6 +14,7 @@ export function AudioSection({
   resetSetting,
 }: SectionProps) {
   const text = SETTINGS_SECTION_TEXT.audio;
+  const audioText = RENDERER_STRINGS.settings.audio;
   const defaultCaptureSource = settings.audio.default_capture_source ?? settings.audio.captureMode;
   const filteredDevices = audioDevices.filter((device) =>
     defaultCaptureSource === 'system'
@@ -63,7 +64,7 @@ export function AudioSection({
             value={settings.audio.defaultDeviceId}
             options={filteredDevices.map((d) => ({
                 value: d.id,
-                label: `${d.name}${d.is_loopback || d.supports_loopback ? ' [rec]' : ''}`,
+                label: `${d.name}${d.is_loopback || d.supports_loopback ? audioText.recordingDeviceSuffix : ''}`,
               }))}
             onChange={(v) => updateSetting('audio', 'defaultDeviceId', v)}
           />
@@ -102,6 +103,18 @@ export function AudioSection({
               { value: '48000', label: SAMPLE_RATE_LABELS['48000'] },
             ]}
             onChange={(v) => updateSetting('audio', 'sampleRate', parseInt(v))}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={audioText.muteTranscriptaAudioDuringDictationTitle}
+          description={audioText.muteTranscriptaAudioDuringDictationDescription}
+          changed={isChanged('audio', 'mute_transcripta_audio_during_dictation')}
+          onReset={() => resetSetting('audio', 'mute_transcripta_audio_during_dictation')}
+        >
+          <Toggle
+            checked={Boolean(settings.audio.mute_transcripta_audio_during_dictation)}
+            onChange={(value) => updateSetting('audio', 'mute_transcripta_audio_during_dictation', value)}
           />
         </SettingCard>
 
@@ -146,48 +159,23 @@ export function AudioSection({
             <Layers className="w-4 h-4 text-lawn-accent" />
             {text.processing_group_title}
           </h4>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">{text.noise_filtering_title}</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">{text.coming_soon}</span>
-                </div>
-                <p className="text-xs text-stone-500">{text.noise_filtering_description}</p>
-              </div>
-              <Toggle
-                checked={settings.audio.noiseFiltering}
-                onChange={(v) => updateSetting('audio', 'noiseFiltering', v)}
-                disabled={isFakeSetting('audio', 'noiseFiltering')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">{text.echo_cancellation_title}</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">{text.coming_soon}</span>
-                </div>
-                <p className="text-xs text-stone-500">{text.echo_cancellation_description}</p>
-              </div>
-              <Toggle
-                checked={settings.audio.echoCancellation}
-                onChange={(v) => updateSetting('audio', 'echoCancellation', v)}
-                disabled={isFakeSetting('audio', 'echoCancellation')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">{text.auto_gain_control_title}</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">{text.coming_soon}</span>
-                </div>
-                <p className="text-xs text-stone-500">{text.auto_gain_control_description}</p>
-              </div>
-              <Toggle
-                checked={settings.audio.autoGainControl}
-                onChange={(v) => updateSetting('audio', 'autoGainControl', v)}
-                disabled={isFakeSetting('audio', 'autoGainControl')}
-              />
+          <div className="space-y-3">
+            <p className="text-xs text-stone-500">
+              Advanced audio post-processing is hidden by default until it has verified runtime support.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                text.noise_filtering_title,
+                text.echo_cancellation_title,
+                text.auto_gain_control_title,
+              ].map((label) => (
+                <span
+                  key={label}
+                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
+                >
+                  {label} · {text.coming_soon}
+                </span>
+              ))}
             </div>
           </div>
         </div>

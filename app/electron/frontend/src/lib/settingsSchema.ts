@@ -82,6 +82,8 @@ export const transcriptionSettingsSchema = z.object({
   microphone_asr_model_id: z.string().default('whisper-medium'),
   system_asr_model_id: z.string().default('whisper-medium'),
   refinement_mode: z.enum(VALID_REFINEMENT_MODES).default(RefinerConstants.DEFAULT_REFINEMENT_MODE),
+  refinement_profile: z.enum(['raw', 'clean_dictation', 'professional', 'student_notes', 'code_logs']).default('raw'),
+  transcription_mode: z.enum(['dictation', 'literal', 'session_paragraph']).default('dictation'),
   compute_type: z.enum(VALID_COMPUTE_TYPES).default(ModelConstants.DEFAULT_COMPUTE_TYPE),
   chunk_duration: z.number()
     .min(SettingsBounds.CHUNK_DURATION_MIN)
@@ -165,6 +167,7 @@ export const audioSettingsSchema = z.object({
   noiseFiltering: z.boolean().default(true),
   echoCancellation: z.boolean().default(true),
   autoGainControl: z.boolean().default(true),
+  mute_transcripta_audio_during_dictation: z.boolean().default(false),
 });
 
 export type AudioSettings = z.infer<typeof audioSettingsSchema>;
@@ -182,7 +185,9 @@ export const hotkeySettingsSchema = z.object({
   language: z.string().default(UIConstants.DEFAULT_LANGUAGE),
   capture_source: z.enum(['system', 'microphone']).default('microphone'),
   device_id: z.string().default(AudioConstants.DEFAULT_CAPTURE_DEVICE_ID),
-  finish_mode_default: z.enum(['finish', 'finish_and_paste']).default('finish_and_paste'),
+  finish_mode_default: z.enum(['finish', 'finish_and_paste', 'cancel']).default('finish_and_paste'),
+  enable_refiner_on_stop: z.boolean().default(false),
+  save_debug_wav: z.boolean().default(false),
   show_floating_window: z.boolean().default(true),
   floating_window_position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']).default('bottom-right'),
   record_on_start: z.boolean().default(false),
@@ -191,6 +196,93 @@ export const hotkeySettingsSchema = z.object({
 });
 
 export type HotkeySettings = z.infer<typeof hotkeySettingsSchema>;
+
+export const coachPromptOverridesSchema = z.object({
+  tone: z.enum(['neutral', 'friendly', 'strict']).default('neutral'),
+  aggressiveness: z.enum(['light', 'medium', 'strong']).default('light'),
+  filler_removal: z.boolean().default(true),
+  keep_slang: z.boolean().default(true),
+  target_style: z.enum(['email', 'chat', 'formal', 'simple']).default('simple'),
+});
+
+export type CoachPromptOverrides = z.infer<typeof coachPromptOverridesSchema>;
+
+export const coachPromptTemplateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  version: z.number().int().min(1).default(1),
+  system: z.string().min(1),
+  user_template: z.string().min(1),
+  enabled: z.boolean().default(true),
+  built_in: z.boolean().default(false),
+});
+
+export type CoachPromptTemplate = z.infer<typeof coachPromptTemplateSchema>;
+
+export const coachSettingsSchema = z.object({
+  coach_enabled: z.boolean().default(true),
+  coach_show_live_hints: z.boolean().default(false),
+  coach_detail_level: z.enum(['compact', 'standard', 'deep']).default('compact'),
+  copy_polished_by_default: z.boolean().default(true),
+  show_diff_view: z.boolean().default(true),
+  coach_template_id_mic: z.string().default('default_english_coach'),
+  coach_template_id_system: z.string().default('default_english_coach'),
+  coach_prompt_custom_enabled: z.boolean().default(false),
+  coach_prompt_custom_text: z.string().default(''),
+  coach_overrides: coachPromptOverridesSchema.default({
+    tone: 'neutral',
+    aggressiveness: 'light',
+    filler_removal: true,
+    keep_slang: true,
+    target_style: 'simple',
+  }),
+  privacy_mode: z.enum(['local_only', 'allow_llm']).default('local_only'),
+  show_floating_coach_result: z.boolean().default(true),
+  coach_prompt_templates: z.array(coachPromptTemplateSchema).default([
+    {
+      id: 'default_english_coach',
+      name: 'Default English Coach',
+      version: 1,
+      system:
+        'You are an English writing coach for dictation transcripts.\nYou must preserve the speakers meaning and tone.\nYou must NOT add new facts.\nPrefer minimal edits.\nOutput MUST be valid JSON only, matching the schema exactly.',
+      user_template:
+        'Language mode: {language_mode}\nDetail level: {detail_level}\nOverrides JSON: {overrides_json}\n\nOriginal transcript:\n{original_text}\n\nTask:\n1) Produce "polished" that reads naturally (single paragraph unless clearly multiple).\n2) Provide "diff" operations aligned to the original string indices where possible. If exact indices are hard, provide approximate ranges but keep them consistent.\n3) Provide 2–5 short tips.\n4) Provide up to 5 mistakes with fixes and short explanations.\n5) Provide one short practice rewrite.\n\nReturn JSON with keys: original, polished, diff, tips, mistakes, practice, meta.',
+      enabled: true,
+      built_in: true,
+    },
+  ]),
+});
+
+export type CoachSettings = z.infer<typeof coachSettingsSchema>;
+
+export const historySettingsSchema = z.object({
+  retention_days: z.number().int().min(1).max(3650).default(30),
+  persist_audio: z.boolean().default(true),
+  allow_retry: z.boolean().default(true),
+  default_analytics_range_days: z.union([z.literal('all'), z.number().int().min(1).max(3650)]).default(7),
+});
+
+export type HistorySettings = z.infer<typeof historySettingsSchema>;
+
+export const dictionarySettingsSchema = z.object({
+  dictionary_enabled: z.boolean().default(true),
+});
+
+export type DictionarySettings = z.infer<typeof dictionarySettingsSchema>;
+
+export const snippetsSettingsSchema = z.object({
+  snippets_enabled: z.boolean().default(true),
+  snippets_quick_insert: z.boolean().default(false),
+});
+
+export type SnippetsSettings = z.infer<typeof snippetsSettingsSchema>;
+
+export const styleSettingsSchema = z.object({
+  style_default_profile: z.string().default('casual'),
+  style_apply_enabled: z.boolean().default(true),
+});
+
+export type StyleSettings = z.infer<typeof styleSettingsSchema>;
 
 // ============================================
 // Advanced Settings Schema
@@ -218,6 +310,11 @@ export const settingsStateSchema = z.object({
   refiner: refinerSettingsSchema,
   audio: audioSettingsSchema,
   hotkey: hotkeySettingsSchema,
+  coach: coachSettingsSchema,
+  history: historySettingsSchema,
+  dictionary: dictionarySettingsSchema,
+  snippets: snippetsSettingsSchema,
+  style: styleSettingsSchema,
   advanced: advancedSettingsSchema,
   version: z.number().default(SETTINGS_VERSION),
 });
@@ -244,6 +341,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
     microphone_asr_model_id: 'whisper-medium',
     system_asr_model_id: 'whisper-medium',
     refinement_mode: RefinerConstants.DEFAULT_REFINEMENT_MODE,
+    refinement_profile: 'raw',
+    transcription_mode: 'dictation',
     compute_type: ModelConstants.DEFAULT_COMPUTE_TYPE,
     chunk_duration: AudioConstants.DEFAULT_CHUNK_SECONDS,
     overlap_ratio: AudioConstants.DEFAULT_OVERLAP_SECONDS / AudioConstants.DEFAULT_CHUNK_SECONDS,
@@ -279,6 +378,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
     noiseFiltering: true,
     echoCancellation: true,
     autoGainControl: true,
+    mute_transcripta_audio_during_dictation: false,
   },
   hotkey: {
     enabled: false,
@@ -291,11 +391,63 @@ export const DEFAULT_SETTINGS: SettingsState = {
     capture_source: 'microphone',
     device_id: AudioConstants.DEFAULT_CAPTURE_DEVICE_ID,
     finish_mode_default: 'finish_and_paste',
+    enable_refiner_on_stop: false,
+    save_debug_wav: false,
     show_floating_window: true,
     floating_window_position: 'bottom-right',
     record_on_start: false,
     stop_on_release: false,
     copy_to_clipboard: true,
+  },
+  coach: {
+    coach_enabled: true,
+    coach_show_live_hints: false,
+    coach_detail_level: 'compact',
+    copy_polished_by_default: true,
+    show_diff_view: true,
+    coach_template_id_mic: 'default_english_coach',
+    coach_template_id_system: 'default_english_coach',
+    coach_prompt_custom_enabled: false,
+    coach_prompt_custom_text: '',
+    coach_overrides: {
+      tone: 'neutral',
+      aggressiveness: 'light',
+      filler_removal: true,
+      keep_slang: true,
+      target_style: 'simple',
+    },
+    privacy_mode: 'local_only',
+    show_floating_coach_result: true,
+    coach_prompt_templates: [
+      {
+        id: 'default_english_coach',
+        name: 'Default English Coach',
+        version: 1,
+        system:
+          'You are an English writing coach for dictation transcripts.\nYou must preserve the speakers meaning and tone.\nYou must NOT add new facts.\nPrefer minimal edits.\nOutput MUST be valid JSON only, matching the schema exactly.',
+        user_template:
+          'Language mode: {language_mode}\nDetail level: {detail_level}\nOverrides JSON: {overrides_json}\n\nOriginal transcript:\n{original_text}\n\nTask:\n1) Produce "polished" that reads naturally (single paragraph unless clearly multiple).\n2) Provide "diff" operations aligned to the original string indices where possible. If exact indices are hard, provide approximate ranges but keep them consistent.\n3) Provide 2–5 short tips.\n4) Provide up to 5 mistakes with fixes and short explanations.\n5) Provide one short practice rewrite.\n\nReturn JSON with keys: original, polished, diff, tips, mistakes, practice, meta.',
+        enabled: true,
+        built_in: true,
+      },
+    ],
+  },
+  history: {
+    retention_days: 30,
+    persist_audio: true,
+    allow_retry: true,
+    default_analytics_range_days: 7,
+  },
+  dictionary: {
+    dictionary_enabled: true,
+  },
+  snippets: {
+    snippets_enabled: true,
+    snippets_quick_insert: false,
+  },
+  style: {
+    style_default_profile: 'casual',
+    style_apply_enabled: true,
   },
   advanced: {
     debugMode: false,
@@ -434,6 +586,7 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
   { key: 'noiseFiltering', type: 'boolean', label: SETTING_LABELS.noiseFiltering, description: SETTING_DESCRIPTIONS.noiseFiltering, category: 'audio', isFake: true },
   { key: 'echoCancellation', type: 'boolean', label: SETTING_LABELS.echoCancellation, description: SETTING_DESCRIPTIONS.echoCancellation, category: 'audio', isFake: true },
   { key: 'autoGainControl', type: 'boolean', label: SETTING_LABELS.autoGainControl, description: SETTING_DESCRIPTIONS.autoGainControl, category: 'audio', isFake: true },
+  { key: 'mute_transcripta_audio_during_dictation', type: 'boolean', label: 'Mute App Audio During Dictation', description: 'Silence Transcripta renderer audio while microphone dictation is active.', category: 'audio' },
 
   // Hotkey
   { key: 'enabled', type: 'boolean', label: SETTING_LABELS.enabled, description: SETTING_DESCRIPTIONS.enabled, category: 'hotkey' },
@@ -451,7 +604,10 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
   { key: 'finish_mode_default', type: 'enum', label: SETTING_LABELS.finish_mode_default, description: SETTING_DESCRIPTIONS.finish_mode_default, category: 'hotkey', options: [
     { value: 'finish', label: FINISH_ACTION_LABELS.finish },
     { value: 'finish_and_paste', label: FINISH_ACTION_LABELS.finish_and_paste },
+    { value: 'cancel', label: FINISH_ACTION_LABELS.cancel },
   ]},
+  { key: 'enable_refiner_on_stop', type: 'boolean', label: 'Enable Refiner on Dictation Stop', description: 'Run the text refiner after hotkey dictation stops.', category: 'hotkey' },
+  { key: 'save_debug_wav', type: 'boolean', label: 'Save Hotkey Debug WAV', description: 'Write captured dictation audio to logs/hotkey-debug when dictation stops.', category: 'hotkey' },
   { key: 'show_floating_window', type: 'boolean', label: SETTING_LABELS.show_floating_window, description: SETTING_DESCRIPTIONS.show_floating_window, category: 'hotkey' },
   { key: 'floating_window_position', type: 'enum', label: SETTING_LABELS.floating_window_position, description: SETTING_DESCRIPTIONS.floating_window_position, category: 'hotkey', options: [
     { value: 'top-left', label: FLOATING_POSITION_LABELS['top-left'] },

@@ -7,47 +7,127 @@ interface HotkeyRecorderProps {
   disabled?: boolean;
 }
 
+const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta']);
+
+const DISPLAY_MAP: Record<string, string> = {
+  CommandOrControl: 'Ctrl',
+  Control: 'Ctrl',
+  Ctrl: 'Ctrl',
+  Shift: 'Shift',
+  Alt: 'Alt',
+  Super: 'Win',
+  Meta: 'Win',
+  Command: 'Cmd',
+  ' ': 'Space',
+};
+
+const KEY_NAME_MAP: Record<string, string> = {
+  ' ': 'Space',
+  Spacebar: 'Space',
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+  Escape: 'Escape',
+  Esc: 'Escape',
+  Enter: 'Enter',
+  Return: 'Enter',
+  Tab: 'Tab',
+  Backspace: 'Backspace',
+  Delete: 'Delete',
+  Del: 'Delete',
+  Insert: 'Insert',
+  Home: 'Home',
+  End: 'End',
+  PageUp: 'PageUp',
+  PageDown: 'PageDown',
+  Plus: 'Plus',
+};
+
+function normalizeKeyName(key: string): string | null {
+  if (!key || MODIFIER_KEYS.has(key)) {
+    return null;
+  }
+
+  if (KEY_NAME_MAP[key]) {
+    return KEY_NAME_MAP[key];
+  }
+
+  if (/^F\d{1,2}$/i.test(key)) {
+    return key.toUpperCase();
+  }
+
+  if (/^[a-z]$/i.test(key)) {
+    return key.toUpperCase();
+  }
+
+  if (/^[0-9]$/.test(key)) {
+    return key;
+  }
+
+  if (key.length === 1) {
+    return key.toUpperCase();
+  }
+
+  return key;
+}
+
+export function normalizeAcceleratorFromKeyboardEvent(event: KeyboardEvent): string | null {
+  const parts: string[] = [];
+
+  if (event.ctrlKey) {
+    parts.push('CommandOrControl');
+  }
+  if (event.altKey) {
+    parts.push('Alt');
+  }
+  if (event.shiftKey) {
+    parts.push('Shift');
+  }
+  if (event.metaKey) {
+    parts.push('Super');
+  }
+
+  const keyName = normalizeKeyName(event.key);
+  if (keyName) {
+    parts.push(keyName);
+  }
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  if (parts.length === 1 && !/^F\d{1,2}$/i.test(parts[0])) {
+    return null;
+  }
+
+  return parts.join('+');
+}
+
+export function formatHotkeyCombo(combo: string): string {
+  if (!combo) {
+    return 'None';
+  }
+
+  return combo
+    .split('+')
+    .map((key) => DISPLAY_MAP[key] || key)
+    .join('+');
+}
+
 export function HotkeyRecorder({ value, onChange, disabled = false }: HotkeyRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
-
-  const formatKeyCombo = (combo: string): string => {
-    if (!combo) return 'None';
-    const displayMap: Record<string, string> = {
-      Control: 'Ctrl',
-      Shift: 'Shift',
-      Alt: 'Alt',
-      Meta: 'Win',
-      ' ': 'Space',
-    };
-    return combo
-      .split('+')
-      .map((key) => displayMap[key] || key)
-      .join(' + ');
-  };
 
   const startRecording = () => {
     if (disabled) return;
     setIsRecording(true);
-    const keysPressed = new Set<string>();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
-      if (e.ctrlKey) keysPressed.add('Control');
-      if (e.shiftKey) keysPressed.add('Shift');
-      if (e.altKey) keysPressed.add('Alt');
-      if (e.metaKey) keysPressed.add('Meta');
-
-      if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
-        keysPressed.add(e.key);
-      }
-
-      const hasModifier = e.ctrlKey || e.shiftKey || e.altKey || e.metaKey;
-      const isFKey = /^F\d+$/.test(e.key);
-
-      if ((hasModifier && keysPressed.size >= 2) || isFKey) {
-        const combo = Array.from(keysPressed).join('+');
+      const combo = normalizeAcceleratorFromKeyboardEvent(e);
+      if (combo) {
         stopRecording(combo);
       }
     };
@@ -85,7 +165,7 @@ export function HotkeyRecorder({ value, onChange, disabled = false }: HotkeyReco
       {isRecording ? (
         <span className="text-sm font-bold text-lawn-accent">Press key combination...</span>
       ) : (
-        <span className="text-sm font-mono font-bold">{formatKeyCombo(value)}</span>
+        <span className="text-sm font-mono font-bold">{formatHotkeyCombo(value)}</span>
       )}
     </button>
   );

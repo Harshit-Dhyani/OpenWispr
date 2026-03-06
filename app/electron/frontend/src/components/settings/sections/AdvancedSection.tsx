@@ -3,7 +3,8 @@ import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
 import { Toggle, Select, NumberInput } from '../controls';
 import type { SectionProps } from '../types';
-import { isFakeSetting } from '../../../lib/settingsSchema';
+import { AppConstants } from '../../../config/generated/constants';
+import { RENDERER_STRINGS } from '../../../strings/en';
 
 interface AdvancedSectionProps extends SectionProps {
   saveError: string | null;
@@ -17,21 +18,23 @@ export function AdvancedSection({
   resetSetting,
   saveError,
 }: AdvancedSectionProps) {
+  const text = RENDERER_STRINGS.settings.advanced;
+  const common = RENDERER_STRINGS.settings.common;
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Advanced Settings"
+        title={text.title}
         icon={Cpu}
-        description="Expert configuration and developer options"
+        description={text.description}
       />
 
       <div className="border-2 border-theme-error/30 bg-theme-error/5 p-4">
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-theme-error flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-bold text-theme-error">Warning</h4>
+            <h4 className="text-sm font-bold text-theme-error">{text.warningTitle}</h4>
             <p className="text-xs text-stone-600 mt-1">
-              These settings are intended for advanced users. Incorrect values may cause instability or poor performance.
+              {text.warningDescription}
             </p>
           </div>
         </div>
@@ -42,7 +45,7 @@ export function AdvancedSection({
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-theme-error flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-theme-error">Error</h4>
+              <h4 className="text-sm font-bold text-theme-error">{text.errorTitle}</h4>
               <p className="text-xs text-stone-600 mt-1">{saveError}</p>
             </div>
           </div>
@@ -53,13 +56,13 @@ export function AdvancedSection({
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-lawn-accent" />
-            Debugging
+            {text.debuggingTitle}
           </h4>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <span className="text-sm font-bold block">Debug Mode</span>
-                <p className="text-xs text-stone-500">Enable verbose logging and diagnostics</p>
+                <span className="text-sm font-bold block">{text.debugModeTitle}</span>
+                <p className="text-xs text-stone-500">{text.debugModeDescription}</p>
               </div>
               <Toggle
                 checked={settings.advanced.debugMode}
@@ -67,25 +70,22 @@ export function AdvancedSection({
               />
             </div>
             <SettingCard
-              title="Log Level"
-              description="Minimum severity for log messages"
+              title={text.logLevelTitle}
+              description={text.logLevelDescription}
               changed={isChanged('advanced', 'logLevel')}
               onReset={() => resetSetting('advanced', 'logLevel')}
             >
               <Select
                 value={settings.advanced.logLevel}
                 options={[
-                  { value: 'DEBUG', label: 'Debug (Most Verbose)' },
-                  { value: 'INFO', label: 'Info' },
-                  { value: 'WARN', label: 'Warning' },
-                  { value: 'ERROR', label: 'Error (Least Verbose)' },
+                  ...text.logLevelOptions,
                 ]}
                 onChange={(v) => updateSetting('advanced', 'logLevel', v)}
               />
             </SettingCard>
             <SettingCard
-              title="Max Log Files"
-              description="Number of log files to retain"
+              title={text.maxLogFilesTitle}
+              description={text.maxLogFilesDescription}
               changed={isChanged('advanced', 'maxLogFiles')}
               onReset={() => resetSetting('advanced', 'maxLogFiles')}
             >
@@ -102,41 +102,23 @@ export function AdvancedSection({
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
             <Zap className="w-4 h-4 text-lawn-accent" />
-            Experimental Features
+            {text.experimentalTitle}
           </h4>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">Enhanced STEM Detection</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">Coming Soon</span>
-                </div>
-                <p className="text-xs text-stone-500">Advanced formula and equation recognition</p>
-              </div>
-              <Toggle
-                checked={settings.advanced.experimentalStem}
-                onChange={(v) => updateSetting('advanced', 'experimentalStem', v)}
-                disabled={isFakeSetting('advanced', 'experimentalStem')}
-              />
+            <div className="flex flex-wrap gap-2">
+              {[text.enhancedStemTitle, text.gpuAccelerationTitle].map((label) => (
+                <span
+                  key={label}
+                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
+                >
+                  {label} · {common.comingSoon}
+                </span>
+              ))}
             </div>
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">GPU Acceleration</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">Coming Soon</span>
-                </div>
-                <p className="text-xs text-stone-500">Use GPU for pre-processing when available</p>
-              </div>
-              <Toggle
-                checked={settings.advanced.experimentalGpuAccel}
-                onChange={(v) => updateSetting('advanced', 'experimentalGpuAccel', v)}
-                disabled={isFakeSetting('advanced', 'experimentalGpuAccel')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-bold block">Enable Metrics</span>
-                <p className="text-xs text-stone-500">Collect and report performance metrics</p>
+                <span className="text-sm font-bold block">{text.metricsTitle}</span>
+                <p className="text-xs text-stone-500">{text.metricsDescription}</p>
               </div>
               <Toggle
                 checked={settings.advanced.enableMetrics}
@@ -149,24 +131,24 @@ export function AdvancedSection({
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
             <Info className="w-4 h-4 text-lawn-accent" />
-            Application Info
+            {text.appInfoTitle}
           </h4>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="border border-lawn-border bg-lawn-bg p-3">
-              <span className="text-stone-500 text-xs block">Version</span>
+              <span className="text-stone-500 text-xs block">{text.appInfoLabels.version}</span>
               <span className="font-bold">1.0.0</span>
             </div>
             <div className="border border-lawn-border bg-lawn-bg p-3">
-              <span className="text-stone-500 text-xs block">Platform</span>
-              <span className="font-bold">{hardwareProfile?.platform || 'Unknown'}</span>
+              <span className="text-stone-500 text-xs block">{text.appInfoLabels.platform}</span>
+              <span className="font-bold">{hardwareProfile?.platform || RENDERER_STRINGS.settings.common.unknown}</span>
             </div>
             <div className="border border-lawn-border bg-lawn-bg p-3">
-              <span className="text-stone-500 text-xs block">Build</span>
-              <span className="font-bold">Release</span>
+              <span className="text-stone-500 text-xs block">{text.appInfoLabels.build}</span>
+              <span className="font-bold">{RENDERER_STRINGS.settings.common.release}</span>
             </div>
             <div className="border border-lawn-border bg-lawn-bg p-3">
-              <span className="text-stone-500 text-xs block">Electron</span>
-              <span className="font-bold">Latest</span>
+              <span className="text-stone-500 text-xs block">{AppConstants.APP_NAME}</span>
+              <span className="font-bold">{RENDERER_STRINGS.settings.common.latest}</span>
             </div>
           </div>
         </div>

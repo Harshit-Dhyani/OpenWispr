@@ -20,6 +20,8 @@ export const PRESETS: OptimizationPreset[] = [
       overlap_ratio: 0.18,
       min_segment_length: 0.35,
       enable_filler_filter: false,
+      refinement_mode: 'strict',
+      refinement_profile: 'clean_dictation',
     },
   },
   {
@@ -37,6 +39,8 @@ export const PRESETS: OptimizationPreset[] = [
       temperature: 0.0,
       vad_threshold_db: -45,
       confidence_threshold: 0.7,
+      refinement_mode: 'polished',
+      refinement_profile: 'professional',
     },
   },
   {
@@ -54,6 +58,8 @@ export const PRESETS: OptimizationPreset[] = [
       temperature: 0.0,
       vad_threshold_db: -40,
       confidence_threshold: 0.6,
+      refinement_mode: 'strict',
+      refinement_profile: 'clean_dictation',
     },
   },
   {
@@ -72,6 +78,8 @@ export const PRESETS: OptimizationPreset[] = [
       vad_threshold_db: -35,
       confidence_threshold: 0.5,
       chunk_duration: 1.0,
+      refinement_mode: 'off',
+      refinement_profile: 'raw',
     },
   },
   {
@@ -92,6 +100,8 @@ export const PRESETS: OptimizationPreset[] = [
       chunk_duration: 0.8,
       use_parallel_processing: false,
       preload_model: false,
+      refinement_mode: 'off',
+      refinement_profile: 'raw',
     },
   },
 ];

@@ -7,7 +7,18 @@ import type {
 import type { SettingsState, HotkeySettings } from '../../lib/settingsSchema';
 import type { ModelManagerState } from '../../lib/modelRegistry';
 
-export type SettingsCategory = 'general' | 'models' | 'transcription' | 'audio' | 'hotkey' | 'advanced';
+export type SettingsCategory =
+  | 'general'
+  | 'models'
+  | 'transcription'
+  | 'audio'
+  | 'hotkey'
+  | 'coach'
+  | 'history'
+  | 'dictionary'
+  | 'snippets'
+  | 'style'
+  | 'advanced';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 

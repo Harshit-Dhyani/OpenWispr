@@ -1,4 +1,4 @@
-import { Mic, Zap, Gauge, Filter, Activity } from 'lucide-react';
+import { Mic, Zap, Gauge, Filter, Activity, Keyboard } from 'lucide-react';
 import { useState } from 'react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
@@ -6,7 +6,14 @@ import { Toggle, Slider, NumberInput, Select } from '../controls';
 import { PRESETS } from '../presets';
 import { cn } from '../utils';
 import type { SectionProps } from '../types';
-import { SETTINGS_SECTION_TEXT, COMPUTE_TYPE_LABELS } from '../../../config/text';
+import {
+  SETTINGS_SECTION_TEXT,
+  REFINEMENT_MODE_LABELS,
+  REFINEMENT_PROFILE_LABELS,
+} from '../../../config/text';
+import { getLanguageLabel } from '../../../lib/languages';
+import { RENDERER_STRINGS } from '../../../strings/en';
+import { isFakeSetting } from '../../../lib/settingsSchema';
 
 interface TranscriptionSectionProps extends SectionProps {
   selectedPreset: string;
@@ -18,6 +25,7 @@ export function TranscriptionSection({
   settings,
   modelManager,
   availableModels,
+  availableLanguages,
   isChanged,
   updateSetting,
   resetSetting,
@@ -26,6 +34,8 @@ export function TranscriptionSection({
 }: TranscriptionSectionProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const text = SETTINGS_SECTION_TEXT.transcription;
+  const transcriptionText = RENDERER_STRINGS.settings.transcription;
+  const common = RENDERER_STRINGS.settings.common;
   const asrModels = modelManager?.catalog.filter((entry) => entry.category === 'asr') ?? [];
   const asrOptions = (asrModels.length ? asrModels : availableModels.map((m) => ({
     id: m,
@@ -36,6 +46,21 @@ export function TranscriptionSection({
     label: `${m.display_name}${m.installed ? '' : text.not_installed_suffix}`,
   }));
   const defaultCaptureSource = settings.audio.default_capture_source ?? settings.audio.captureMode;
+  const activeProfileSummary = {
+    preset: PRESETS.find((preset) => preset.id === selectedPreset)?.name ?? common.custom,
+    language: getLanguageLabel(settings.hotkey.language),
+    finishMode: settings.hotkey.finish_mode_default.replace(/_/g, ' '),
+    refinementMode: REFINEMENT_MODE_LABELS[settings.transcription.refinement_mode],
+    refinementProfile: REFINEMENT_PROFILE_LABELS[settings.transcription.refinement_profile],
+    microphoneHotkey: settings.hotkey.microphone_key_combination || common.unassigned,
+    systemHotkey: settings.hotkey.system_key_combination || common.unassigned,
+  };
+  const fakeAdvancedControls = [
+    { key: 'patience', label: text.patience_label },
+    { key: 'use_parallel_processing', label: text.parallel_processing_title },
+    { key: 'preload_model', label: text.preload_model_title },
+    { key: 'max_workers', label: text.max_workers_title },
+  ].filter((control) => isFakeSetting('transcription', control.key));
 
   const handleSourceModelChange = (captureSource: 'microphone' | 'system', modelId: string) => {
     const field = captureSource === 'system' ? 'system_asr_model_id' : 'microphone_asr_model_id';
@@ -108,6 +133,162 @@ export function TranscriptionSection({
         </SettingCard>
 
         <SettingCard
+          title={transcriptionText.micLanguageTitle}
+          description={transcriptionText.micLanguageDescription}
+          changed={isChanged('hotkey', 'language')}
+          onReset={() => resetSetting('hotkey', 'language')}
+        >
+          <Select
+            value={settings.hotkey.language}
+            options={availableLanguages.map((language) => ({
+              value: language,
+              label: getLanguageLabel(language),
+            }))}
+            onChange={(v) => updateSetting('hotkey', 'language', v)}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={transcriptionText.modeTitle}
+          description={transcriptionText.modeDescription}
+          changed={isChanged('transcription', 'transcription_mode')}
+          onReset={() => resetSetting('transcription', 'transcription_mode')}
+        >
+          <Select
+            value={settings.transcription.transcription_mode}
+            options={[
+              ...transcriptionText.modeOptions,
+            ]}
+            onChange={(v) => updateSetting('transcription', 'transcription_mode', v)}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={text.profile_summary_title}
+          description={text.profile_summary_description}
+        >
+          <div className="grid gap-2 text-xs font-bold text-lawn-border sm:grid-cols-2">
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500">{transcriptionText.profileSummaryLabels.preset}</div>
+              <div className="mt-1">{activeProfileSummary.preset}</div>
+            </div>
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500">{transcriptionText.profileSummaryLabels.language}</div>
+              <div className="mt-1">{activeProfileSummary.language}</div>
+            </div>
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500">{transcriptionText.profileSummaryLabels.finish}</div>
+              <div className="mt-1">{activeProfileSummary.finishMode}</div>
+            </div>
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-stone-500">{transcriptionText.profileSummaryLabels.refinement}</div>
+              <div className="mt-1">{activeProfileSummary.refinementMode} · {activeProfileSummary.refinementProfile}</div>
+            </div>
+          </div>
+        </SettingCard>
+
+        <SettingCard
+          title={text.refinement_mode_title}
+          description={text.refinement_mode_description}
+          changed={isChanged('transcription', 'refinement_mode')}
+          onReset={() => resetSetting('transcription', 'refinement_mode')}
+        >
+          <Select
+            value={settings.transcription.refinement_mode}
+            options={[
+              ...transcriptionText.refinementModeOptions,
+            ]}
+            onChange={(v) => updateSetting('transcription', 'refinement_mode', v)}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={text.refinement_profile_title}
+          description={text.refinement_profile_description}
+          changed={isChanged('transcription', 'refinement_profile')}
+          onReset={() => resetSetting('transcription', 'refinement_profile')}
+        >
+          <Select
+            value={settings.transcription.refinement_profile}
+            options={[
+              ...transcriptionText.refinementProfileOptions,
+            ]}
+            onChange={(v) => updateSetting('transcription', 'refinement_profile', v)}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={text.finish_mode_title}
+          description={text.finish_mode_description}
+          changed={isChanged('hotkey', 'finish_mode_default')}
+          onReset={() => resetSetting('hotkey', 'finish_mode_default')}
+        >
+          <Select
+            value={settings.hotkey.finish_mode_default}
+            options={[
+              ...transcriptionText.finishModeOptions,
+            ]}
+            onChange={(v) => updateSetting('hotkey', 'finish_mode_default', v)}
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={text.refinement_toggle_title}
+          description={text.refinement_toggle_description}
+          changed={isChanged('hotkey', 'enable_refiner_on_stop')}
+          onReset={() => resetSetting('hotkey', 'enable_refiner_on_stop')}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-stone-500">
+              {settings.refiner.runtime_enabled
+                ? transcriptionText.refinerEnabledHint(settings.refiner.selected_model_id)
+                : transcriptionText.refinerDisabledHint}
+            </div>
+            <Toggle
+              checked={settings.hotkey.enable_refiner_on_stop}
+              onChange={(checked) => updateSetting('hotkey', 'enable_refiner_on_stop', checked)}
+            />
+          </div>
+        </SettingCard>
+
+        <SettingCard
+          title={text.cleanup_instructions_title}
+          description={text.cleanup_instructions_description}
+          changed={isChanged('refiner', 'cleanup_instructions')}
+          onReset={() => resetSetting('refiner', 'cleanup_instructions')}
+        >
+          <textarea
+            value={settings.refiner.cleanup_instructions}
+            onChange={(event) => updateSetting('refiner', 'cleanup_instructions', event.target.value)}
+            rows={4}
+            placeholder={transcriptionText.cleanupPlaceholder}
+            className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm text-lawn-border outline-none focus:border-lawn-accent"
+          />
+        </SettingCard>
+
+        <SettingCard
+          title={text.hotkey_summary_title}
+          description={text.hotkey_summary_description}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">
+                <Keyboard className="h-3.5 w-3.5 text-lawn-accent" />
+                {transcriptionText.profileSummaryLabels.microphone}
+              </div>
+              <div className="mt-1 text-sm font-bold text-lawn-border">{activeProfileSummary.microphoneHotkey}</div>
+            </div>
+            <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">
+                <Keyboard className="h-3.5 w-3.5 text-lawn-accent" />
+                {transcriptionText.profileSummaryLabels.systemAudio}
+              </div>
+              <div className="mt-1 text-sm font-bold text-lawn-border">{activeProfileSummary.systemHotkey}</div>
+            </div>
+          </div>
+        </SettingCard>
+
+        <SettingCard
           title={text.system_asr_title}
           description={text.system_asr_description}
           changed={isChanged('transcription', 'system_asr_model_id')}
@@ -142,9 +323,7 @@ export function TranscriptionSection({
           <Select
             value={settings.transcription.compute_type}
             options={[
-              { value: 'float16', label: COMPUTE_TYPE_LABELS.float16 },
-              { value: 'int8', label: COMPUTE_TYPE_LABELS.int8 },
-              { value: 'int8_float16', label: COMPUTE_TYPE_LABELS.int8_float16 },
+              ...transcriptionText.computeTypeOptions,
             ]}
             onChange={(v) => updateSetting('transcription', 'compute_type', v)}
           />
@@ -153,17 +332,17 @@ export function TranscriptionSection({
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h4 className="text-sm font-bold">Advanced Tuning</h4>
+              <h4 className="text-sm font-bold">{transcriptionText.advancedTuningTitle}</h4>
               <p className="text-xs text-stone-500">
-                Keep these on defaults unless you are troubleshooting quality, latency, or memory usage.
+                {transcriptionText.advancedTuningDescription}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setShowAdvanced((value) => !value)}
-              className="border-2 border-lawn-border bg-white px-3 py-1 text-xs font-bold uppercase"
+              className="border-2 border-lawn-border bg-lawn-bg px-3 py-1 text-xs font-bold uppercase text-lawn-border hover:bg-lawn-accent hover:text-lawn-bg"
             >
-              {showAdvanced ? 'Hide' : 'Show'}
+              {showAdvanced ? transcriptionText.hideAdvanced : transcriptionText.showAdvanced}
             </button>
           </div>
         </div>
@@ -244,16 +423,18 @@ export function TranscriptionSection({
                 onChange={(v) => updateSetting('transcription', 'best_of', v)}
               />
             </div>
-            <div>
-              <label className="text-xs font-bold text-stone-500 block mb-2">{text.patience_label}</label>
-              <NumberInput
-                value={settings.transcription.patience}
-                min={0.1}
-                max={5}
-                step={0.1}
-                onChange={(v) => updateSetting('transcription', 'patience', v)}
-              />
-            </div>
+            {!isFakeSetting('transcription', 'patience') ? (
+              <div>
+                <label className="text-xs font-bold text-stone-500 block mb-2">{text.patience_label}</label>
+                <NumberInput
+                  value={settings.transcription.patience}
+                  min={0.1}
+                  max={5}
+                  step={0.1}
+                  onChange={(v) => updateSetting('transcription', 'patience', v)}
+                />
+              </div>
+            ) : null}
             <div>
               <label className="text-xs font-bold text-stone-500 block mb-2">{text.temperature_label}</label>
               <NumberInput
@@ -317,26 +498,30 @@ export function TranscriptionSection({
             {text.performance_group_title}
           </h4>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-bold block">{text.parallel_processing_title}</span>
-                <p className="text-xs text-stone-500">{text.parallel_processing_description}</p>
+            {!isFakeSetting('transcription', 'use_parallel_processing') ? (
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-bold block">{text.parallel_processing_title}</span>
+                  <p className="text-xs text-stone-500">{text.parallel_processing_description}</p>
+                </div>
+                <Toggle
+                  checked={settings.transcription.use_parallel_processing}
+                  onChange={(v) => updateSetting('transcription', 'use_parallel_processing', v)}
+                />
               </div>
-              <Toggle
-                checked={settings.transcription.use_parallel_processing}
-                onChange={(v) => updateSetting('transcription', 'use_parallel_processing', v)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-bold block">{text.preload_model_title}</span>
-                <p className="text-xs text-stone-500">{text.preload_model_description}</p>
+            ) : null}
+            {!isFakeSetting('transcription', 'preload_model') ? (
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-bold block">{text.preload_model_title}</span>
+                  <p className="text-xs text-stone-500">{text.preload_model_description}</p>
+                </div>
+                <Toggle
+                  checked={settings.transcription.preload_model}
+                  onChange={(v) => updateSetting('transcription', 'preload_model', v)}
+                />
               </div>
-              <Toggle
-                checked={settings.transcription.preload_model}
-                onChange={(v) => updateSetting('transcription', 'preload_model', v)}
-              />
-            </div>
+            ) : null}
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-bold block">{text.hotkey_optimized_title}</span>
@@ -347,21 +532,43 @@ export function TranscriptionSection({
                 onChange={(v) => updateSetting('transcription', 'hotkey_optimized', v)}
               />
             </div>
-            <SettingCard
-              title={text.max_workers_title}
-              description={text.max_workers_description}
-              changed={isChanged('transcription', 'max_workers')}
-              onReset={() => resetSetting('transcription', 'max_workers')}
-            >
-              <NumberInput
-                value={settings.transcription.max_workers}
-                min={1}
-                max={16}
-                onChange={(v) => updateSetting('transcription', 'max_workers', v)}
-              />
-            </SettingCard>
+            {!isFakeSetting('transcription', 'max_workers') ? (
+              <SettingCard
+                title={text.max_workers_title}
+                description={text.max_workers_description}
+                changed={isChanged('transcription', 'max_workers')}
+                onReset={() => resetSetting('transcription', 'max_workers')}
+              >
+                <NumberInput
+                  value={settings.transcription.max_workers}
+                  min={1}
+                  max={16}
+                  onChange={(v) => updateSetting('transcription', 'max_workers', v)}
+                />
+              </SettingCard>
+            ) : null}
           </div>
             </div>
+            {fakeAdvancedControls.length ? (
+              <article className="border-2 border-lawn-border bg-lawn-panel p-4">
+                <h5 className="text-xs font-black uppercase tracking-[0.12em] text-lawn-muted">
+                  {common.comingSoon}
+                </h5>
+                <p className="mt-1 text-xs text-stone-500">
+                  These controls are intentionally hidden from runtime until implementation is complete.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {fakeAdvancedControls.map((control) => (
+                    <span
+                      key={control.key}
+                      className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
+                    >
+                      {control.label}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ) : null}
           </>
         ) : null}
       </div>

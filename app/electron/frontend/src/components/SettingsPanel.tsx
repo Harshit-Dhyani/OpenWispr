@@ -26,6 +26,11 @@ import {
   TranscriptionSection,
   AudioSection,
   HotkeySection,
+  CoachSection,
+  HistorySection,
+  DictionarySection,
+  SnippetsSection,
+  StyleSection,
   AdvancedSection,
 } from './settings/sections';
 
@@ -360,7 +365,7 @@ export function SettingsPanel({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Sidebar */}
           <div className="w-[200px] sm:w-[240px] border-r-2 border-lawn-border bg-lawn-panel overflow-y-auto flex-shrink-0">
             <nav className="p-2">
@@ -397,7 +402,13 @@ export function SettingsPanel({
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 overflow-y-auto min-w-0">
+          <div
+            className="min-h-0 min-w-0 flex-1 overflow-y-auto"
+            data-testid="settings-scroll-container"
+            role="region"
+            aria-label="Settings content"
+            tabIndex={0}
+          >
             <div className="p-4 sm:p-6 max-w-3xl">
               {activeCategory === 'general' && (
                 <GeneralSection {...sectionProps} />
@@ -417,6 +428,21 @@ export function SettingsPanel({
               )}
               {activeCategory === 'hotkey' && (
                 <HotkeySection {...sectionProps} />
+              )}
+              {activeCategory === 'coach' && (
+                <CoachSection {...sectionProps} />
+              )}
+              {activeCategory === 'history' && (
+                <HistorySection {...sectionProps} />
+              )}
+              {activeCategory === 'dictionary' && (
+                <DictionarySection {...sectionProps} />
+              )}
+              {activeCategory === 'snippets' && (
+                <SnippetsSection {...sectionProps} />
+              )}
+              {activeCategory === 'style' && (
+                <StyleSection {...sectionProps} />
               )}
               {activeCategory === 'advanced' && (
                 <AdvancedSection {...sectionProps} saveError={saveError} />

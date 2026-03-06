@@ -1,10 +1,10 @@
 import { Settings, Sliders } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
-import { Toggle, Slider, Select } from '../controls';
+import { Slider, Select } from '../controls';
 import type { SectionProps } from '../types';
-import { isFakeSetting } from '../../../lib/settingsSchema';
 import { getLanguageLabel } from '../../../lib/languages';
+import { RENDERER_STRINGS } from '../../../strings/en';
 
 interface GeneralSectionProps extends SectionProps {
   availableLanguages: string[];
@@ -17,25 +17,22 @@ export function GeneralSection({
   resetSetting,
   availableLanguages,
 }: GeneralSectionProps) {
-  const themeOptions = [
-    { value: 'light', label: 'Light (Lawn)' },
-    { value: 'dark', label: 'Dark (Night)' },
-    { value: 'cyber', label: 'Cyberpunk' },
-    { value: 'dracula', label: 'Dracula' },
-  ];
+  const text = RENDERER_STRINGS.settings.general;
+  const common = RENDERER_STRINGS.settings.common;
+  const themeOptions = [...text.themeOptions];
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="General Settings"
+        title={text.title}
         icon={Settings}
-        description="Configure default session behavior and application preferences"
+        description={text.description}
       />
 
       <div className="grid gap-4">
         <SettingCard
-          title="Theme"
-          description="Application color theme"
+          title={text.themeTitle}
+          description={text.themeDescription}
           changed={isChanged('general', 'theme')}
           onReset={() => resetSetting('general', 'theme')}
         >
@@ -47,8 +44,8 @@ export function GeneralSection({
         </SettingCard>
 
         <SettingCard
-          title="Default Session Title"
-          description="Default name for new transcription sessions"
+          title={text.defaultSessionTitle}
+          description={text.defaultSessionDescription}
           changed={isChanged('general', 'defaultSessionTitle')}
           onReset={() => resetSetting('general', 'defaultSessionTitle')}
         >
@@ -61,8 +58,8 @@ export function GeneralSection({
         </SettingCard>
 
         <SettingCard
-          title="Default Language"
-          description="Primary language for transcription (auto-detects if set to Auto)"
+          title={text.defaultLanguageTitle}
+          description={text.defaultLanguageDescription}
           changed={isChanged('general', 'defaultLanguage')}
           onReset={() => resetSetting('general', 'defaultLanguage')}
         >
@@ -80,8 +77,8 @@ export function GeneralSection({
         </SettingCard>
 
         <SettingCard
-          title="Export Directory"
-          description="Default location for exported transcripts and files"
+          title={text.exportDirectoryTitle}
+          description={text.exportDirectoryDescription}
           changed={isChanged('general', 'exportDirectory')}
           onReset={() => resetSetting('general', 'exportDirectory')}
         >
@@ -90,7 +87,7 @@ export function GeneralSection({
               type="text"
               value={settings.general.exportDirectory}
               onChange={(e) => updateSetting('general', 'exportDirectory', e.target.value)}
-              placeholder="Use default documents folder"
+              placeholder={text.exportDirectoryPlaceholder}
               className="flex-1 h-10 px-3 border-2 border-lawn-border bg-lawn-bg text-sm focus:border-lawn-accent focus:outline-none text-lawn-border"
             />
             <button
@@ -102,14 +99,14 @@ export function GeneralSection({
               }}
               className="px-4 h-10 border-2 border-lawn-border bg-lawn-bg hover:bg-lawn-accent/10 font-bold text-sm transition-colors"
             >
-              Browse
+              {common.browse}
             </button>
           </div>
         </SettingCard>
 
         <SettingCard
-          title="Auto-save Interval"
-          description="How often to automatically save session progress (in seconds)"
+          title={text.autoSaveTitle}
+          description={text.autoSaveDescription}
           changed={isChanged('general', 'autoSaveInterval')}
           onReset={() => resetSetting('general', 'autoSaveInterval')}
         >
@@ -126,50 +123,25 @@ export function GeneralSection({
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
             <Sliders className="w-4 h-4 text-lawn-accent" />
-            Application Behavior
+            {text.behaviorTitle}
           </h4>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">Show Notifications</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">Coming Soon</span>
-                </div>
-                <p className="text-xs text-stone-500">Display desktop notifications for events</p>
-              </div>
-              <Toggle
-                checked={settings.general.showNotifications}
-                onChange={(v) => updateSetting('general', 'showNotifications', v)}
-                disabled={isFakeSetting('general', 'showNotifications')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">Minimize to Tray</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">Coming Soon</span>
-                </div>
-                <p className="text-xs text-stone-500">Keep running in system tray when closed</p>
-              </div>
-              <Toggle
-                checked={settings.general.minimizeToTray}
-                onChange={(v) => updateSetting('general', 'minimizeToTray', v)}
-                disabled={isFakeSetting('general', 'minimizeToTray')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold block">Start with System</span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-600 font-bold">Coming Soon</span>
-                </div>
-                <p className="text-xs text-stone-500">Launch automatically on Windows startup</p>
-              </div>
-              <Toggle
-                checked={settings.general.startupWithSystem}
-                onChange={(v) => updateSetting('general', 'startupWithSystem', v)}
-                disabled={isFakeSetting('general', 'startupWithSystem')}
-              />
+          <div className="space-y-3">
+            <p className="text-xs text-stone-500">
+              Runtime-only behavior controls are hidden until they are fully implemented end-to-end.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                text.showNotificationsTitle,
+                text.minimizeToTrayTitle,
+                text.startupWithSystemTitle,
+              ].map((label) => (
+                <span
+                  key={label}
+                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
+                >
+                  {label} · {common.comingSoon}
+                </span>
+              ))}
             </div>
           </div>
         </div>

@@ -28,6 +28,7 @@ function normalizeSourceAwareSettings(data: Record<string, unknown>): Record<str
   const transcription = { ...((normalized.transcription as Record<string, unknown>) ?? {}) };
   const audio = { ...((normalized.audio as Record<string, unknown>) ?? {}) };
   const hotkey = { ...((normalized.hotkey as Record<string, unknown>) ?? {}) };
+  const coach = { ...((normalized.coach as Record<string, unknown>) ?? {}) };
 
   const fallbackModel = (
     transcription.default_asr_model_id ??
@@ -38,6 +39,10 @@ function normalizeSourceAwareSettings(data: Record<string, unknown>): Record<str
     : undefined;
 
   transcription.default_asr_model_id = fallbackModel;
+  transcription.transcription_mode =
+    (transcription.transcription_mode as string | undefined) ?? 'dictation';
+  transcription.refinement_profile =
+    (transcription.refinement_profile as string | undefined) ?? 'raw';
   transcription.microphone_asr_model_id =
     (transcription.microphone_asr_model_id as string | undefined) ??
     legacyHotkeyModel ??
@@ -67,6 +72,41 @@ function normalizeSourceAwareSettings(data: Record<string, unknown>): Record<str
   normalized.transcription = transcription;
   normalized.audio = audio;
   normalized.hotkey = hotkey;
+  normalized.coach = {
+    coach_enabled: true,
+    coach_show_live_hints: false,
+    coach_detail_level: 'compact',
+    copy_polished_by_default: true,
+    show_diff_view: true,
+    coach_template_id_mic: 'default_english_coach',
+    coach_template_id_system: 'default_english_coach',
+    coach_prompt_custom_enabled: false,
+    coach_prompt_custom_text: '',
+    coach_overrides: {
+      tone: 'neutral',
+      aggressiveness: 'light',
+      filler_removal: true,
+      keep_slang: true,
+      target_style: 'simple',
+      ...((coach.coach_overrides as Record<string, unknown>) ?? {}),
+    },
+    privacy_mode: 'local_only',
+    show_floating_coach_result: true,
+    coach_prompt_templates: [
+      {
+        id: 'default_english_coach',
+        name: 'Default English Coach',
+        version: 1,
+        system:
+          'You are an English writing coach for dictation transcripts.\nYou must preserve the speakers meaning and tone.\nYou must NOT add new facts.\nPrefer minimal edits.\nOutput MUST be valid JSON only, matching the schema exactly.',
+        user_template:
+          'Language mode: {language_mode}\nDetail level: {detail_level}\nOverrides JSON: {overrides_json}\n\nOriginal transcript:\n{original_text}\n\nTask:\n1) Produce "polished" that reads naturally (single paragraph unless clearly multiple).\n2) Provide "diff" operations aligned to the original string indices where possible. If exact indices are hard, provide approximate ranges but keep them consistent.\n3) Provide 2–5 short tips.\n4) Provide up to 5 mistakes with fixes and short explanations.\n5) Provide one short practice rewrite.\n\nReturn JSON with keys: original, polished, diff, tips, mistakes, practice, meta.',
+        enabled: true,
+        built_in: true,
+      },
+    ],
+    ...coach,
+  };
   return normalized;
 }
 
@@ -94,6 +134,7 @@ const migrations: Record<number, (data: unknown) => unknown> = {
           mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
         system_asr_model_id: mapRuntimeModelToCatalogId((old.transcription as Record<string, unknown>)?.model_name as string | undefined),
         refinement_mode: (old.transcription as Record<string, unknown>)?.refinement_mode ?? 'off',
+        transcription_mode: (old.transcription as Record<string, unknown>)?.transcription_mode ?? 'dictation',
         compute_type: (old.transcription as Record<string, unknown>)?.compute_type ?? 'float16',
         chunk_duration: (old.transcription as Record<string, unknown>)?.chunk_duration ?? 1.6,
         overlap_ratio: (old.transcription as Record<string, unknown>)?.overlap_ratio ?? 0.2,
@@ -130,6 +171,8 @@ const migrations: Record<number, (data: unknown) => unknown> = {
         noiseFiltering: (old.audio as Record<string, unknown>)?.noiseFiltering ?? true,
         echoCancellation: (old.audio as Record<string, unknown>)?.echoCancellation ?? true,
         autoGainControl: (old.audio as Record<string, unknown>)?.autoGainControl ?? true,
+        mute_transcripta_audio_during_dictation:
+          (old.audio as Record<string, unknown>)?.mute_transcripta_audio_during_dictation ?? false,
       },
       hotkey: {
         enabled: (old.hotkey as Record<string, unknown>)?.enabled ?? false,
@@ -183,8 +226,51 @@ const migrations: Record<number, (data: unknown) => unknown> = {
         noiseFiltering: oldAudio?.noiseFiltering ?? true,
         echoCancellation: oldAudio?.echoCancellation ?? true,
         autoGainControl: oldAudio?.autoGainControl ?? true,
+        mute_transcripta_audio_during_dictation:
+          oldAudio?.mute_transcripta_audio_during_dictation ?? false,
       },
       version: 4,
+    };
+  },
+  4: (data: unknown) => {
+    const old = data as Record<string, unknown>;
+    return {
+      ...old,
+      coach: {
+        coach_enabled: true,
+        coach_show_live_hints: false,
+        coach_detail_level: 'compact',
+        copy_polished_by_default: true,
+        show_diff_view: true,
+        coach_template_id_mic: 'default_english_coach',
+        coach_template_id_system: 'default_english_coach',
+        coach_prompt_custom_enabled: false,
+        coach_prompt_custom_text: '',
+        coach_overrides: {
+          tone: 'neutral',
+          aggressiveness: 'light',
+          filler_removal: true,
+          keep_slang: true,
+          target_style: 'simple',
+        },
+        privacy_mode: 'local_only',
+        show_floating_coach_result: true,
+        coach_prompt_templates: [
+          {
+            id: 'default_english_coach',
+            name: 'Default English Coach',
+            version: 1,
+            system:
+              'You are an English writing coach for dictation transcripts.\nYou must preserve the speakers meaning and tone.\nYou must NOT add new facts.\nPrefer minimal edits.\nOutput MUST be valid JSON only, matching the schema exactly.',
+            user_template:
+              'Language mode: {language_mode}\nDetail level: {detail_level}\nOverrides JSON: {overrides_json}\n\nOriginal transcript:\n{original_text}\n\nTask:\n1) Produce "polished" that reads naturally (single paragraph unless clearly multiple).\n2) Provide "diff" operations aligned to the original string indices where possible. If exact indices are hard, provide approximate ranges but keep them consistent.\n3) Provide 2–5 short tips.\n4) Provide up to 5 mistakes with fixes and short explanations.\n5) Provide one short practice rewrite.\n\nReturn JSON with keys: original, polished, diff, tips, mistakes, practice, meta.',
+            enabled: true,
+            built_in: true,
+          },
+        ],
+        ...((old.coach as Record<string, unknown>) ?? {}),
+      },
+      version: 5,
     };
   },
 };
@@ -243,6 +329,11 @@ function mergeWithDefaults(partial: Record<string, unknown>): SettingsState {
     refiner: { ...DEFAULT_SETTINGS.refiner, ...(typedPartial.refiner || {}) },
     audio: { ...DEFAULT_SETTINGS.audio, ...(typedPartial.audio || {}) },
     hotkey: { ...DEFAULT_SETTINGS.hotkey, ...(typedPartial.hotkey || {}) },
+    coach: { ...DEFAULT_SETTINGS.coach, ...(typedPartial.coach || {}) },
+    history: { ...DEFAULT_SETTINGS.history, ...(typedPartial.history || {}) },
+    dictionary: { ...DEFAULT_SETTINGS.dictionary, ...(typedPartial.dictionary || {}) },
+    snippets: { ...DEFAULT_SETTINGS.snippets, ...(typedPartial.snippets || {}) },
+    style: { ...DEFAULT_SETTINGS.style, ...(typedPartial.style || {}) },
     advanced: { ...DEFAULT_SETTINGS.advanced, ...(typedPartial.advanced || {}) },
     version: CURRENT_SETTINGS_VERSION,
   } as SettingsState;

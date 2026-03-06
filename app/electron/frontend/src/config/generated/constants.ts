@@ -61,7 +61,7 @@ export const ModelConstants = {
   MIN_SEGMENT_LENGTH: 0.5,
 } as const;
 
-export const VALID_MODEL_NAMES = ["base", "small", "medium", "turbo", "large-v3", "tiny"] as const;
+export const VALID_MODEL_NAMES = ["tiny", "turbo", "small", "base", "medium", "large-v3"] as const;
 export const VALID_COMPUTE_TYPES = ['float16', 'int8', 'int8_float16'] as const;
 
 export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-small", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;
@@ -105,13 +105,13 @@ export const SessionConstants = {
 export const UIConstants = {
   DEFAULT_THEME: 'light' as const,
   DEFAULT_LANGUAGE: 'auto' as const,
-  SETTINGS_VERSION: 3,
+  SETTINGS_VERSION: 5,
   AUTO_SAVE_INTERVAL_SECONDS: 30,
   MAX_LOG_FILES: 10,
   DEFAULT_HOTKEY: 'Ctrl+Shift+T',
 } as const;
 
-export const VALID_THEMES = ['light', 'dark', 'cyber', 'dracula'] as const;
+export const VALID_THEMES = ["cyber", "dark", "dracula", "forest", "light", "ocean", "sunset"] as const;
 export const VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
 
 // ============================================

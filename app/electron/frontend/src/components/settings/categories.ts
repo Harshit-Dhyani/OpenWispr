@@ -5,8 +5,14 @@ import {
   Volume2,
   Keyboard,
   Cpu,
+  Sparkles,
+  History,
+  BookText,
+  ScissorsSquareDashedBottom,
+  Paintbrush,
 } from 'lucide-react';
 import type { SettingsCategory } from './types';
+import { RENDERER_STRINGS } from '../../strings/en';
 
 export const CATEGORIES: {
   id: SettingsCategory;
@@ -16,38 +22,68 @@ export const CATEGORIES: {
 }[] = [
   {
     id: 'general',
-    label: 'General',
+    label: RENDERER_STRINGS.settings.categories.general.label,
     icon: Settings,
-    description: 'Session defaults, language, export location',
+    description: RENDERER_STRINGS.settings.categories.general.description,
   },
   {
     id: 'models',
-    label: 'Models',
+    label: RENDERER_STRINGS.settings.categories.models.label,
     icon: Bot,
-    description: 'Download, verify, and select ASR and refiner models',
+    description: RENDERER_STRINGS.settings.categories.models.description,
   },
   {
     id: 'transcription',
-    label: 'Transcription',
+    label: RENDERER_STRINGS.settings.categories.transcription.label,
     icon: Mic,
-    description: 'Model, quality, performance settings',
+    description: RENDERER_STRINGS.settings.categories.transcription.description,
   },
   {
     id: 'audio',
-    label: 'Audio',
+    label: RENDERER_STRINGS.settings.categories.audio.label,
     icon: Volume2,
-    description: 'VAD, noise filtering, audio devices',
+    description: RENDERER_STRINGS.settings.categories.audio.description,
   },
   {
     id: 'hotkey',
-    label: 'Hotkey',
+    label: RENDERER_STRINGS.settings.categories.hotkey.label,
     icon: Keyboard,
-    description: 'Global hotkey configuration',
+    description: RENDERER_STRINGS.settings.categories.hotkey.description,
+  },
+  {
+    id: 'coach',
+    label: RENDERER_STRINGS.settings.categories.coach.label,
+    icon: Sparkles,
+    description: RENDERER_STRINGS.settings.categories.coach.description,
+  },
+  {
+    id: 'history',
+    label: RENDERER_STRINGS.settings.categories.history.label,
+    icon: History,
+    description: RENDERER_STRINGS.settings.categories.history.description,
+  },
+  {
+    id: 'dictionary',
+    label: RENDERER_STRINGS.settings.categories.dictionary.label,
+    icon: BookText,
+    description: RENDERER_STRINGS.settings.categories.dictionary.description,
+  },
+  {
+    id: 'snippets',
+    label: RENDERER_STRINGS.settings.categories.snippets.label,
+    icon: ScissorsSquareDashedBottom,
+    description: RENDERER_STRINGS.settings.categories.snippets.description,
+  },
+  {
+    id: 'style',
+    label: RENDERER_STRINGS.settings.categories.style.label,
+    icon: Paintbrush,
+    description: RENDERER_STRINGS.settings.categories.style.description,
   },
   {
     id: 'advanced',
-    label: 'Advanced',
+    label: RENDERER_STRINGS.settings.categories.advanced.label,
     icon: Cpu,
-    description: 'Expert settings, developer options',
+    description: RENDERER_STRINGS.settings.categories.advanced.description,
   },
 ];
