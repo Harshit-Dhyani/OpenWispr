@@ -14,7 +14,7 @@ import logging
 import time
 import warnings
 from collections.abc import Generator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 import numpy as np
@@ -414,6 +414,9 @@ class FastWhisperBackend:
                 length_penalty=config.length_penalty,
                 suppress_tokens=normalize_suppress_tokens(config.suppress_tokens),
                 condition_on_previous_text=config.condition_on_previous_text,
+                compression_ratio_threshold=config.compression_ratio_threshold,
+                log_prob_threshold=config.logprob_threshold,
+                no_speech_threshold=config.no_speech_threshold,
                 prefix=config.prefix,
                 hotwords=config.hotwords,
                 vad_filter=self.mode_config.use_vad,
@@ -582,9 +585,12 @@ class OptimizedWhisperFactory:
         device: str = "cuda",
         language: str | None = None,
         model_name: str | None = None,
+        compute_type: str | None = None,
     ) -> FastWhisperBackend:
         """Create an optimized backend for the specified mode."""
         mode_config = WISPR_MODE if mode == "wispr" else SYSTEM_MODE
+        if compute_type:
+            mode_config = replace(mode_config, compute_type=compute_type)
         resolved_model_name = model_name or mode_config.model_size
 
         model = model_pool.get_model(

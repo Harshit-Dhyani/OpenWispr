@@ -47,6 +47,7 @@ from app.stt.fast_whisper_backend import (
 )
 from app.stt.model_pool import ModelPool
 from app.stt.quality import assess_segment_quality
+from app.stt.repetition_guard import is_repetitive_segment, repeated_sentence_count, repetition_score
 from app.stt.streaming_engine import (
     AdaptiveBeamController,
     ContextCarryoverManager,
@@ -323,8 +324,14 @@ class FastWhisperBackend:
         self.vad_filter = vad_filter
         self.vad_params = vad_params or {}
         self.max_queue_items = max_queue_items
+        self._is_hotkey_streaming = not vad_filter
         self.streaming_window_ms = streaming_window_ms
         self.streaming_overlap_ms = streaming_overlap_ms
+        if self._is_hotkey_streaming:
+            # Hotkey microphone dictation is unstable with sub-second decode windows.
+            # Keep this path responsive, but give the decoder enough voiced context.
+            self.streaming_window_ms = max(self.streaming_window_ms, 2400)
+            self.streaming_overlap_ms = max(self.streaming_overlap_ms, 320)
 
         # Use the new optimized model pool
         self.model_pool = ModelPool()
@@ -333,7 +340,7 @@ class FastWhisperBackend:
         self.language_optimizer = LanguageOptimizer()
 
         # Determine mode config
-        if "tiny" in model_name:
+        if self._is_hotkey_streaming or "tiny" in model_name:
             self._mode_config = WISPR_MODE
         else:
             self._mode_config = SYSTEM_MODE
@@ -355,7 +362,7 @@ class FastWhisperBackend:
                 min_beam_size=self._mode_config.beam_size,
                 max_beam_size=5,
             )
-        if self._mode_config.enable_prefix:
+        if self._mode_config.enable_prefix and not self._is_hotkey_streaming:
             self._context_manager = ContextCarryoverManager()
 
         # Callbacks
@@ -409,13 +416,18 @@ class FastWhisperBackend:
         try:
             # Create backend using factory
             self._backend = OptimizedWhisperFactory.create_backend(
-                mode="wispr" if "tiny" in self.model_name else "system",
+                mode="wispr" if self._is_hotkey_streaming or "tiny" in self.model_name else "system",
                 model_pool=self.model_pool,
                 download_root=self.download_root,
                 device=actual_device,
                 language=self.language_mode if self.language_mode != "auto" else None,
                 model_name=self.model_name,
+                compute_type=actual_compute_type,
             )
+            if self._is_hotkey_streaming and getattr(self._backend, "prefix_manager", None) is not None:
+                self._backend.prefix_manager = None
+            if self.language_mode != "auto":
+                logger.debug("Hotkey decoder language fixed: %s", self.language_mode)
 
             # Warmup
             if self._backend.warmup():
@@ -441,12 +453,13 @@ class FastWhisperBackend:
             logger.warning(self._warning)
 
             self._backend = OptimizedWhisperFactory.create_backend(
-                mode="wispr" if "tiny" in self.model_name else "system",
+                mode="wispr" if self._is_hotkey_streaming or "tiny" in self.model_name else "system",
                 model_pool=self.model_pool,
                 download_root=self.download_root,
                 device="cpu",
                 language=self.language_mode if self.language_mode != "auto" else None,
                 model_name=self.model_name,
+                compute_type="int8",
             )
             self._backend.warmup()
 
@@ -604,6 +617,18 @@ class FastWhisperBackend:
                         prefix=prefix,
                     )
 
+                    if self._should_reject_result(result):
+                        logger.warning(
+                            "Rejected suspect hotkey decode: text=%r compression_ratio=%s avg_logprob=%s no_speech_prob=%s",
+                            result.text,
+                            getattr(result, "compression_ratio", None),
+                            getattr(result, "avg_logprob", None),
+                            getattr(result, "no_speech_prob", None),
+                        )
+                        if self._context_manager:
+                            self._context_manager.clear()
+                        continue
+
                     # Report latency for adaptive beam
                     latency_ms = (time.perf_counter() - start_time) * 1000
                     if self._adaptive_beam:
@@ -614,12 +639,13 @@ class FastWhisperBackend:
                         self._context_manager.update_context(result.text, result.confidence)
 
                     # Convert to segment
+                    chunk_offset = float(getattr(chunk, "started_at", 0.0) or 0.0)
                     partial = PartialResult(
                         text=result.text,
                         is_final=True,
                         is_stable=True,
-                        start_time=result.start_time,
-                        end_time=result.end_time,
+                        start_time=chunk_offset + float(result.start_time or 0.0),
+                        end_time=chunk_offset + float(result.end_time or 0.0),
                         language=result.language,
                         confidence=result.confidence,
                         prefix_context=prefix or "",
@@ -674,8 +700,8 @@ class FastWhisperBackend:
 
         return TranscriptSegment(
             id=f"seg-{int(time.time() * 1000)}-{hash(partial.text) & 0xFFFF}",
-            start=partial.start_time,
-            end=partial.end_time,
+            start=float(partial.start_time or 0.0),
+            end=float(partial.end_time or 0.0),
             text=partial.text,
             display_text=quality.display_text,
             language=partial.language,
@@ -688,6 +714,43 @@ class FastWhisperBackend:
             script_mismatch=quality.script_mismatch,
             source_chunk_started_at=chunk.started_at,
         )
+
+    def _should_reject_result(self, result: Any) -> bool:
+        text = " ".join((getattr(result, "text", "") or "").split())
+        if not text:
+            return False
+
+        compression_ratio = getattr(result, "compression_ratio", None)
+        avg_logprob = getattr(result, "avg_logprob", None)
+        no_speech_prob = getattr(result, "no_speech_prob", None)
+
+        repeat_score = repetition_score(text)
+        repeated_phrase_count = repeated_sentence_count(text)
+
+        if is_repetitive_segment(
+            text,
+            compression_ratio=compression_ratio,
+            avg_logprob=avg_logprob,
+        ):
+            return True
+
+        if compression_ratio is not None and compression_ratio > 2.4:
+            if repeat_score >= 0.7 or repeated_phrase_count >= 3:
+                return True
+            if avg_logprob is not None and avg_logprob < -0.9:
+                return True
+
+        if repeated_phrase_count >= 4:
+            return True
+        if repeat_score >= 0.82:
+            return True
+        if (
+            no_speech_prob is not None
+            and no_speech_prob > 0.8
+            and repeated_phrase_count >= 2
+        ):
+            return True
+        return False
 
     def _handle_gpu_failure(self) -> None:
         """Handle GPU failure by reloading on CPU."""
