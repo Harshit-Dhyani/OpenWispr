@@ -45,12 +45,17 @@ tools/
 │   ├── check-system.py    # System-wide diagnostics (CUDA, deps)
 │   └── check-audio.py     # Audio device diagnostics
 ├── ci/                    # CI/Pre-commit checks
-│   └── verify-fixes.py    # Bug fix verification
+│   ├── verify-fixes.py    # Bug fix verification
+│   ├── verify-docs.py     # Documentation verification
+│   ├── update-docs.py     # Documentation auto-update
+│   ├── generate-api-docs.py      # API docs generation
+│   └── generate-settings-docs.py # Settings docs generation
 ├── maintenance/           # Cleanup and maintenance
 │   └── cleanup-logs.py    # Log file management
-└── setup/                 # Installation scripts
-    ├── install-pytorch-cuda.ps1
-    └── install-ffmpeg.ps1
+├── setup/                 # Installation scripts
+│   ├── install-pytorch-cuda.ps1
+│   └── install-ffmpeg.ps1
+└── check_renderer_strings.py    # Renderer string validation
 ```
 
 ## Tools Reference
@@ -173,6 +178,61 @@ Pre-commit verification for bug fixes:
 
 ```bash
 python tools/ci/verify-fixes.py [--json] [--strict]
+```
+
+### ci/verify-docs.py
+
+Verifies documentation accuracy and completeness:
+- Checks code examples in documentation
+- Validates cross-references
+- Ensures documented paths exist
+
+```bash
+python tools/ci/verify-docs.py [--fix] [--json]
+```
+
+### ci/update-docs.py
+
+Auto-updates documentation based on code changes:
+- Regenerates API documentation
+- Updates settings documentation
+- Syncs README files with actual structure
+
+```bash
+python tools/ci/update-docs.py [--dry-run] [--force]
+```
+
+### ci/generate-api-docs.py
+
+Generates API documentation from backend code:
+- Extracts endpoint definitions
+- Documents request/response schemas
+- Updates API reference
+
+```bash
+python tools/ci/generate-api-docs.py [--output PATH]
+```
+
+### ci/generate-settings-docs.py
+
+Generates settings documentation:
+- Documents configuration options
+- Updates settings reference tables
+- Syncs with actual config schemas
+
+```bash
+python tools/ci/generate-settings-docs.py [--output PATH]
+```
+
+### check_renderer_strings.py
+
+Validates renderer strings per AGENTS.md requirements:
+- Ensures strings are properly externalized
+- Validates translation key consistency
+- Checks for hardcoded UI text
+
+```bash
+python tools/check_renderer_strings.py [--fix] [--strict]
 ```
 
 ### maintenance/cleanup-logs.py
