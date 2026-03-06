@@ -26,13 +26,13 @@ export function ActivityFeed({ session, transcript, health, variant = 'sidebar' 
         "border-2 border-lawn-border bg-lawn-panel shadow-brutal text-lawn-border",
         isInline ? "p-3 min-w-[200px] max-w-[280px]" : "p-5 mb-6"
       ].join(' ')}>
-        <p className={["font-bold uppercase tracking-[0.2em] text-stone-500", isInline ? "mb-1 text-[10px]" : "mb-2 text-[11px]"].join(' ')}>
+        <p className={["font-bold uppercase tracking-[0.2em] text-lawn-muted", isInline ? "mb-1 text-[10px]" : "mb-2 text-[11px]"].join(' ')}>
           Session Pulse
         </p>
-        <h2 className={["font-display uppercase tracking-tighter text-lawn-border truncate", isInline ? "text-xl" : "text-4xl"].join(' ')}>
+        <h2 className={["font-display uppercase tracking-tighter text-lawn-border break-words whitespace-normal leading-tight", isInline ? "text-xl" : "text-4xl"].join(' ')}>
           {session?.title ?? 'No Session'}
         </h2>
-        <p className={["font-bold text-stone-600 truncate", isInline ? "mt-1 text-[10px] leading-4" : "mt-3 text-sm leading-6"].join(' ')}>
+        <p className={["font-bold text-lawn-muted break-words whitespace-normal", isInline ? "mt-1 text-[10px] leading-4" : "mt-3 text-sm leading-6"].join(' ')}>
           {session
             ? `Writing to ${session.output_dir}`
             : (isInline ? 'Start a session to begin.' : 'Start a session to stream transcript, review flags, and notes.')}
@@ -75,7 +75,7 @@ export function ActivityFeed({ session, transcript, health, variant = 'sidebar' 
                   isInline ? "min-w-[180px] max-w-[240px]" : ""
                 ].join(' ')}
               >
-                <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-stone-500">
+                <div className="mb-1 text-[9px] font-black uppercase tracking-widest text-lawn-muted">
                   {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
                 </div>
                 <div className={["font-bold leading-5 text-lawn-border", isInline ? "line-clamp-1 text-[11px]" : "line-clamp-2 text-xs"].join(' ')}>
@@ -93,7 +93,7 @@ export function ActivityFeed({ session, transcript, health, variant = 'sidebar' 
 function Empty({ message, isInline = false }: { message: string; isInline?: boolean }) {
   return (
     <div className={[
-      "border-2 border-lawn-border bg-lawn-bg/50 text-center text-xs font-bold text-stone-500",
+      "border-2 border-lawn-border bg-lawn-bg/50 text-center text-xs font-bold text-lawn-muted",
       isInline ? "p-3 min-w-[150px]" : "p-6 py-10"
     ].join(' ')}>
       {message}

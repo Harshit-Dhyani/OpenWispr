@@ -86,14 +86,42 @@ declare global {
     };
     transcriptaFloating?: {
       onRecordingState: (
-        callback: (state: { isRecording: boolean; processing?: boolean; finished?: boolean }) => void
+        callback: (state: {
+          isRecording: boolean;
+          processing?: boolean;
+          finished?: boolean;
+          sessionId?: string | null;
+          mode?: string;
+          error?: string | null;
+        }) => void
       ) => () => void;
       onTranscription: (
-        callback: (data: { text?: string; isPartial?: boolean } | string) => void
+        callback: (data: {
+          text?: string;
+          committedText?: string;
+          partialText?: string;
+          isPartial?: boolean;
+          sessionId?: string | null;
+          segmentIndex?: number | null;
+          mode?: string;
+        } | string) => void
       ) => () => void;
       onAudioVisualizer: (callback: (data: { levels: number[]; peak: number }) => void) => () => void;
       onHotkeyEvent: (callback: (event: { type: 'start' | 'stop' }) => void) => () => void;
+      onCoachResult?: (callback: (payload: import('./types/api').HotkeyStopResponse | null) => void) => () => void;
+      onCoachResultClear?: (callback: () => void) => () => void;
+      cancelRecording?: () => void;
+      finishRecording?: () => void;
+      finishAndPaste?: () => void;
+      dismissResult?: () => void;
       platform: string;
+      debugEnabled?: boolean;
+      strings?: {
+        status?: Record<string, string>;
+        waitingForSpeech?: string;
+        actions?: Record<string, string>;
+        resultMeta?: Record<string, string>;
+      };
     };
   }
 }

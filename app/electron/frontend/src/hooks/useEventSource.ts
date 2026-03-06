@@ -48,6 +48,7 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const startTimeoutRef = useRef<number | null>(null);
   const isManuallyClosedRef = useRef(false);
   const isConnectingRef = useRef(false);
   const isPollingRef = useRef(false);
@@ -67,6 +68,11 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
   const disconnect = useCallback(() => {
     isManuallyClosedRef.current = true;
     isConnectingRef.current = false;
+
+    if (startTimeoutRef.current !== null) {
+      window.clearTimeout(startTimeoutRef.current);
+      startTimeoutRef.current = null;
+    }
 
     if (reconnectTimeoutRef.current !== null) {
       window.clearTimeout(reconnectTimeoutRef.current);
@@ -290,7 +296,12 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
       reconnectAttemptsRef.current = 0;
       isManuallyClosedRef.current = false;
       isConnectingRef.current = false;
-      connect();
+      startTimeoutRef.current = window.setTimeout(() => {
+        startTimeoutRef.current = null;
+        if (!cancelled && !isManuallyClosedRef.current) {
+          connect();
+        }
+      }, 0);
     };
 
     void start();
@@ -303,6 +314,11 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
       if (reconnectTimeoutRef.current !== null) {
         window.clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
+      }
+
+      if (startTimeoutRef.current !== null) {
+        window.clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = null;
       }
 
       if (pollIntervalRef.current !== null) {

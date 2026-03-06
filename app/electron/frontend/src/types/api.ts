@@ -91,6 +91,7 @@ export type RefineFinalPayload = {
   segment_id: string;
   base_revision: number;
   refinement_mode: 'off' | 'strict' | 'polished';
+  refinement_profile?: 'raw' | 'clean_dictation' | 'professional' | 'student_notes' | 'code_logs';
   refiner_model_id?: string | null;
   used_runtime: boolean;
   segment: Segment;
@@ -199,6 +200,7 @@ export type ModelCatalogPayload = {
   selected_asr_model_id: string;
   selected_refiner_model_id: string;
   refinement_mode: 'off' | 'strict' | 'polished';
+  refinement_profile?: 'raw' | 'clean_dictation' | 'professional' | 'student_notes' | 'code_logs';
   recommendations: string[];
 };
 
@@ -256,6 +258,8 @@ export type HotkeySession = {
   session_id: string;
   is_recording: boolean;
   status: HotkeyStatus;
+  lifecycle_state?: 'idle' | 'starting' | 'recording' | 'stopping' | 'error';
+  capture_source?: 'microphone' | 'system' | null;
   last_activated_at: string | null;
   total_activations: number;
   current_text: string;
@@ -270,6 +274,9 @@ export type HotkeyState = {
   session: HotkeySession | null;
   is_registered: boolean;
   error: string | null;
+  capabilities?: {
+    holdModeSupported?: boolean;
+  };
 };
 
 // ============================================
@@ -282,6 +289,7 @@ export type HotkeyStartRequest = {
   model_name?: string;
   language_mode?: string;
   execution_mode?: string;
+  transcription_mode?: 'dictation' | 'literal' | 'session_paragraph';
 };
 
 export type HotkeyStartResponse = {
@@ -290,16 +298,72 @@ export type HotkeyStartResponse = {
   message?: string;
 };
 
+export type CoachDiffOp = {
+  op: 'delete' | 'insert' | 'replace';
+  from: string;
+  to: string;
+  start: number;
+  end: number;
+};
+
+export type CoachMistake = {
+  type: 'grammar' | 'wording' | 'tense' | 'article' | 'preposition' | 'clarity';
+  example: string;
+  fix: string;
+  why: string;
+};
+
+export type CoachPractice = {
+  prompt: string;
+  answer: string;
+};
+
+export type CoachMeta = {
+  model: string;
+  confidence: number;
+  cache_hit: boolean;
+  provider: string;
+  prompt_template_id: string;
+  prompt_version: number;
+};
+
+export type CoachResult = {
+  original: string;
+  polished: string;
+  diff: CoachDiffOp[];
+  tips: string[];
+  mistakes: CoachMistake[];
+  practice: CoachPractice;
+  meta: CoachMeta;
+};
+
 export type HotkeyStopResponse = {
+  session_id?: string | null;
+  status?: 'idle' | 'stopping' | 'error';
+  transcription_mode?: 'dictation' | 'literal' | 'session_paragraph';
+  composed_text?: string;
   final_transcription: string;
+  aggregated_raw_text?: string;
+  aggregated_clean_text?: string;
+  postprocessed_text?: string;
+  paste_text?: string;
+  live_paste_text?: string;
+  final_cleanup_applied?: boolean;
   raw_transcription?: string;
   refined_transcription?: string | null;
+  coach_result?: CoachResult | null;
+  coach_status?: 'disabled' | 'queued' | 'running' | 'failed' | 'fallback' | 'cache_hit' | 'generated' | 'success';
+  coach_error?: string | null;
+  coach_cache_hit?: boolean;
+  debug_wav_path?: string | null;
   duration_ms: number;
   segment_count: number;
   source_backend?: string;
   language_used?: string;
   refinement_mode?: 'off' | 'strict' | 'polished';
+  refinement_profile?: 'raw' | 'clean_dictation' | 'professional' | 'student_notes' | 'code_logs';
   refiner_model_id?: string | null;
+  warnings?: string[];
 };
 
 export type HotkeyStatusResponse = {
@@ -465,6 +529,8 @@ export type OptimizedSettings = {
   best_of?: number;
   patience?: number;
   temperature?: number;
+  refinement_mode?: 'off' | 'strict' | 'polished';
+  refinement_profile?: 'raw' | 'clean_dictation' | 'professional' | 'student_notes' | 'code_logs';
 };
 
 export type OptimizationMetadata = {
@@ -510,6 +576,105 @@ export type FloatingWindowOptions = {
   width: number;
   height: number;
 };
+
+export type HistorySessionRevision = {
+  revision_index: number;
+  text_source: string;
+  text_value: string;
+  metadata_json: string;
+  created_at: string;
+};
+
+export type HistorySession = {
+  session_id: string;
+  source_workflow: 'dictation' | 'session' | string;
+  capture_source: 'microphone' | 'system' | string;
+  title: string | null;
+  transcription_mode: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_ms: number;
+  model_name: string | null;
+  model_id: string | null;
+  language_mode: string | null;
+  execution_mode: string | null;
+  device_id: string | null;
+  status: string;
+  raw_text: string | null;
+  aggregated_clean_text: string | null;
+  postprocessed_text: string | null;
+  coach_polished_text: string | null;
+  active_text: string | null;
+  active_text_source: string | null;
+  audio_path?: string | null;
+  audio_available: boolean;
+  retry_status: string;
+  retry_error?: string | null;
+  retry_attempt_count: number;
+  deleted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  word_count: number;
+  revisions?: HistorySessionRevision[];
+};
+
+export type HistoryAnalyticsSummary = {
+  days_used: number;
+  total_words: number;
+  avg_wpm: number;
+  peak_usage_hour: number | null;
+};
+
+export type HistoryAnalytics = {
+  range_days: number | 'all';
+  timezone: string;
+  summary: HistoryAnalyticsSummary;
+  daily: Array<{ day: string; count: number }>;
+  hourly: Array<{ hour: number; count: number }>;
+};
+
+export type RetryJob = {
+  session_id: string;
+  retry_status: 'idle' | 'queued' | 'running' | 'completed' | 'failed' | string;
+  retry_attempt_count: number;
+  retry_error?: string | null;
+};
+
+export type SnippetEntry = {
+  id: string;
+  trigger: string;
+  expansion: string;
+  scope: 'personal' | 'shared' | 'team' | string;
+  enabled: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DictionaryEntry = {
+  id: string;
+  phrase: string;
+  replacement: string;
+  scope: 'personal' | 'shared' | 'team' | string;
+  enabled: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StyleProfile = {
+  id: string;
+  name: string;
+  style_key: string;
+  description: string;
+  rules: Record<string, unknown>;
+  enabled: boolean;
+  built_in: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StyleAssignments = Record<string, string>;
 
 // ============================================
 // Settings Types
