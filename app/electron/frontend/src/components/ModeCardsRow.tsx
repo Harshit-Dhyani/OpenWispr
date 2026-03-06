@@ -16,15 +16,17 @@ export function ModeCardsRow({ cards }: ModeCardsRowProps) {
       {cards.map((card) => (
         <section
           key={card.title}
-          className="border-2 border-lawn-border bg-lawn-bg p-4 shadow-brutal-sm"
+          className="flex flex-col gap-3 border-2 border-lawn-border bg-lawn-bg p-3 shadow-brutal-sm"
         >
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
-            {card.title}
-          </p>
-          <p className="mt-2 text-sm font-bold leading-5 text-lawn-border">
-            {card.description}
-          </p>
-          {card.controls ? <div className="mt-3 space-y-3">{card.controls}</div> : null}
+          <div className="border-2 border-lawn-border bg-lawn-panel p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-lawn-muted">
+              {card.title}
+            </p>
+            <p className="mt-2 text-sm font-bold leading-5 text-lawn-border">
+              {card.description}
+            </p>
+          </div>
+          {card.controls ? <div className="space-y-3">{card.controls}</div> : null}
         </section>
       ))}
     </div>

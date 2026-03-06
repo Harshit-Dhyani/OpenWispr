@@ -1,97 +1,10 @@
+@import "../../shared/theme-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-
-  :root,
-  [data-theme="light"] {
-    --color-bg: #f8f6f0;
-    --color-panel: #ffffff;
-    --color-dark: #1a1c1a;
-    --color-accent: #22c55e;
-    --color-border: #18191b;
-    --color-text: #18191b;
-    --color-success: #22c55e;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
-    --color-info: #3b82f6;
-    --color-scroll-track: #f1ede4;
-    --color-scroll-thumb: #18191b;
-    --color-scroll-thumb-hover: #22c55e;
-    /* Select option colors */
-    --color-select-bg: #ffffff;
-    --color-select-text: #18191b;
-    --color-select-hover: #22c55e;
-    --color-select-hover-text: #ffffff;
-  }
-
-  [data-theme="dark"] {
-    --color-bg: #000000;
-    --color-panel: #121212;
-    --color-dark: #18181b;
-    --color-accent: #22c55e;
-    --color-border: #ffffff;
-    --color-text: #ffffff;
-    --color-shadow: rgba(0, 0, 0, 0.8);
-    --color-success: #22c55e;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
-    --color-info: #3b82f6;
-    --color-scroll-track: #000000;
-    --color-scroll-thumb: #ffffff;
-    --color-scroll-thumb-hover: #22c55e;
-    /* Select option colors */
-    --color-select-bg: #121212;
-    --color-select-text: #ffffff;
-    --color-select-hover: #22c55e;
-    --color-select-hover-text: #000000;
-  }
-
-  [data-theme="cyber"] {
-    --color-bg: #050505;
-    --color-panel: #0d0d0d;
-    --color-dark: #1a1a1a;
-    --color-accent: #facc15;
-    --color-border: #facc15;
-    --color-text: #facc15;
-    --color-shadow: rgba(250, 204, 21, 0.2);
-    --color-success: #4ade80;
-    --color-warning: #facc15;
-    --color-error: #f87171;
-    --color-info: #60a5fa;
-    --color-scroll-track: #050505;
-    --color-scroll-thumb: #facc15;
-    --color-scroll-thumb-hover: #fcd34d;
-    /* Select option colors */
-    --color-select-bg: #0d0d0d;
-    --color-select-text: #facc15;
-    --color-select-hover: #facc15;
-    --color-select-hover-text: #000000;
-  }
-
-  [data-theme="dracula"] {
-    --color-bg: #282a36;
-    --color-panel: #44475a;
-    --color-dark: #000000;
-    --color-accent: #bd93f9;
-    --color-border: #f8f8f2;
-    --color-text: #f8f8f2;
-    --color-shadow: rgba(0, 0, 0, 0.5);
-    --color-success: #50fa7b;
-    --color-warning: #ffb86c;
-    --color-error: #ff5555;
-    --color-info: #8be9fd;
-    --color-scroll-track: #282a36;
-    --color-scroll-thumb: #bd93f9;
-    --color-scroll-thumb-hover: #ff79c6;
-    /* Select option colors */
-    --color-select-bg: #44475a;
-    --color-select-text: #f8f8f2;
-    --color-select-hover: #bd93f9;
-    --color-select-hover-text: #000000;
-  }
-
   * {
     transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
       border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
@@ -172,3 +85,75 @@
 }
 
 /* Remove old glassmorphism unused stuff */
+
+@layer utilities {
+  .text-lawn-muted {
+    color: var(--color-muted) !important;
+  }
+
+  .text-lawn-muted-strong {
+    color: var(--color-muted-strong) !important;
+  }
+
+  .bg-lawn-soft {
+    background-color: var(--color-soft-bg) !important;
+  }
+
+  .border-lawn-soft {
+    border-color: var(--color-soft-border) !important;
+  }
+
+  .text-stone-200,
+  .text-stone-300,
+  .text-stone-400,
+  .text-stone-500,
+  .text-stone-600 {
+    color: var(--color-muted) !important;
+  }
+
+  .text-stone-700 {
+    color: var(--color-muted-strong) !important;
+  }
+
+  .bg-stone-100,
+  .bg-stone-200 {
+    background-color: var(--color-soft-bg) !important;
+  }
+
+  .border-stone-300 {
+    border-color: var(--color-soft-border) !important;
+  }
+
+  .placeholder\:text-stone-400::placeholder {
+    color: var(--color-muted) !important;
+    opacity: 1;
+  }
+
+  [data-theme="dark"] .text-lawn-bg,
+  [data-theme="cyber"] .text-lawn-bg,
+  [data-theme="dracula"] .text-lawn-bg {
+    color: var(--color-text) !important;
+  }
+
+  .bg-lawn-dark.text-lawn-bg,
+  .bg-lawn-accent.text-lawn-bg,
+  .bg-lawn-border.text-lawn-bg,
+  .bg-theme-success.text-lawn-bg,
+  .bg-theme-warning.text-lawn-bg,
+  .bg-theme-error.text-lawn-bg,
+  .bg-theme-info.text-lawn-bg {
+    color: var(--color-on-solid) !important;
+  }
+
+  .bg-lawn-accent.text-lawn-border {
+    color: var(--color-on-solid) !important;
+  }
+
+  .hover\:bg-lawn-accent.hover\:text-lawn-bg:hover {
+    color: var(--color-on-solid) !important;
+  }
+
+  .hover\:bg-lawn-accent.hover\:text-lawn-border:hover {
+    color: var(--color-on-solid) !important;
+  }
+}

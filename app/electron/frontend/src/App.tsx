@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityFeed } from './components/ActivityFeed';
 import { AppSidebar } from './components/AppSidebar';
+import { DictionaryPage } from './components/pages/DictionaryPage';
+import { HomePage } from './components/pages/HomePage';
 import { ModeCardsRow } from './components/ModeCardsRow';
 import { QuickSettingsDrawer } from './components/QuickSettingsDrawer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MainContent } from './components/MainContent';
+import { SnippetsPage } from './components/pages/SnippetsPage';
 import { useEventSource, type EventSourceEvent } from './hooks/useEventSource';
 import {
   applyModelCatalogPayload,
@@ -47,6 +50,7 @@ import type {
   SystemProfile,
   StartSessionRequest,
   HotkeyState,
+  HotkeyStopResponse,
 } from './types/api';
 
 type FormState = {
@@ -75,7 +79,7 @@ type TranscriptDebugEvent = {
   textLength: number;
 };
 
-type AppPage = 'dictation' | 'sessions' | 'settings';
+type AppPage = 'home' | 'microphone' | 'systemAudio' | 'dictionary' | 'snippets' | 'settings';
 type QuickSettingsMode = 'dictation' | 'sessions' | null;
 
 const DEFAULT_FORM: FormState = {
@@ -110,7 +114,7 @@ function App() {
     message: '',
     stage: 'idle',
   });
-  const [activePage, setActivePage] = useState<AppPage>('dictation');
+  const [activePage, setActivePage] = useState<AppPage>('home');
   const [liveLatency, setLiveLatency] = useState<number | null>(null);
   const [quickSettingsMode, setQuickSettingsMode] = useState<QuickSettingsMode>(null);
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
@@ -119,6 +123,12 @@ function App() {
   const [modelManager, setModelManager] = useState(EMPTY_MODEL_MANAGER_STATE);
   const [liveDraft, setLiveDraft] = useState<LiveDraftState | null>(null);
   const [dictationLiveDraft, setDictationLiveDraft] = useState<LiveDraftState | null>(null);
+  const [dictationCoachResult, setDictationCoachResult] = useState<HotkeyStopResponse['coach_result'] | null>(null);
+  const [dictationAggregatedText, setDictationAggregatedText] = useState('');
+  const [dictationPostprocessedText, setDictationPostprocessedText] = useState('');
+  const [dictationPasteText, setDictationPasteText] = useState('');
+  const [dictationCoachStatus, setDictationCoachStatus] = useState<HotkeyStopResponse['coach_status'] | null>(null);
+  const [dictationCoachError, setDictationCoachError] = useState<string | null>(null);
   const [hotkeyState, setHotkeyState] = useState<HotkeyState | null>(null);
   const [transcriptDebugEvents, setTranscriptDebugEvents] = useState<TranscriptDebugEvent[]>([]);
   const initializedRef = useRef(false);
@@ -129,6 +139,7 @@ function App() {
   const partialSegmentRef = useRef<Segment | null>(null);
   const dirtyFieldsRef = useRef<Set<keyof FormState>>(new Set());
   const loadSettingsInFlightRef = useRef(false);
+  const loadDevicesInFlightRef = useRef(false);
   const preloadedModelKeysRef = useRef<Set<string>>(new Set());
   const activeSessionIdRef = useRef<string | null>(null);
   const activeDictationSessionIdRef = useRef<string | null>(null);
@@ -354,11 +365,13 @@ function App() {
   }, [snapshot.session?.session_id]);
 
   const handleSseError = useCallback((error: Error) => {
-    console.warn('SSE error:', error);
-  }, []);
+    if (settings.advanced.debugMode) {
+      console.warn('SSE error:', error);
+    }
+  }, [settings.advanced.debugMode]);
 
   const handleSseOpen = useCallback(() => {
-    console.log('SSE connected');
+    return;
   }, []);
 
   const hasActiveModelDownload = useMemo(
@@ -370,7 +383,10 @@ function App() {
   );
 
   const isSessionRunning = snapshot.session?.status === 'running';
-  const shouldSubscribeToSessionEvents = activePage === 'sessions' || isSessionRunning;
+  const shouldSubscribeToSessionEvents =
+    backendReady &&
+    !isStarting &&
+    (activePage === 'home' || activePage === 'microphone' || activePage === 'systemAudio' || isSessionRunning);
 
   const livePollInterval = useMemo(() => {
     if (hasActiveModelDownload || isSessionRunning) {
@@ -379,7 +395,7 @@ function App() {
     return 4000;
   }, [hasActiveModelDownload, isSessionRunning]);
 
-  const { status: sseStatus, connect, disconnect } = useEventSource({
+  const { status: sseStatus, disconnect } = useEventSource({
     url: '/api/events',
     enabled: shouldSubscribeToSessionEvents,
     maxReconnectAttempts: 3,
@@ -399,7 +415,6 @@ function App() {
   const loadSettings = useCallback(async () => {
     // Prevent duplicate requests
     if (loadSettingsInFlightRef.current) {
-      console.log('Settings load already in progress, skipping duplicate request');
       return;
     }
 
@@ -454,7 +469,12 @@ function App() {
           microphone_asr_model_id: migrated.transcription.microphone_asr_model_id,
           system_asr_model_id: migrated.transcription.system_asr_model_id,
           finish_mode_default: migrated.hotkey.finish_mode_default,
+          enable_refiner_on_stop: migrated.hotkey.enable_refiner_on_stop,
+          save_debug_wav: migrated.hotkey.save_debug_wav,
+          mute_transcripta_audio_during_dictation:
+            migrated.audio.mute_transcripta_audio_during_dictation,
           show_floating_window: migrated.hotkey.show_floating_window,
+          show_floating_coach_result: migrated.coach.show_floating_coach_result,
           floating_window_position: migrated.hotkey.floating_window_position,
           record_on_start: migrated.hotkey.record_on_start,
           stop_on_release: migrated.hotkey.stop_on_release,
@@ -469,7 +489,6 @@ function App() {
         );
       }
 
-      console.log('Settings loaded successfully');
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -500,27 +519,55 @@ function App() {
           capture_source: hotkeyCaptureSource,
         },
       });
+      const settingsWithDefaults: SettingsState = {
+        ...DEFAULT_SETTINGS,
+        ...normalizedSettings,
+        general: { ...DEFAULT_SETTINGS.general, ...normalizedSettings.general },
+        transcription: { ...DEFAULT_SETTINGS.transcription, ...normalizedSettings.transcription },
+        refiner: { ...DEFAULT_SETTINGS.refiner, ...normalizedSettings.refiner },
+        coach: { ...DEFAULT_SETTINGS.coach, ...normalizedSettings.coach },
+        audio: { ...DEFAULT_SETTINGS.audio, ...normalizedSettings.audio },
+        hotkey: { ...DEFAULT_SETTINGS.hotkey, ...normalizedSettings.hotkey },
+        history: { ...DEFAULT_SETTINGS.history, ...normalizedSettings.history },
+        dictionary: { ...DEFAULT_SETTINGS.dictionary, ...normalizedSettings.dictionary },
+        snippets: { ...DEFAULT_SETTINGS.snippets, ...normalizedSettings.snippets },
+        style: { ...DEFAULT_SETTINGS.style, ...normalizedSettings.style },
+        advanced: { ...DEFAULT_SETTINGS.advanced, ...normalizedSettings.advanced },
+      };
       // Filter out fake settings before sending to backend
       const cleanedSettings: SettingsState = {
         general: Object.fromEntries(
-          Object.entries(normalizedSettings.general).filter(([key]) => !isFakeSetting('general', key))
+          Object.entries(settingsWithDefaults.general).filter(([key]) => !isFakeSetting('general', key))
         ) as SettingsState['general'],
         transcription: Object.fromEntries(
-          Object.entries(normalizedSettings.transcription).filter(([key]) => !isFakeSetting('transcription', key))
+          Object.entries(settingsWithDefaults.transcription).filter(([key]) => !isFakeSetting('transcription', key))
         ) as SettingsState['transcription'],
-        refiner: normalizedSettings.refiner,
+        refiner: settingsWithDefaults.refiner,
+        coach: settingsWithDefaults.coach,
         audio: Object.fromEntries(
-          Object.entries(normalizedSettings.audio).filter(([key]) => !isFakeSetting('audio', key))
+          Object.entries(settingsWithDefaults.audio).filter(([key]) => !isFakeSetting('audio', key))
         ) as SettingsState['audio'],
         hotkey: Object.fromEntries(
-          Object.entries(normalizedSettings.hotkey).filter(
+          Object.entries(settingsWithDefaults.hotkey).filter(
             ([key]) => key !== 'model_name' && !isFakeSetting('hotkey', key),
           )
         ) as SettingsState['hotkey'],
+        history: Object.fromEntries(
+          Object.entries(settingsWithDefaults.history).filter(([key]) => !isFakeSetting('history', key))
+        ) as SettingsState['history'],
+        dictionary: Object.fromEntries(
+          Object.entries(settingsWithDefaults.dictionary).filter(([key]) => !isFakeSetting('dictionary', key))
+        ) as SettingsState['dictionary'],
+        snippets: Object.fromEntries(
+          Object.entries(settingsWithDefaults.snippets).filter(([key]) => !isFakeSetting('snippets', key))
+        ) as SettingsState['snippets'],
+        style: Object.fromEntries(
+          Object.entries(settingsWithDefaults.style).filter(([key]) => !isFakeSetting('style', key))
+        ) as SettingsState['style'],
         advanced: Object.fromEntries(
-          Object.entries(normalizedSettings.advanced).filter(([key]) => !isFakeSetting('advanced', key))
+          Object.entries(settingsWithDefaults.advanced).filter(([key]) => !isFakeSetting('advanced', key))
         ) as SettingsState['advanced'],
-        version: normalizedSettings.version,
+        version: settingsWithDefaults.version,
       };
       cleanedSettings.audio.captureMode = normalizedCaptureSource;
       cleanedSettings.audio.default_capture_source = normalizedCaptureSource;
@@ -530,10 +577,10 @@ function App() {
         body: JSON.stringify(cleanedSettings),
       });
       const persistedSettings = sanitizeSettings({
-        ...normalizedSettings,
+        ...settingsWithDefaults,
         hotkey: cleanedSettings.hotkey,
         audio: {
-          ...normalizedSettings.audio,
+          ...settingsWithDefaults.audio,
           captureMode: normalizedCaptureSource,
           default_capture_source: normalizedCaptureSource,
         },
@@ -565,7 +612,7 @@ function App() {
       // Apply hotkey config to Electron main process
       const hotkeyApi = window.transcriptaDesktop.hotkey;
       if (hotkeyApi) {
-        await hotkeyApi.updateConfig({
+        const hotkeyResult = await hotkeyApi.updateConfig({
           enabled: persistedSettings.hotkey.enabled,
           key_combination: persistedSettings.hotkey.key_combination,
           microphone_key_combination: persistedSettings.hotkey.microphone_key_combination,
@@ -581,12 +628,20 @@ function App() {
           microphone_asr_model_id: persistedSettings.transcription.microphone_asr_model_id,
           system_asr_model_id: persistedSettings.transcription.system_asr_model_id,
           finish_mode_default: persistedSettings.hotkey.finish_mode_default,
+          enable_refiner_on_stop: persistedSettings.hotkey.enable_refiner_on_stop,
+          save_debug_wav: persistedSettings.hotkey.save_debug_wav,
+          mute_transcripta_audio_during_dictation:
+            persistedSettings.audio.mute_transcripta_audio_during_dictation,
           show_floating_window: persistedSettings.hotkey.show_floating_window,
+          show_floating_coach_result: persistedSettings.coach.show_floating_coach_result,
           floating_window_position: persistedSettings.hotkey.floating_window_position,
           record_on_start: persistedSettings.hotkey.record_on_start,
           stop_on_release: persistedSettings.hotkey.stop_on_release,
           copy_to_clipboard: persistedSettings.hotkey.copy_to_clipboard,
         } as any);
+        if (!hotkeyResult?.success) {
+          throw new Error(hotkeyResult?.error || 'Unable to apply hotkey settings.');
+        }
       }
 
       if (persistedSettings.transcription.preload_model) {
@@ -596,10 +651,10 @@ function App() {
         );
       }
 
-      console.log('Settings saved successfully');
       return true;
     } catch (error) {
       console.error('Failed to save settings:', error);
+      setStatusMessage(error instanceof Error ? error.message : 'Unable to save settings.');
       return false;
     }
   }, [mergeFormDefaults, settings]);
@@ -607,7 +662,16 @@ function App() {
   const loadModelCatalog = useCallback(async () => {
     try {
       const payload = await backendRequest<ModelCatalogPayload>('/api/models/catalog');
-      setModelManager((current) => applyModelCatalogPayload(current, payload));
+      setModelManager((current) =>
+        applyModelCatalogPayload(current, {
+          catalog: Array.isArray(payload?.catalog) ? payload.catalog : current.catalog,
+          installed: Array.isArray(payload?.installed) ? payload.installed : current.installed,
+          selected_asr_model_id: payload?.selected_asr_model_id ?? current.selectedAsrModelId,
+          selected_refiner_model_id:
+            payload?.selected_refiner_model_id ?? current.selectedRefinerModelId,
+          refinement_mode: payload?.refinement_mode ?? current.refinementMode,
+        } as ModelCatalogPayload),
+      );
     } catch (error) {
       console.error('Failed to load model catalog:', error);
     }
@@ -641,16 +705,22 @@ function App() {
   }, []);
 
   const loadDevices = useCallback(async () => {
+    if (loadDevicesInFlightRef.current) {
+      return;
+    }
+
+    loadDevicesInFlightRef.current = true;
     try {
       const payload = await backendRequest<{ devices: Device[] }>('/api/devices');
-      setDevices(payload.devices);
+      const nextDevices = Array.isArray(payload?.devices) ? payload.devices : [];
+      setDevices(nextDevices);
       setForm((current) => {
-        const eligibleDevices = getEligibleDevices(payload.devices, current.captureMode);
-        const currentExists = payload.devices.some((device) => device.id === current.deviceId);
+        const eligibleDevices = getEligibleDevices(nextDevices, current.captureMode);
+        const currentExists = nextDevices.some((device) => device.id === current.deviceId);
         const preferred =
           eligibleDevices[0]?.id ??
-          payload.devices.find((device) => device.is_loopback)?.id ??
-          payload.devices[0]?.id ??
+          nextDevices.find((device) => device.is_loopback)?.id ??
+          nextDevices[0]?.id ??
           '';
         return {
           ...current,
@@ -659,6 +729,8 @@ function App() {
       });
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Unable to load devices.');
+    } finally {
+      loadDevicesInFlightRef.current = false;
     }
   }, []);
 
@@ -689,40 +761,64 @@ function App() {
   const loadInitialSnapshot = useCallback(async () => {
     try {
       const payload = await backendRequest<SnapshotPayload>('/api/session');
-      revisionRef.current = payload.runtime_revision;
-      activeSessionIdRef.current = payload.session?.session_id ?? null;
-      setSnapshot((current) => applySnapshot(current, payload));
-      if (payload.session?.status !== 'running') {
+      const normalizedPayload: SnapshotPayload = {
+        ...buildInitialSnapshot(),
+        ...payload,
+        transcript: Array.isArray(payload?.transcript) ? payload.transcript : [],
+        suppressed_transcript: Array.isArray(payload?.suppressed_transcript)
+          ? payload.suppressed_transcript
+          : [],
+        formulas: Array.isArray(payload?.formulas) ? payload.formulas : [],
+        needs_review: Array.isArray(payload?.needs_review) ? payload.needs_review : [],
+        available_models: Array.isArray(payload?.available_models) ? payload.available_models : [],
+        available_languages: Array.isArray(payload?.available_languages)
+          ? payload.available_languages
+          : [],
+        available_live_modes: Array.isArray(payload?.available_live_modes)
+          ? payload.available_live_modes
+          : [],
+        available_execution_modes: Array.isArray(payload?.available_execution_modes)
+          ? payload.available_execution_modes
+          : [],
+      };
+      revisionRef.current = normalizedPayload.runtime_revision;
+      activeSessionIdRef.current = normalizedPayload.session?.session_id ?? null;
+      setSnapshot((current) => applySnapshot(current, normalizedPayload));
+      if (normalizedPayload.session?.status !== 'running') {
         setLiveDraft(null);
       }
-      setModelLoading(payload.loading ?? false);
+      setModelLoading(normalizedPayload.loading ?? false);
       setBackendReady(true);
       initializedRef.current = true;
       setForm((current) => ({
         ...current,
         modelName:
-          dirtyFieldsRef.current.has('modelName') || payload.available_models.includes(current.modelName) || modelManager.catalog.some((entry) => entry.id === current.modelName)
+          dirtyFieldsRef.current.has('modelName') ||
+          normalizedPayload.available_models.includes(current.modelName) ||
+          modelManager.catalog.some((entry) => entry.id === current.modelName)
             ? current.modelName
-            : modelManager.selectedAsrModelId ?? payload.available_models[0] ?? 'whisper-medium',
+            : modelManager.selectedAsrModelId ?? normalizedPayload.available_models[0] ?? 'whisper-medium',
         languageMode:
-          dirtyFieldsRef.current.has('languageMode') || payload.available_languages.includes(current.languageMode)
+          dirtyFieldsRef.current.has('languageMode') ||
+          normalizedPayload.available_languages.includes(current.languageMode)
             ? current.languageMode
-            : payload.available_languages[0] ?? 'auto',
+            : normalizedPayload.available_languages[0] ?? 'auto',
         liveMode:
-          dirtyFieldsRef.current.has('liveMode') || payload.available_live_modes.includes(current.liveMode)
+          dirtyFieldsRef.current.has('liveMode') ||
+          normalizedPayload.available_live_modes.includes(current.liveMode)
             ? current.liveMode
-            : payload.available_live_modes[0] ?? 'balanced',
+            : normalizedPayload.available_live_modes[0] ?? 'balanced',
         executionMode:
           dirtyFieldsRef.current.has('executionMode') ||
-          payload.available_execution_modes.includes(current.executionMode)
+          normalizedPayload.available_execution_modes.includes(current.executionMode)
             ? current.executionMode
-            : payload.available_execution_modes[0] ?? 'auto',
+            : normalizedPayload.available_execution_modes[0] ?? 'auto',
       }));
       setStatusMessage(
-        payload.session?.status === 'running'
-          ? payload.health?.gpu_mode?.startsWith('cuda')
+        normalizedPayload.session?.status === 'running'
+          ? normalizedPayload.health?.gpu_mode?.startsWith('cuda')
             ? 'Capturing and transcribing locally on GPU.'
-            : payload.health?.execution_mode === 'gpu_only'
+            : normalizedPayload.health?.execution_mode === 'gpu_only'
               ? 'GPU-only mode requested but unavailable. Fix CUDA runtime.'
               : 'Capturing locally on CPU fallback. Use hi or en instead of auto for better speed.'
           : 'Ready. Configure a session and start.'
@@ -826,6 +922,9 @@ function App() {
           if (transcriptPayload.session_id) {
             activeDictationSessionIdRef.current = transcriptPayload.session_id;
           }
+          if (transcriptPayload.state === 'processing') {
+            setDictationCoachStatus((current) => (current === 'queued' ? 'running' : current));
+          }
           if (transcriptPayload.state === 'idle') {
             setDictationLiveDraft(null);
           }
@@ -833,14 +932,61 @@ function App() {
         }
 
         if (type === 'hotkey_stopped') {
+          const stopPayload = payload as HotkeyStopResponse;
           setDictationLiveDraft(null);
+          setHotkeyState((current) =>
+            current
+              ? {
+                  ...current,
+                  error: null,
+                  session: current.session
+                    ? {
+                        ...current.session,
+                        session_id: stopPayload.session_id || '',
+                        is_recording: false,
+                        status: 'idle',
+                        lifecycle_state: 'idle',
+                      }
+                    : current.session,
+                }
+              : current,
+          );
+          setDictationCoachResult(stopPayload.coach_result ?? null);
+          setDictationAggregatedText(
+            stopPayload.aggregated_clean_text ||
+              stopPayload.composed_text ||
+              stopPayload.final_transcription ||
+              '',
+          );
+          setDictationPostprocessedText(
+            stopPayload.postprocessed_text ||
+              stopPayload.refined_transcription ||
+              stopPayload.final_transcription ||
+              '',
+          );
+          setDictationPasteText(
+            stopPayload.paste_text ||
+              stopPayload.postprocessed_text ||
+              stopPayload.aggregated_clean_text ||
+              stopPayload.final_transcription ||
+              '',
+          );
+          const resolvedCoachStatus =
+            stopPayload.coach_status === 'generated' || stopPayload.coach_status === 'cache_hit'
+              ? 'success'
+              : stopPayload.coach_status === 'fallback'
+                ? 'failed'
+                : stopPayload.coach_status ?? null;
+          setDictationCoachStatus(resolvedCoachStatus);
+          setDictationCoachError(stopPayload.coach_error ?? null);
         }
       },
     );
     disposeBackendExit = window.transcriptaDesktop.onBackendExit(() => {
       setBackendReady(false);
-      setStatusMessage('Backend exited. Restart the desktop app.');
+      setStatusMessage('Backend exited. Reconnecting…');
       disconnect();
+      scheduleNextPoll(1000);
     });
     disposeOpenSettings = window.transcriptaDesktop.onOpenSettings(() => {
       setActivePage('settings');
@@ -869,23 +1015,6 @@ function App() {
     if (isStarting) {
       return;
     }
-    if (!backendReady) {
-      disconnect();
-      return;
-    }
-
-    const isRunning = snapshot.session?.status === 'running';
-    if (isRunning) {
-      connect();
-    } else {
-      disconnect();
-    }
-  }, [backendReady, snapshot.session?.status, isStarting, connect, disconnect]);
-
-  useEffect(() => {
-    if (isStarting) {
-      return;
-    }
     if (sseStatus === 'polling' || sseStatus === 'error') {
       scheduleNextPoll(snapshot.session?.status === 'running' ? 300 : 3000);
     } else if (sseStatus === 'connected') {
@@ -906,6 +1035,24 @@ function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!settings.advanced.debugMode || !dictationCoachStatus) {
+      return;
+    }
+    console.debug('[renderer] Coach panel state', {
+      coachStatus: dictationCoachStatus,
+      hasResult: Boolean(dictationCoachResult),
+      coachError: dictationCoachError,
+      pasteTextChars: dictationPasteText.length,
+    });
+  }, [
+    dictationCoachError,
+    dictationCoachResult,
+    dictationCoachStatus,
+    dictationPasteText.length,
+    settings.advanced.debugMode,
+  ]);
 
   // Sync theme to settings when changed from Sidebar
   const saveSettingsRef = useRef(saveSettings);
@@ -937,9 +1084,9 @@ function App() {
     }
   }, [theme, settingsLoading, settings]); // Include settings dependency to fix stale closure
 
-  async function backendRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const backendRequest = useCallback(async <T,>(path: string, options?: RequestInit): Promise<T> => {
     return window.transcriptaDesktop.fetchJson(path, options) as Promise<T>;
-  }
+  }, []);
 
   async function preloadPreferredModel(modelName?: string, executionMode?: string) {
     if (!modelName) {
@@ -1203,11 +1350,23 @@ function App() {
     dictationCaptureSource === 'system'
       ? settings.hotkey.system_key_combination || settings.hotkey.key_combination
       : settings.hotkey.microphone_key_combination || settings.hotkey.key_combination;
-  const activeRuntimeStatus = hotkeyState?.session?.is_recording
-    ? `Hotkey ${dictationCaptureSource} recording`
-    : snapshot.session?.status === 'running'
-      ? `${form.captureMode === 'system' ? 'System' : 'Microphone'} session running`
-      : 'Ready';
+  const dictationLifecycleState =
+    hotkeyState?.session?.lifecycle_state ??
+    (hotkeyState?.session?.is_recording ? 'recording' : 'idle');
+  const isDictationRecording =
+    dictationLifecycleState === 'recording' || dictationLifecycleState === 'starting';
+  const isDictationTransitioning =
+    dictationLifecycleState === 'starting' || dictationLifecycleState === 'stopping';
+  const activeRuntimeStatus =
+    dictationLifecycleState === 'starting'
+      ? `Starting ${dictationCaptureSource} dictation`
+      : dictationLifecycleState === 'stopping'
+        ? 'Finishing dictation'
+        : isDictationRecording
+          ? `Hotkey ${dictationCaptureSource} recording`
+          : snapshot.session?.status === 'running'
+            ? `${form.captureMode === 'system' ? 'System' : 'Microphone'} session running`
+            : 'Ready';
   const preloadHeadline =
     modelLoading && preloadStatus.stage === 'idle'
       ? 'Loading model'
@@ -1291,11 +1450,53 @@ function App() {
   const startDictation = useCallback(async () => {
     setStatusMessage(`Starting ${dictationCaptureSource === 'system' ? 'system audio' : 'microphone'} dictation...`);
     try {
+      setHotkeyState((current) =>
+        current
+          ? {
+              ...current,
+              error: null,
+              session: {
+                ...(current.session ?? {
+                  session_id: '',
+                  last_activated_at: null,
+                  total_activations: 0,
+                  current_text: '',
+                  duration_ms: 0,
+                }),
+                is_recording: true,
+                status: 'processing',
+                lifecycle_state: 'starting',
+                capture_source: dictationCaptureSource,
+              },
+            }
+          : current,
+      );
       setDictationSnapshot(buildInitialSnapshot());
       setDictationLiveDraft(null);
+      setDictationCoachResult(null);
+      setDictationAggregatedText('');
+      setDictationPostprocessedText('');
+      setDictationPasteText('');
+      setDictationCoachStatus(null);
+      setDictationCoachError(null);
       activeDictationSessionIdRef.current = null;
       await window.transcriptaDesktop.hotkey.start?.(dictationCaptureSource);
     } catch (error) {
+      setHotkeyState((current) =>
+        current
+          ? {
+              ...current,
+              session: current.session
+                ? {
+                    ...current.session,
+                    is_recording: false,
+                    status: 'idle',
+                    lifecycle_state: 'idle',
+                  }
+                : current.session,
+            }
+          : current,
+      );
       setStatusMessage(error instanceof Error ? error.message : 'Unable to start dictation.');
     }
   }, [dictationCaptureSource]);
@@ -1303,24 +1504,62 @@ function App() {
   const stopDictation = useCallback(async () => {
     setStatusMessage('Stopping dictation...');
     try {
+      setHotkeyState((current) =>
+        current
+          ? {
+              ...current,
+              session: current.session
+                ? {
+                    ...current.session,
+                    is_recording: false,
+                    status: 'processing',
+                    lifecycle_state: 'stopping',
+                  }
+                : current.session,
+            }
+          : current,
+      );
+      if (settings.coach.coach_enabled) {
+        setDictationCoachStatus('queued');
+        setDictationCoachError(null);
+      } else {
+        setDictationCoachStatus('disabled');
+      }
       await window.transcriptaDesktop.hotkey.stop?.();
     } catch (error) {
+      setHotkeyState((current) =>
+        current
+          ? {
+              ...current,
+              session: current.session
+                ? {
+                    ...current.session,
+                    is_recording: true,
+                    status: 'listening',
+                    lifecycle_state: 'recording',
+                  }
+                : current.session,
+            }
+          : current,
+      );
       setStatusMessage(error instanceof Error ? error.message : 'Unable to stop dictation.');
+      setDictationCoachStatus('failed');
+      setDictationCoachError(error instanceof Error ? error.message : 'stop_failed');
     }
-  }, []);
+  }, [settings.coach.coach_enabled]);
 
   const dictationView = (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-stone-500">
+          <div className="max-w-3xl border-2 border-lawn-border bg-lawn-bg/60 p-4 shadow-brutal-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-muted">
               Dictation workspace
             </p>
             <h2 className="mt-2 font-display text-4xl uppercase tracking-tight text-lawn-border">
               Talk, clean up, paste
             </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
+            <p className="mt-3 text-sm leading-6 text-lawn-muted">
               Mic and hotkey dictation stay lightweight here. Use the quick drawer for language, finish action,
               and source-aware model choices without opening the full settings panel.
             </p>
@@ -1328,10 +1567,22 @@ function App() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => void (hotkeyState?.session?.is_recording ? stopDictation() : startDictation())}
+              onClick={() => {
+                if (isDictationTransitioning) {
+                  return;
+                }
+                void (isDictationRecording ? stopDictation() : startDictation());
+              }}
+              disabled={isDictationTransitioning}
               className="border-2 border-lawn-accent bg-lawn-accent px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg"
             >
-              {hotkeyState?.session?.is_recording ? 'Stop Dictation' : 'Start Dictation'}
+              {dictationLifecycleState === 'starting'
+                ? 'Starting…'
+                : dictationLifecycleState === 'stopping'
+                  ? 'Stopping…'
+                  : isDictationRecording
+                    ? 'Stop Dictation'
+                    : 'Start Dictation'}
             </button>
             <button
               type="button"
@@ -1349,59 +1600,74 @@ function App() {
             </button>
           </div>
         </div>
-        <div className="mt-4">
-          <ModeCardsRow
-            cards={[
-              {
-                title: 'Dictation Workspace',
-                description: `${dictationCaptureSource === 'system' ? 'System audio' : 'Microphone'} ready with ${dictationLanguage.toUpperCase()} language mode.`,
-                controls: (
-                  <>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500">
-                      {settings.hotkey.device_id || dictationDevices[0]?.name || 'Default device'}
-                    </div>
-                  </>
-                ),
-              },
-              {
-                title: 'Low-latency Mic / Hotkey Timeline',
-                description: `${dictationModelId} · ${activeRuntimeStatus}`,
-                controls: (
-                  <div className="flex flex-wrap gap-2">
-                    <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
-                      {connectionStatus}
-                    </span>
-                    <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
-                      {gpuStatus}
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                title: 'Dictation Finish Action',
-                description: `${settings.hotkey.finish_mode_default.replace(/_/g, ' ')} · ${dictationHotkeyLabel || 'No hotkey set'}`,
-                controls: (
-                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500">
-                    {preloadHeadline}
-                  </div>
-                ),
-              },
-            ]}
-          />
+        <div className="mt-4 border-2 border-lawn-border bg-lawn-bg p-3">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Language</span>
+              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">{dictationLanguage || 'auto'}</p>
+            </div>
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Model</span>
+              <p className="mt-1 text-xs font-bold text-lawn-border">{dictationModelId}</p>
+            </div>
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Finish</span>
+              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">
+                {settings.hotkey.finish_mode_default.replace(/_/g, ' ')}
+              </p>
+            </div>
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
+              <p className="mt-1 text-xs font-bold text-lawn-border">
+                {dictationDevices.find((device) => device.id === settings.hotkey.device_id)?.name ||
+                  dictationDevices[0]?.name ||
+                  'Default device'}
+              </p>
+            </div>
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Runtime</span>
+              <p className="mt-1 text-xs font-bold text-lawn-border">{activeRuntimeStatus}</p>
+            </div>
+            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Refiner</span>
+              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">
+                {settings.hotkey.enable_refiner_on_stop ? 'Enabled' : 'Disabled'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
+              {connectionStatus}
+            </span>
+            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
+              {gpuStatus}
+            </span>
+            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
+              {dictationHotkeyLabel || 'No hotkey set'}
+            </span>
+          </div>
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 gap-4 p-4 xl:grid-cols-[minmax(0,1.25fr)_320px]">
+      <div className="grid min-h-0 flex-1 gap-4 p-4 xl:grid-cols-[minmax(0,1.2fr)_380px]">
         <MainContent
           scope="dictation"
           snapshot={dictationSnapshot}
           liveLatency={liveLatency}
           liveDraft={dictationLiveDraft}
           transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
+          coachResult={dictationCoachResult ?? null}
+          coachStatus={dictationCoachStatus ?? null}
+          coachError={dictationCoachError}
+          originalText={dictationAggregatedText}
+          pasteText={dictationPasteText || dictationPostprocessedText}
+          showCoachDiff={settings.coach.show_diff_view}
           workspaceLabel="Dictation"
           workspaceTitle="Mic / hotkey timeline"
           workspaceDescription="Quick dictation, low-latency feedback, and one shared timeline for recent spoken text."
         />
-        <div className="min-h-0 overflow-hidden">{dictationActivityFeedNode}</div>
+        <div className="min-h-0 overflow-hidden">
+          <div className="h-full min-h-0 overflow-hidden">{dictationActivityFeedNode}</div>
+        </div>
       </div>
     </div>
   );
@@ -1411,14 +1677,14 @@ function App() {
       <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto]">
           <div className="space-y-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-stone-500">
+            <div className="border-2 border-lawn-border bg-lawn-bg/60 p-4 shadow-brutal-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-muted">
                 Session workspace
               </p>
               <h2 className="mt-2 font-display text-4xl uppercase tracking-tight text-lawn-border">
                 Long-form transcription
               </h2>
-              <p className="mt-3 text-sm leading-6 text-stone-600">
+              <p className="mt-3 text-sm leading-6 text-lawn-muted">
                 System audio is the default here. Use the session controls for meetings, videos, exports, and review.
               </p>
             </div>
@@ -1536,12 +1802,12 @@ function App() {
   );
 
   const settingsView = (
-    <div className="h-full overflow-hidden p-4">
-      <div className="h-full overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
+    <div className="flex h-full min-h-0 flex-col p-4">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
         <SettingsPanel
           inline
           isOpen
-          onClose={() => setActivePage('dictation')}
+          onClose={() => setActivePage('home')}
           initialSettings={settings}
           onSettingsChange={async (newSettings) => {
             await saveSettings(newSettings);
@@ -1571,6 +1837,38 @@ function App() {
     </div>
   );
 
+  const homeView = (
+    <div className="flex h-full min-h-0 flex-col p-4">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
+        <HomePage
+          request={backendRequest}
+          onOpenSettings={() => setActivePage('settings')}
+          onStatus={setStatusMessage}
+          defaultRangeDays={settings.history.default_analytics_range_days}
+          allowRetry={settings.history.allow_retry}
+          persistAudio={settings.history.persist_audio}
+          variant="full"
+        />
+      </div>
+    </div>
+  );
+  const microphoneView = dictationView;
+  const systemAudioView = sessionsView;
+
+  const dictionaryView = (
+    <DictionaryPage
+      request={backendRequest}
+      enabled={settings.dictionary.dictionary_enabled}
+    />
+  );
+
+  const snippetsView = (
+    <SnippetsPage
+      request={backendRequest}
+      enabled={settings.snippets.snippets_enabled}
+    />
+  );
+
   const quickSettingsDrawer =
     quickSettingsMode === 'dictation' ? (
       <QuickSettingsDrawer
@@ -1581,7 +1879,7 @@ function App() {
       >
         <div className="space-y-4">
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Source</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Source</span>
             <select
               value={dictationCaptureSource}
               onChange={(event) => void updateDictationSetting('capture_source', event.target.value)}
@@ -1592,7 +1890,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Device</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
             <select
               value={settings.hotkey.device_id || dictationDevices[0]?.id || ''}
               onChange={(event) => void updateDictationSetting('device_id', event.target.value)}
@@ -1606,7 +1904,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Language</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Language</span>
             <select
               value={dictationLanguage}
               onChange={(event) => void updateDictationSetting('language', event.target.value)}
@@ -1620,7 +1918,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Dictation model</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Dictation model</span>
             <select
               value={dictationModelId}
               onChange={(event) => void updateDictationSetting('model_id', event.target.value)}
@@ -1636,19 +1934,19 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Finish action</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Finish action</span>
             <select
               value={settings.hotkey.finish_mode_default}
               onChange={(event) => void updateDictationSetting('finish_mode_default', event.target.value)}
               className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
             >
               <option value="finish_and_paste">Finish &amp; Paste</option>
-              <option value="finish_only">Finish only</option>
+              <option value="finish">Finish only</option>
               <option value="cancel">Cancel</option>
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Refiner mode</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Refiner mode</span>
             <select
               value={settings.transcription.refinement_mode}
               onChange={(event) => void updateDictationSetting('refinement_mode', event.target.value)}
@@ -1670,7 +1968,7 @@ function App() {
       >
         <div className="space-y-4">
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Session title</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Session title</span>
             <input
               value={form.sessionTitle}
               onChange={(event) => handleSidebarFieldChange('sessionTitle', event.target.value)}
@@ -1678,7 +1976,7 @@ function App() {
             />
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Source</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Source</span>
             <select
               value={form.captureMode}
               onChange={(event) => handleSidebarFieldChange('captureMode', event.target.value as FormState['captureMode'])}
@@ -1689,7 +1987,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Device</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
             <select
               value={form.deviceId}
               onChange={(event) => handleSidebarFieldChange('deviceId', event.target.value)}
@@ -1703,7 +2001,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">ASR model</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">ASR model</span>
             <select
               value={sessionModelId}
               onChange={(event) => void updateSessionModelSetting(event.target.value)}
@@ -1719,7 +2017,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Quality mode</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Quality mode</span>
             <select
               value={form.liveMode}
               onChange={(event) => handleSidebarFieldChange('liveMode', event.target.value)}
@@ -1733,7 +2031,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Execution mode</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Execution mode</span>
             <select
               value={form.executionMode}
               onChange={(event) => handleSidebarFieldChange('executionMode', event.target.value)}
@@ -1747,7 +2045,7 @@ function App() {
             </select>
           </label>
           <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">Export folder</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Export folder</span>
             <div className="flex gap-2">
               <input
                 value={form.exportRoot}
@@ -1782,9 +2080,9 @@ function App() {
           onNavigate={(page) => {
             setActivePage(page);
             setQuickSettingsMode(null);
-            if (page === 'sessions' && form.captureMode !== 'system') {
-              handleSidebarFieldChange('captureMode', 'system');
-            }
+          }}
+          onRefreshDevices={() => {
+            void loadDevices();
           }}
           appName={AppConstants.APP_NAME}
           statusMessage={statusMessage}
@@ -1793,7 +2091,17 @@ function App() {
           sessionStatus={activeRuntimeStatus}
         />
         <div className="min-h-0 flex-1 overflow-hidden">
-          {activePage === 'dictation' ? dictationView : activePage === 'sessions' ? sessionsView : settingsView}
+          {activePage === 'home'
+            ? homeView
+            : activePage === 'microphone'
+              ? microphoneView
+              : activePage === 'systemAudio'
+              ? systemAudioView
+            : activePage === 'dictionary'
+              ? dictionaryView
+              : activePage === 'snippets'
+                ? snippetsView
+                  : settingsView}
         </div>
       </div>
       {quickSettingsDrawer}

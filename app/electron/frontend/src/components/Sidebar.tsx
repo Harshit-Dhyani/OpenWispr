@@ -532,7 +532,7 @@ export function Sidebar({
                 </span>
                 <span className="text-xs font-black text-lawn-border">{meterPercent}%</span>
               </div>
-              <div className="h-3 border-[2px] border-lawn-border bg-white overflow-hidden">
+              <div className="h-3 border-[2px] border-lawn-border bg-lawn-bg overflow-hidden">
                 <div
                   className="h-full bg-lawn-accent transition-all duration-100 border-r-2 border-lawn-border"
                   style={{ width: `${meterPercent}%` }}
