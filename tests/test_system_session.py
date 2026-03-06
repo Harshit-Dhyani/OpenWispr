@@ -117,8 +117,8 @@ class TestSrtFormatter:
                 id="1",
                 start=0.0,
                 end=2.0,
-                text="Hello world",
-                display_text="Hello world",
+                text="Project status update",
+                display_text="Project status update",
                 language="en",
             ),
             TranscriptSegment(
@@ -146,7 +146,7 @@ class TestSrtFormatter:
         assert "1" in result
         assert "2" in result
         assert "00:00:00,000 --> 00:00:02,000" in result
-        assert "Hello world" in result
+        assert "Project status update" in result
         assert "Third segment" in result
         assert "Test segment" not in result  # Suppressed
 
@@ -578,7 +578,7 @@ class TestSystemSessionHandler:
         """Test text slugification."""
         handler = SystemSessionHandler(sample_settings)
 
-        assert handler._slugify("Hello World") == "hello-world"
+        assert handler._slugify("Project Status Update") == "project-status-update"
         assert handler._slugify("Test-123-File") == "test-123-file"
         assert handler._slugify("Multiple   Spaces") == "multiple-spaces"
 
@@ -586,7 +586,7 @@ class TestSystemSessionHandler:
         """Test text normalization."""
         handler = SystemSessionHandler(sample_settings)
 
-        assert handler._normalize_text("Hello World") == "hello world"
+        assert handler._normalize_text("Project Status Update") == "project status update"
         assert handler._normalize_text("UPPER CASE") == "upper case"
         assert handler._normalize_text("Extra   Spaces") == "extra spaces"
 

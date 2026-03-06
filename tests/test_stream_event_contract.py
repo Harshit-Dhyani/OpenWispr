@@ -28,14 +28,14 @@ def test_backend_service_emits_draft_then_commit_events_in_order(monkeypatch) ->
     service._stabilizer = PartialStabilizer(session_id="session-123", stability_threshold=1)  # type: ignore[attr-defined]
     monkeypatch.setattr(service._refinement_queue, "enqueue", lambda **kwargs: None)
 
-    service._on_partial("hello world", 0.0, 0.5)
+    service._on_partial("project status update", 0.0, 0.5)
     service._on_segment(
         TranscriptSegment(
             id="seg-1",
             start=0.0,
             end=0.8,
-            text="hello world",
-            display_text="hello world",
+            text="project status update",
+            display_text="project status update",
             language="en",
             confidence=0.9,
         )

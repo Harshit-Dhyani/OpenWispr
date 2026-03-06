@@ -178,6 +178,7 @@ class TestHotkeyWebSocket:
             "hotkey_stop_ack",
             "hotkey_stopping",
             "hotkey_stopped",
+            "final_text",
             "hotkey_draft_partial",
             "hotkey_commit_final",
             "hotkey_audio_level",
@@ -185,10 +186,11 @@ class TestHotkeyWebSocket:
         ]
 
         # Just verify the list is reasonable
-        assert len(expected_events) == 8
+        assert len(expected_events) == 9
         assert "hotkey_status" in expected_events
         assert "hotkey_audio_level" in expected_events
         assert "hotkey_commit_final" in expected_events
+        assert "final_text" in expected_events
 
 
 class TestWebSocketErrorHandling:

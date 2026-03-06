@@ -95,7 +95,7 @@ class TestSSEEventFormat:
         def event_generator():
             yield mock_backend_service._publish_event(
                 "segment",
-                {"id": "seg-1", "text": "Hello world", "start": 0.0, "end": 2.0},
+                {"id": "seg-1", "text": "Project status update", "start": 0.0, "end": 2.0},
             )
 
         with client.stream("GET", "/api/events") as response:

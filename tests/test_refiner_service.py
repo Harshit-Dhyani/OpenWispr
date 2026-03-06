@@ -21,14 +21,15 @@ def test_refiner_service_returns_original_text_when_runtime_disabled(tmp_path: P
     service = RefinerService(tmp_path)
 
     result = service.refine_text(
-        "hello world",
+        "project status update",
         mode="strict",
+        profile="clean_dictation",
         model_id="qwen2.5-7b-instruct",
         runtime_enabled=False,
         language_hint="en",
     )
 
-    assert result.text == "hello world"
+    assert result.text == "project status update"
     assert result.used_runtime is False
     assert "disabled" in (result.error or "")
 
@@ -40,20 +41,21 @@ def test_refiner_service_uses_runtime_when_available(tmp_path: Path) -> None:
 
     class FakeLlama:
         def create_completion(self, **_: object) -> dict[str, object]:
-            return {"choices": [{"text": "Hello world."}]}
+            return {"choices": [{"text": "Project status update."}]}
 
     service = RefinerService(tmp_path)
     service._ensure_model = lambda model_id: FakeLlama()  # type: ignore[method-assign]
 
     result = service.refine_text(
-        "hello world",
+        "project status update",
         mode="strict",
+        profile="clean_dictation",
         model_id="phi-3-mini-4k-instruct",
         runtime_enabled=True,
         language_hint="en",
     )
 
-    assert result.text == "Hello world."
+    assert result.text == "Project status update."
     assert result.used_runtime is True
     assert result.model_id == "phi-3-mini-4k-instruct"
 
@@ -73,6 +75,7 @@ def test_refiner_service_preserves_technical_tokens_in_strict_mode(tmp_path: Pat
     result = service.refine_text(
         "set max_tokens to 128ms in app.api.server",
         mode="strict",
+        profile="code_logs",
         model_id="phi-3-mini-4k-instruct",
         runtime_enabled=True,
         language_hint="en",
@@ -97,6 +100,7 @@ def test_refiner_service_falls_back_when_runtime_rewrites_protected_tokens(tmp_p
     result = service.refine_text(
         "set max_tokens to 128ms in app.api.server",
         mode="strict",
+        profile="code_logs",
         model_id="phi-3-mini-4k-instruct",
         runtime_enabled=True,
         language_hint="en",
@@ -111,11 +115,25 @@ def test_refiner_prompt_includes_cleanup_instructions(tmp_path: Path) -> None:
     service = RefinerService(tmp_path)
 
     prompt = service._build_prompt(
-        "hello world",
+        "project status update",
         mode="strict",
+        profile="clean_dictation",
         language_hint="en",
         cleanup_instructions="Keep proper nouns unchanged.",
     )
 
     assert "Additional cleanup instructions for final text only" in prompt
     assert "Keep proper nouns unchanged." in prompt
+
+
+def test_refiner_service_preserves_placeholders_in_code_logs_profile(tmp_path: Path) -> None:
+    service = RefinerService(tmp_path)
+
+    protected = service._protect_sensitive_tokens(
+        "keep HTTPX at 100% and version 0.0.1.000 plus Ctrl+Shift+T"
+    )
+
+    assert "[[KEEP_TOKEN_" in protected.protected_text
+    assert service._placeholders_intact(protected.protected_text, protected.placeholders) is True
+    restored = service._restore_sensitive_tokens(protected.protected_text, protected.placeholders)
+    assert restored == "keep HTTPX at 100% and version 0.0.1.000 plus Ctrl+Shift+T"

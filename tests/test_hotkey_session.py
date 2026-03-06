@@ -369,10 +369,10 @@ class TestHotkeySession:
         mock_injector.inject.return_value = True
 
         session = HotkeySession(config=config, text_injector=mock_injector)
-        session._transcription_result = "Hello world"
+        session._transcription_result = "Project status update"
         session._handle_output()
 
-        mock_injector.inject.assert_called_once_with("Hello world")
+        mock_injector.inject.assert_called_once_with("Project status update")
         assert session._metrics.inject_success is True
 
     def test_handle_output_inject_fails_fallback_to_clipboard(self):
@@ -383,11 +383,11 @@ class TestHotkeySession:
         mock_injector.copy_to_clipboard.return_value = True
 
         session = HotkeySession(config=config, text_injector=mock_injector)
-        session._transcription_result = "Hello world"
+        session._transcription_result = "Project status update"
         session._handle_output()
 
-        mock_injector.inject.assert_called_once_with("Hello world")
-        mock_injector.copy_to_clipboard.assert_called_once_with("Hello world")
+        mock_injector.inject.assert_called_once_with("Project status update")
+        mock_injector.copy_to_clipboard.assert_called_once_with("Project status update")
         assert session._metrics.inject_success is False
 
     def test_handle_output_clipboard_only(self):
@@ -397,11 +397,11 @@ class TestHotkeySession:
         mock_injector.copy_to_clipboard.return_value = True
 
         session = HotkeySession(config=config, text_injector=mock_injector)
-        session._transcription_result = "Hello world"
+        session._transcription_result = "Project status update"
         session._handle_output()
 
         mock_injector.inject.assert_not_called()
-        mock_injector.copy_to_clipboard.assert_called_once_with("Hello world")
+        mock_injector.copy_to_clipboard.assert_called_once_with("Project status update")
 
     def test_save_session(self, tmp_path):
         """Test session saving to disk."""

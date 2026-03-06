@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -138,10 +139,12 @@ class TestHotkeyEndpoints:
             model_name="small",
             language_mode="auto",
             execution_mode="gpu_only",
+            transcription_mode="literal",
         )
 
         assert request.device_id == "mic-1"
         assert request.model_name == "small"
+        assert request.transcription_mode == "literal"
 
     def test_hotkey_start_response(self) -> None:
         """Test HotkeyStartResponse model."""
@@ -161,15 +164,23 @@ class TestHotkeyEndpoints:
         from app.api.server import HotkeyStopResponse
 
         response = HotkeyStopResponse(
-            final_transcription="Hello world",
-            raw_transcription="hello world",
+            transcription_mode="dictation",
+            composed_text="Project status update",
+            final_transcription="Project status update",
+            live_paste_text="Project status update",
+            final_cleanup_applied=True,
+            raw_transcription="project status update",
             duration_ms=5000,
             segment_count=1,
             source_backend="sounddevice",
             language_used="en",
         )
 
-        assert response.final_transcription == "Hello world"
+        assert response.composed_text == "Project status update"
+        assert response.final_transcription == "Project status update"
+        assert response.transcription_mode == "dictation"
+        assert response.live_paste_text == "Project status update"
+        assert response.final_cleanup_applied is True
         assert response.duration_ms == 5000
         assert response.segment_count == 1
 
@@ -222,6 +233,40 @@ class TestHotkeyEndpoints:
         assert request.chunk_seconds == 0.5
         assert request.vad_threshold_db == -35.0
         assert request.confidence_threshold == 0.6
+
+    @pytest.mark.asyncio
+    async def test_coach_prompt_preview_endpoint(self) -> None:
+        from app.api.server import CoachPromptPreviewRequest, coach_prompt_preview
+
+        fake_service = SimpleNamespace(
+            _get_coach_service=lambda: SimpleNamespace(
+                prompt_preview=lambda _context: {
+                    "system_prompt": "SYSTEM",
+                    "user_prompt": "USER",
+                    "resolved_template_id": "default_english_coach",
+                    "resolved_template_version": 1,
+                    "variables": {"original_text": "project status update"},
+                    "warnings": [],
+                }
+            )
+        )
+
+        response = await coach_prompt_preview(
+            CoachPromptPreviewRequest(
+                capture_source="microphone",
+                original_text="project status update",
+                language_mode="en",
+                detail_level="compact",
+                template_id="default_english_coach",
+                overrides={},
+                privacy_mode="local_only",
+            ),
+            svc=fake_service,
+        )
+
+        assert response["resolved_template_id"] == "default_english_coach"
+        assert response["resolved_template_version"] == 1
+        assert response["variables"]["original_text"] == "project status update"
 
 
 class TestHotkeyService:

@@ -31,7 +31,11 @@ def test_settings_manager_applies_new_hotkey_defaults_when_fields_are_missing(tm
     assert settings.hotkey.language == "auto"
     assert settings.hotkey.device_id == "default"
     assert settings.hotkey.finish_mode_default == "finish_and_paste"
+    assert settings.hotkey.enable_refiner_on_stop is False
+    assert settings.hotkey.save_debug_wav is False
     assert settings.hotkey.record_on_start is False
+    assert settings.transcription.transcription_mode == "dictation"
+    assert settings.transcription.refinement_profile == "raw"
 
 
 def test_settings_manager_import_keeps_capture_mode_and_backend(tmp_path):
@@ -94,6 +98,7 @@ def test_settings_manager_persists_model_selections_and_refinement_mode(tmp_path
 
     assert settings.transcription.default_asr_model_id == "whisper-large-v3"
     assert settings.transcription.refinement_mode == "strict"
+    assert settings.transcription.refinement_profile == "raw"
     assert settings.refiner.selected_model_id == "phi-3-mini-4k-instruct"
     assert settings.refiner.engine_preference == "llamacpp"
 

@@ -28,7 +28,7 @@ class TestSlugify:
 
     def test_basic_slugify(self) -> None:
         """Test basic slugification."""
-        assert slugify("Hello World") == "hello-world"
+        assert slugify("Project Status Update") == "project-status-update"
 
     def test_special_characters(self) -> None:
         """Test slugify with special characters."""
@@ -49,15 +49,15 @@ class TestNormalizeTranscriptText:
 
     def test_basic_normalization(self) -> None:
         """Test basic text normalization."""
-        text = "Hello, World!"
+        text = "Project, Status Update!"
         result = _normalize_transcript_text(text)
-        assert result == "hello world"
+        assert result == "project status update"
 
     def test_multiple_spaces_removal(self) -> None:
         """Test removal of multiple spaces."""
-        text = "Hello    World"
+        text = "Project    Status Update"
         result = _normalize_transcript_text(text)
-        assert result == "hello world"
+        assert result == "project status update"
 
     def test_special_characters_removal(self) -> None:
         """Test removal of special characters."""

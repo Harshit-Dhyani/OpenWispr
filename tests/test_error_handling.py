@@ -731,7 +731,7 @@ class TestRecoveryStrategies:
 
         # Create a valid session file
         session_file = tmp_path / "session.json"
-        data = {"id": "session_123", "transcript": "Hello world"}
+        data = {"id": "session_123", "transcript": "Project status update"}
         with open(session_file, "w") as f:
             json.dump(data, f)
 

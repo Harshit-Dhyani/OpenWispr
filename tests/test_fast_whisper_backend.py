@@ -85,6 +85,9 @@ def test_transcribe_normalizes_string_suppress_tokens_before_model_call() -> Non
     assert result.text == "hello"
     assert captured_kwargs["suppress_tokens"] == [-1]
     assert not isinstance(captured_kwargs["suppress_tokens"], str)
+    assert captured_kwargs["compression_ratio_threshold"] == 2.4
+    assert captured_kwargs["log_prob_threshold"] == -1.0
+    assert captured_kwargs["no_speech_threshold"] == 0.6
 
 
 def test_factory_uses_requested_runtime_model_name() -> None:
@@ -104,3 +107,23 @@ def test_factory_uses_requested_runtime_model_name() -> None:
     )
 
     assert captured["model_name"] == "turbo"
+
+
+def test_factory_honors_requested_compute_type_override() -> None:
+    captured: dict[str, object] = {}
+
+    class FakePool:
+        def get_model(self, **kwargs: object):
+            captured.update(kwargs)
+            return object()
+
+    OptimizedWhisperFactory.create_backend(
+        mode="wispr",
+        model_pool=FakePool(),
+        download_root="./models",
+        device="cuda",
+        model_name="turbo",
+        compute_type="float16",
+    )
+
+    assert captured["compute_type"] == "float16"
