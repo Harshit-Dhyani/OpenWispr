@@ -22,8 +22,14 @@ def main() -> None:
         format="%(levelname)s: %(name)s - %(message)s",
     )
     quiet_level = logging.DEBUG if resolved_level == "DEBUG" else logging.WARNING
-    logging.getLogger("httpx").setLevel(quiet_level)
-    logging.getLogger("httpcore").setLevel(quiet_level)
+    for noisy_logger in (
+        "httpx",
+        "httpcore",
+        "faster_whisper",
+        "ctranslate2",
+        "uvicorn.access",
+    ):
+        logging.getLogger(noisy_logger).setLevel(quiet_level)
 
     uvicorn.run(
         "app.api.server:app",
@@ -31,6 +37,7 @@ def main() -> None:
         port=settings.port,
         reload=False,
         log_level=log_level,
+        access_log=resolved_level == "DEBUG",
     )
 
 

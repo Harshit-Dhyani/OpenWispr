@@ -544,6 +544,7 @@ class BackendService:
                 session_id=session_id,
                 segment=serialized,
                 refinement_mode=user_settings.transcription.refinement_mode,
+                refinement_profile=getattr(user_settings.transcription, "refinement_profile", "raw"),
                 model_id=user_settings.refiner.selected_model_id,
                 runtime_enabled=user_settings.refiner.runtime_enabled,
                 language_hint=serialized["language"] or "auto",
