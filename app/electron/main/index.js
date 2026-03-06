@@ -1,5 +1,8 @@
 // Main entry point for Electron
 const { app, ipcMain, globalShortcut } = require("electron");
+if (process.env.TRANSCRIPTA_DISABLE_GPU === "1") {
+  app.disableHardwareAcceleration();
+}
 const state = require("./shared/state");
 const { startBackend, waitForBackendReady, stopBackend } = require("./services/backendSpawn");
 const { initTextInjector } = require("./services/textInjector");
@@ -16,6 +19,14 @@ const {
 
 // Import IPC setup
 require("./ipc/handlers");
+
+process.on("uncaughtException", (error) => {
+  console.error("[main] Uncaught exception", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[main] Unhandled rejection", reason);
+});
 
 // App event handlers
 app.whenReady().then(async () => {
@@ -46,7 +57,9 @@ app.whenReady().then(async () => {
     }
   });
 
-  console.log("[main] Global hotkey starts disabled until settings are loaded.");
+  if (state.isDebugLoggingEnabled()) {
+    console.log("[main] Global hotkey starts disabled until settings are loaded.");
+  }
 }).catch((error) => {
   console.error("[main] App startup failed", error);
 });

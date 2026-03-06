@@ -50,6 +50,10 @@ let hotkeyWebSocketGeneration = 0;
 let hotkeyPendingAction = null;
 let pendingRestartSource = null;
 let activeHotkeyCaptureSource = null;
+let hotkeyLatestPasteCandidate = "";
+let hotkeyPastedLiveCandidate = false;
+let floatingWindowSuppressResult = false;
+let hotkeyMutedAppAudio = false;
 
 // Tray icons cache
 let trayIconIdle = null;
@@ -79,7 +83,11 @@ let hotkeyConfigState = {
   microphone_asr_model_id: "whisper-medium",
   system_asr_model_id: "whisper-medium",
   finish_mode_default: "finish_and_paste",
+  enable_refiner_on_stop: false,
+  save_debug_wav: false,
+  mute_transcripta_audio_during_dictation: false,
   show_floating_window: true,
+  show_floating_coach_result: true,
   floating_window_position: "bottom-right",
   record_on_start: false,
   stop_on_release: false,
@@ -105,6 +113,22 @@ function broadcastToWindows(channel, payload) {
   for (const win of windows) {
     win.webContents.send(channel, payload);
   }
+}
+
+function isDebugLoggingEnabled() {
+  if ((process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug") {
+    return true;
+  }
+
+  const advanced = cachedSettings?.advanced;
+  if (!advanced || typeof advanced !== "object") {
+    return false;
+  }
+
+  return (
+    advanced.debugMode === true ||
+    String(advanced.logLevel || "").toUpperCase() === "DEBUG"
+  );
 }
 
 module.exports = {
@@ -192,6 +216,14 @@ module.exports = {
   set pendingRestartSource(value) { pendingRestartSource = value; },
   get activeHotkeyCaptureSource() { return activeHotkeyCaptureSource; },
   set activeHotkeyCaptureSource(value) { activeHotkeyCaptureSource = value; },
+  get hotkeyLatestPasteCandidate() { return hotkeyLatestPasteCandidate; },
+  set hotkeyLatestPasteCandidate(value) { hotkeyLatestPasteCandidate = value; },
+  get hotkeyPastedLiveCandidate() { return hotkeyPastedLiveCandidate; },
+  set hotkeyPastedLiveCandidate(value) { hotkeyPastedLiveCandidate = value; },
+  get floatingWindowSuppressResult() { return floatingWindowSuppressResult; },
+  set floatingWindowSuppressResult(value) { floatingWindowSuppressResult = value; },
+  get hotkeyMutedAppAudio() { return hotkeyMutedAppAudio; },
+  set hotkeyMutedAppAudio(value) { hotkeyMutedAppAudio = value; },
 
   // Tray icons
   get trayIconIdle() { return trayIconIdle; },
@@ -211,6 +243,7 @@ module.exports = {
   // Constants
   DEFAULT_HOTKEY,
   QUICK_LANGUAGE_OPTIONS,
+  isDebugLoggingEnabled,
 
   // Hotkey config
   get hotkeyConfigState() { return hotkeyConfigState; },

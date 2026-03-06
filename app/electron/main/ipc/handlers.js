@@ -9,10 +9,11 @@ const { hideFloatingWindow } = require("../windows/floatingWindow");
 const { createTray, scheduleTrayRefresh } = require("../windows/tray");
 const {
   validateAccelerator, checkHotkeyAvailability, registerHotkey, unregisterHotkey,
-  applyHotkeyConfig, toggleRecording, buildHotkeyStatePayload
+  applyHotkeyConfig, buildHotkeyStatePayload
 } = require("./hotkeyHandlers");
-const { startRecording, stopRecording } = require("./hotkeyHandlers");
+const { requestStartRecording, requestStopRecording, stopRecording } = require("./hotkeyHandlers");
 const { closeHotkeyWebSocket } = require("./hotkeyHandlers");
+const { ELECTRON_STRINGS } = require("../../strings/en");
 
 // File dialogs
 ipcMain.handle("choose-directory", async () => {
@@ -36,10 +37,14 @@ ipcMain.handle("choose-pdf", async () => {
   return result.filePaths[0];
 });
 
+ipcMain.on("floating:get-strings", (event) => {
+  event.returnValue = ELECTRON_STRINGS.floating;
+});
+
 // Hotkey IPC handlers
 ipcMain.handle("hotkey:register", async (event, { accelerator }) => {
   if (!accelerator) {
-    return { success: false, error: "No accelerator provided" };
+    return { success: false, error: ELECTRON_STRINGS.hotkey.errors.noAcceleratorProvided };
   }
 
   console.log(`[main] IPC: Registering hotkey "${accelerator}"`);
@@ -67,7 +72,7 @@ ipcMain.handle("hotkey:unregister", async () => {
 
 ipcMain.handle("hotkey:validate", async (event, { accelerator }) => {
   if (!accelerator) {
-    return { valid: false, error: "No accelerator provided" };
+    return { valid: false, error: ELECTRON_STRINGS.hotkey.errors.noAcceleratorProvided };
   }
 
   const validation = validateAccelerator(accelerator);
@@ -103,11 +108,11 @@ ipcMain.handle("hotkey:toggle", async (event, enabled) => {
 });
 
 ipcMain.handle("hotkey:start", async (event, { source } = {}) => {
-  return startRecording(source);
+  return requestStartRecording(source);
 });
 
 ipcMain.handle("hotkey:stop", async (event) => {
-  return stopRecording();
+  return requestStopRecording({ keepFloatingResultVisible: false });
 });
 
 ipcMain.handle("hotkey:get-state", async () => {
@@ -118,12 +123,14 @@ ipcMain.handle("hotkey:get-default", async () => {
   return {
     accelerator: state.DEFAULT_HOTKEY,
     platform: process.platform,
-    note: "Uses toggle mode: press once to start, press again to stop"
+    note: ELECTRON_STRINGS.hotkey.notes.toggleMode
   };
 });
 
 ipcMain.handle("hotkey:update-config", async (event, config) => {
-  console.log("[main] IPC: Updating hotkey config", config);
+  if (state.isDebugLoggingEnabled()) {
+    console.log("[main] IPC: Updating hotkey config", config);
+  }
   const result = await applyHotkeyConfig(config);
   await scheduleTrayRefresh();
   return result;
@@ -256,8 +263,9 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
   if (action === "cancel") {
     if (state.isRecording) {
       try {
+        state.floatingWindowSuppressResult = true;
         state.hotkeyPendingAction = "cancel";
-        await toggleRecording(false);
+        await stopRecording({ keepFloatingResultVisible: false });
       } catch (error) {
         console.error("[main] Failed to stop:", error);
       } finally {
@@ -266,9 +274,11 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
     }
   } else if (action === "finish") {
     if (state.isRecording) {
-      state.hotkeyPendingAction = "finish";
+      state.hotkeyPendingAction =
+        state.hotkeyConfigState.finish_mode_default ||
+        (state.hotkeyConfigState.auto_inject ? "finish_and_paste" : "finish");
       try {
-        await toggleRecording(false);
+        await stopRecording({ keepFloatingResultVisible: true });
       } finally {
         state.hotkeyPendingAction = null;
       }
@@ -277,10 +287,14 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
     if (state.isRecording) {
       try {
         state.hotkeyPendingAction = "finish_and_paste";
-        await toggleRecording(false);
+        await stopRecording({ keepFloatingResultVisible: true });
       } finally {
         state.hotkeyPendingAction = null;
       }
+    }
+  } else if (action === "dismiss-result") {
+    if (state.floatingWindow && !state.floatingWindow.isDestroyed()) {
+      state.floatingWindow.hide();
     }
   }
 });

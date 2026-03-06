@@ -4,6 +4,11 @@ const path = require("path");
 const fs = require("fs");
 const state = require("../shared/state");
 
+let restartTimer = null;
+let suppressRestart = false;
+let restartAttempts = 0;
+const MAX_BACKEND_RESTARTS = 3;
+
 function resolvePythonLaunch() {
   const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
   const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
@@ -17,14 +22,20 @@ function resolvePythonLaunch() {
 
   // Prefer venv Python if it exists
   if (process.env.TRANSCRIPTA_PYTHON) {
-    console.log(`[backend] Using TRANSCRIPTA_PYTHON: ${process.env.TRANSCRIPTA_PYTHON}`);
+    if (state.isDebugLoggingEnabled()) {
+      console.log(`[backend] Using TRANSCRIPTA_PYTHON: ${process.env.TRANSCRIPTA_PYTHON}`);
+    }
     return { command: process.env.TRANSCRIPTA_PYTHON, args: [apiMainPath] };
   }
   if (fs.existsSync(venvPython)) {
-    console.log(`[backend] Using venv Python: ${venvPython}`);
+    if (state.isDebugLoggingEnabled()) {
+      console.log(`[backend] Using venv Python: ${venvPython}`);
+    }
     return { command: venvPython, args: [apiMainPath] };
   }
-  console.log(`[backend] Falling back to system Python (py -3)`);
+  if (state.isDebugLoggingEnabled()) {
+    console.log(`[backend] Falling back to system Python (py -3)`);
+  }
   return { command: "py", args: ["-3", apiMainPath] };
 }
 
@@ -32,6 +43,9 @@ async function backendAlreadyRunning() {
   try {
     const response = await fetch(`${state.API_ORIGIN}/api/health`);
     state.backendReady = response.ok;
+    if (response.ok) {
+      restartAttempts = 0;
+    }
     return response.ok;
   } catch {
     state.backendReady = false;
@@ -56,8 +70,10 @@ async function startBackend() {
   }
   if (await backendAlreadyRunning()) {
     state.backendReady = true;
+    restartAttempts = 0;
     return;
   }
+  suppressRestart = false;
   const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
   const { command, args } = resolvePythonLaunch();
   const { app } = require("electron");
@@ -67,19 +83,27 @@ async function startBackend() {
   const pathSeparator = process.platform === "win32" ? ";" : ":";
   const pythonPath = repoRoot + (process.env.PYTHONPATH ? pathSeparator + process.env.PYTHONPATH : "");
 
-  console.log(`[backend] Starting Python backend:`);
-  console.log(`[backend]   Command: ${command}`);
-  console.log(`[backend]   Args: ${JSON.stringify(args)}`);
-  console.log(`[backend]   CWD: ${repoRoot}`);
-  console.log(`[backend]   PYTHONPATH: ${pythonPath}`);
+  if (state.isDebugLoggingEnabled()) {
+    console.log(`[backend] Starting Python backend:`);
+    console.log(`[backend]   Command: ${command}`);
+    console.log(`[backend]   Args: ${JSON.stringify(args)}`);
+    console.log(`[backend]   CWD: ${repoRoot}`);
+    console.log(`[backend]   PYTHONPATH: ${pythonPath}`);
+  }
+
+  const backendEnv = {
+    ...process.env,
+    PYTHONPATH: pythonPath,
+    TRANSCRIPTA_DOWNLOAD_ROOT: modelsRoot,
+  };
+
+  if (process.env.TRANSCRIPTA_LOG_LEVEL) {
+    backendEnv.TRANSCRIPTA_LOG_LEVEL = process.env.TRANSCRIPTA_LOG_LEVEL;
+  }
 
   state.backendProcess = spawn(command, args, {
     cwd: repoRoot,
-    env: {
-      ...process.env,
-      PYTHONPATH: pythonPath,
-      TRANSCRIPTA_DOWNLOAD_ROOT: modelsRoot,
-    },
+    env: backendEnv,
     stdio: "pipe",
     windowsHide: true
   });
@@ -98,10 +122,24 @@ async function startBackend() {
     if (state.mainWindow && !state.mainWindow.isDestroyed()) {
       state.mainWindow.webContents.send("backend-exit");
     }
+    if (!suppressRestart && restartAttempts < MAX_BACKEND_RESTARTS) {
+      restartAttempts += 1;
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(async () => {
+        try {
+          await startBackend();
+          await waitForBackendReady(10000);
+        } catch (error) {
+          console.error("[backend] Restart attempt failed", error);
+        }
+      }, 1000);
+    }
   });
 }
 
 function stopBackend() {
+  suppressRestart = true;
+  clearTimeout(restartTimer);
   if (state.backendProcess) {
     state.backendProcess.kill();
     state.backendProcess = null;

@@ -2,8 +2,6 @@
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
-const isDebugRendererLogging =
-  (process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug";
 
 function shouldIgnoreRendererConsoleMessage(message) {
   return (
@@ -37,7 +35,9 @@ function createMainWindow() {
   });
 
   state.mainWindow.webContents.on("did-finish-load", () => {
-    console.log("[main] Renderer finished loading");
+    if (state.isDebugLoggingEnabled()) {
+      console.log("[main] Renderer finished loading");
+    }
   });
 
   state.mainWindow.webContents.on(
@@ -60,7 +60,7 @@ function createMainWindow() {
     if (shouldIgnoreRendererConsoleMessage(message)) {
       return;
     }
-    if (level >= 2 || isDebugRendererLogging) {
+    if (level >= 2 || state.isDebugLoggingEnabled()) {
       console.error(`[renderer] ${sourceId}:${lineNumber} ${message}`);
     }
   });

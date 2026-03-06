@@ -92,24 +92,28 @@ async function createTray() {
 
   let settings = state.cachedSettings;
   let devices = Array.isArray(state.cachedDevices) ? state.cachedDevices : [];
-  try {
-    settings = await loadUserSettings();
-    state.cachedSettings = settings;
-  } catch (error) {
-    const { backendAlreadyRunning } = require("../services/backendSpawn");
-    const backendReady = await backendAlreadyRunning();
-    if (backendReady) {
-      console.error("[main] Failed to load settings for tray:", error.message);
+  if (!settings) {
+    try {
+      settings = await loadUserSettings();
+      state.cachedSettings = settings;
+    } catch (error) {
+      const { backendAlreadyRunning } = require("../services/backendSpawn");
+      const backendReady = await backendAlreadyRunning();
+      if (backendReady) {
+        console.error("[main] Failed to load settings for tray:", error.message);
+      }
     }
   }
-  try {
-    devices = await loadDevicesForDesktop();
-    state.cachedDevices = devices;
-  } catch (error) {
-    const { backendAlreadyRunning } = require("../services/backendSpawn");
-    const backendReady = await backendAlreadyRunning();
-    if (backendReady) {
-      console.error("[main] Failed to load devices for tray:", error.message);
+  if (devices.length === 0) {
+    try {
+      devices = await loadDevicesForDesktop();
+      state.cachedDevices = devices;
+    } catch (error) {
+      const { backendAlreadyRunning } = require("../services/backendSpawn");
+      const backendReady = await backendAlreadyRunning();
+      if (backendReady) {
+        console.error("[main] Failed to load devices for tray:", error.message);
+      }
     }
   }
 

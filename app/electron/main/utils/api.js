@@ -1,5 +1,7 @@
 // API utilities for backend communication
 const state = require("../shared/state");
+let settingsRequestPromise = null;
+let devicesRequestPromise = null;
 
 async function fetchBackendJson(apiPath, options = {}) {
   const method = (options.method || "GET").toUpperCase();
@@ -62,10 +64,30 @@ async function fetchBackendJson(apiPath, options = {}) {
 }
 
 async function loadUserSettings() {
+  if (state.cachedSettings) {
+    return state.cachedSettings;
+  }
+  if (settingsRequestPromise) {
+    return settingsRequestPromise;
+  }
+
+  settingsRequestPromise = (async () => {
+    try {
+      const settings = await fetchBackendJson("/api/settings");
+      state.cachedSettings = settings;
+      return settings;
+    } catch (error) {
+      if (state.cachedSettings) {
+        return state.cachedSettings;
+      }
+      throw error;
+    } finally {
+      settingsRequestPromise = null;
+    }
+  })();
+
   try {
-    const settings = await fetchBackendJson("/api/settings");
-    state.cachedSettings = settings;
-    return settings;
+    return await settingsRequestPromise;
   } catch (error) {
     if (state.cachedSettings) {
       return state.cachedSettings;
@@ -79,16 +101,36 @@ async function saveUserSettings(settings) {
     method: "POST",
     body: JSON.stringify(settings),
   });
-  state.cachedSettings = payload;
+  state.cachedSettings = settings;
   return payload;
 }
 
 async function loadDevicesForDesktop() {
+  if (Array.isArray(state.cachedDevices) && state.cachedDevices.length > 0) {
+    return state.cachedDevices;
+  }
+  if (devicesRequestPromise) {
+    return devicesRequestPromise;
+  }
+
+  devicesRequestPromise = (async () => {
+    try {
+      const result = await fetchBackendJson("/api/devices");
+      const devices = Array.isArray(result?.devices) ? result.devices : [];
+      state.cachedDevices = devices;
+      return devices;
+    } catch (error) {
+      if (Array.isArray(state.cachedDevices) && state.cachedDevices.length > 0) {
+        return state.cachedDevices;
+      }
+      throw error;
+    } finally {
+      devicesRequestPromise = null;
+    }
+  })();
+
   try {
-    const result = await fetchBackendJson("/api/devices");
-    const devices = Array.isArray(result?.devices) ? result.devices : [];
-    state.cachedDevices = devices;
-    return devices;
+    return await devicesRequestPromise;
   } catch (error) {
     if (Array.isArray(state.cachedDevices) && state.cachedDevices.length > 0) {
       return state.cachedDevices;

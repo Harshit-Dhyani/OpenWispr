@@ -17,7 +17,9 @@ async function initTextInjector() {
         }
       }
     };
-    console.log("[main] Text injection: using robotjs");
+    if (state.isDebugLoggingEnabled()) {
+      console.log("[main] Text injection: using robotjs");
+    }
     return;
   } catch {
     state.hasRobotjs = false;
@@ -36,14 +38,18 @@ async function initTextInjector() {
         }
       }
     };
-    console.log("[main] Text injection: using node-key-sender");
+    if (state.isDebugLoggingEnabled()) {
+      console.log("[main] Text injection: using node-key-sender");
+    }
     return;
   } catch {
     state.hasNodeKeySender = false;
   }
 
   // Fallback: clipboard-based injection
-  console.log("[main] Text injection: using clipboard fallback");
+  if (state.isDebugLoggingEnabled()) {
+    console.log("[main] Text injection: using clipboard fallback");
+  }
   state.textInjector = {
     typeString: async (text) => {
       try {
