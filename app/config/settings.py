@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional
 
 from app.config.coach_prompts import get_default_coach_templates
-from app.core.constants import (
+from app.config.constants import (
     AudioConstants,
     ModelConstants,
     PerformanceConstants,
@@ -1140,3 +1140,4 @@ CURRENT_SETTINGS_VERSION = UIConstants.SETTINGS_VERSION
 def get_settings_version() -> int:
     """Get the current settings version."""
     return CURRENT_SETTINGS_VERSION
+

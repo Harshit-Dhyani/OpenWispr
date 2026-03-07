@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.core.constants import (
+from app.config.constants import (
     AppConstants,
     AudioConstants,
     AutoOptimizationConstants,
@@ -412,3 +412,4 @@ def create_default_mode_configs() -> SettingsContainer:
         ),
         active_mode=TranscriptionMode.SYSTEM,
     )
+
