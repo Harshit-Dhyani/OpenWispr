@@ -52,7 +52,7 @@ from app.api.schemas import (
     StartSessionRequest,
 )
 from app.api.strings.en import API_STRINGS
-from app.api.service import BackendService
+from app.api.services.backend_service import BackendService
 from app.api.refiner_service import RefinerService, is_llama_cpp_available
 from app.api.services import (
     DictionaryService,
@@ -3132,6 +3132,7 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
 
 
 
