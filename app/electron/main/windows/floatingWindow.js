@@ -115,7 +115,7 @@ function createFloatingWindow() {
     backgroundColor: "#00000000",
     hasShadow: true,
     webPreferences: {
-      preload: path.join(__dirname, "..", "preload-floating.js"),
+      preload: path.join(__dirname, "..", "preload", "floating.js"),
       contextIsolation: true,
       nodeIntegration: false,
       offscreen: false

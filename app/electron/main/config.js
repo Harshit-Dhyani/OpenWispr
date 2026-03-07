@@ -29,8 +29,8 @@ const WINDOW_CONFIG = {
 function getPaths() {
   return {
     repoRoot: path.resolve(__dirname, "..", ".."),
-    preload: path.join(__dirname, "preload.js"),
-    preloadFloating: path.join(__dirname, "preload-floating.js"),
+    preload: path.join(__dirname, "preload", "main.js"),
+    preloadFloating: path.join(__dirname, "preload", "floating.js"),
     floatingHtml: path.join(__dirname, "..", "floating-window.html"),
     venvPython: path.join(path.resolve(__dirname, "..", ".."), ".venv", "Scripts", "python.exe"),
   };

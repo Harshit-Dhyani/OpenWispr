@@ -26,7 +26,7 @@ function createMainWindow() {
     ...(windowIcon ? { icon: windowIcon } : {}),
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "..", "preload.js"),
+      preload: path.join(__dirname, "..", "preload", "main.js"),
       contextIsolation: true,
       nodeIntegration: false
     }

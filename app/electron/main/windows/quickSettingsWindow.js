@@ -24,7 +24,7 @@ function createQuickSettingsWindow() {
     backgroundColor: "#10161f",
     ...(windowIcon ? { icon: windowIcon } : {}),
     webPreferences: {
-      preload: path.join(__dirname, "..", "preload-quick-settings.js"),
+      preload: path.join(__dirname, "..", "preload", "quickSettings.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
