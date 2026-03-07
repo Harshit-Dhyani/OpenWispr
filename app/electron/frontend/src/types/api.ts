@@ -267,7 +267,7 @@ export type HotkeySession = {
 };
 
 // Import type explicitly to avoid circular import resolution issues
-import type { HotkeySettings } from '../lib/settingsSchema';
+import type { HotkeySettings } from '../config/settingsSchema';
 
 export type HotkeyState = {
   config: HotkeySettings;
@@ -681,8 +681,8 @@ export type StyleAssignments = Record<string, string>;
 // Settings Types
 // ============================================
 // NOTE: SettingsState, GeneralSettings, TranscriptionSettings, AudioSettings,
-// HotkeySettings, and AdvancedSettings are defined in lib/settingsSchema.ts
+// HotkeySettings, and AdvancedSettings are defined in config/settingsSchema.ts
 // Import them from there to use Zod-inferred types as the single source of truth.
 //
-// Example: import type { SettingsState } from '../lib/settingsSchema';
+// Example: import type { SettingsState } from '../config/settingsSchema';
 

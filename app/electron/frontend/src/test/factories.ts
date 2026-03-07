@@ -17,8 +17,8 @@ import type {
   StorageInfo,
   Word,
 } from '../types/api';
-import type { SettingsState } from '../lib/settingsSchema';
-import { DEFAULT_SETTINGS } from '../lib/settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
+import { DEFAULT_SETTINGS } from '../config/settingsSchema';
 
 // ============================================
 // Device Factories

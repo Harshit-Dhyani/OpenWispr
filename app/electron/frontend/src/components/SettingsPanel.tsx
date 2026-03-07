@@ -11,8 +11,8 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import type { SettingsState } from '../lib/settingsSchema';
-import { DEFAULT_SETTINGS, validateSettings } from '../lib/settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
+import { DEFAULT_SETTINGS, validateSettings } from '../config/settingsSchema';
 import { sanitizeSettings } from '../lib/settingsMigration';
 import { LANGUAGE_OPTIONS } from '../lib/languages';
 import type { Device, SystemProfile, ModelManagerState } from './settings/types';

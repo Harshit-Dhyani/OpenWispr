@@ -11,7 +11,7 @@ import {
   Circle,
 } from 'lucide-react';
 import type { HotkeyState } from '../types/api';
-import type { HotkeySettings } from '../lib/settingsSchema';
+import type { HotkeySettings } from '../config/settingsSchema';
 
 interface HotkeySettingsProps {
   onConfigChange?: (config: HotkeySettings) => void;

@@ -1,4 +1,4 @@
-import { validateSettings, type SettingsState, DEFAULT_SETTINGS } from './settingsSchema';
+import { validateSettings, type SettingsState, DEFAULT_SETTINGS } from '../config/settingsSchema';
 import { CURRENT_SETTINGS_VERSION } from '../config/settings';
 
 // ============================================

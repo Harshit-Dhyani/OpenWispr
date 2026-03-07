@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { HotkeyState, HotkeyStatus } from '../types/api';
-import type { HotkeySettings } from '../lib/settingsSchema';
+import type { HotkeySettings } from '../config/settingsSchema';
 
 export type HotkeyEvent = {
   type: 'activated' | 'deactivated' | 'text_ready' | 'error' | 'state_change';

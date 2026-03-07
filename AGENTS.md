@@ -64,6 +64,10 @@ Keep this file short. Only add rules that prevent repeat regressions.
 - Do not introduce repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, or `/api/models/catalog`. Load once, cache, and resubscribe only when needed.
 - Prefer one canonical source of truth for shared constants/settings. Compatibility shims are acceptable; duplicate live definitions are not.
 - Keep microphone and system audio as mutually exclusive active capture modes.
+- What went wrong: pnpm run typecheck at the repo root reported success-by-fallback because the frontend package had no real typecheck script.
+- Why it happened: the root wrapper assumed a package-level validation contract that did not exist.
+- Detect earlier: whenever adding or relying on a root validation command, run the package-level command directly once and confirm it fails on real type errors.
+- Prevention rule: do not add wrapper validation scripts that silently downgrade to echo/fallback behavior for required checks; renderer TypeScript validation must resolve to a real package command.
 
 ## Regression Checklist
 

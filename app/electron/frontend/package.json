@@ -16,7 +16,8 @@
     "test:integration": "node ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
     "test:unit": "node ./node_modules/vitest/vitest.mjs run --exclude '**/integration/**'",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/eslint/bin/eslint.js . --ext .ts,.tsx",
-    "lint:fix": "node ./node_modules/eslint/bin/eslint.js . --ext .ts,.tsx --fix"
+    "lint:fix": "node ./node_modules/eslint/bin/eslint.js . --ext .ts,.tsx --fix",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit"
   },
   "keywords": [],
   "author": "",

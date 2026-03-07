@@ -1,4 +1,4 @@
-import type { SettingsState } from './settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
 
 export type CaptureSource = 'system' | 'microphone';
 

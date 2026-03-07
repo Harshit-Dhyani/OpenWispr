@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS } from './settingsSchema';
+import { DEFAULT_SETTINGS } from '../config/settingsSchema';
 import { resolveSourceModelId, syncInheritedAsrModelIds } from './asrRouting';
 
 describe('asrRouting', () => {

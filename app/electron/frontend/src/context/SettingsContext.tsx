@@ -14,8 +14,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { SettingsState } from '../lib/settingsSchema';
-import { DEFAULT_SETTINGS, validateSettings } from '../lib/settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
+import { DEFAULT_SETTINGS, validateSettings } from '../config/settingsSchema';
 import {
   queuePendingChange,
   getPendingChanges,

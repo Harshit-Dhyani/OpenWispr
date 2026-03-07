@@ -5,8 +5,8 @@
  * Includes retry logic, offline queueing, and error handling.
  */
 
-import type { SettingsState } from './settingsSchema';
-import { DEFAULT_SETTINGS } from './settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
+import { DEFAULT_SETTINGS } from '../config/settingsSchema';
 import { AppConstants } from './constants';
 
 // ============================================

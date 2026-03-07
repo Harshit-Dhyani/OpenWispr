@@ -46,12 +46,14 @@ export function TranscriptionSection({
     label: `${m.display_name}${m.installed ? '' : text.not_installed_suffix}`,
   }));
   const defaultCaptureSource = settings.audio.default_capture_source ?? settings.audio.captureMode;
+  const refinementModeKey = String(settings.transcription.refinement_mode) as keyof typeof REFINEMENT_MODE_LABELS;
+  const refinementProfileKey = String(settings.transcription.refinement_profile) as keyof typeof REFINEMENT_PROFILE_LABELS;
   const activeProfileSummary = {
     preset: PRESETS.find((preset) => preset.id === selectedPreset)?.name ?? common.custom,
     language: getLanguageLabel(settings.hotkey.language),
     finishMode: settings.hotkey.finish_mode_default.replace(/_/g, ' '),
-    refinementMode: REFINEMENT_MODE_LABELS[settings.transcription.refinement_mode],
-    refinementProfile: REFINEMENT_PROFILE_LABELS[settings.transcription.refinement_profile],
+    refinementMode: REFINEMENT_MODE_LABELS[refinementModeKey] ?? String(settings.transcription.refinement_mode),
+    refinementProfile: REFINEMENT_PROFILE_LABELS[refinementProfileKey] ?? String(settings.transcription.refinement_profile),
     microphoneHotkey: settings.hotkey.microphone_key_combination || common.unassigned,
     systemHotkey: settings.hotkey.system_key_combination || common.unassigned,
   };

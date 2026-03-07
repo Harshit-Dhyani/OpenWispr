@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { SettingsState } from '../lib/settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
 import type { SyncStatus, SettingsChangeEvent, ConflictResolution } from '../lib/settingsApi';
 import {
   loadSettings,
@@ -25,7 +25,7 @@ import {
   type SettingsSyncResponse,
   type PendingChange,
 } from '../lib/settingsApi';
-import { DEFAULT_SETTINGS, validateSettings } from '../lib/settingsSchema';
+import { DEFAULT_SETTINGS, validateSettings } from '../config/settingsSchema';
 
 // ============================================
 // Debounce Utility

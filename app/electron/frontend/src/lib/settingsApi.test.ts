@@ -15,7 +15,7 @@ import {
   type SettingsExportData,
 } from './settingsApi';
 import { createMockSettings } from './factories';
-import type { SettingsState } from './settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
 
 describe('settingsApi', () => {
   const mockFetch = vi.fn();

@@ -18,7 +18,7 @@ import type {
   HardwareProfile,
   OptimizationResult,
 } from '../types/api';
-import type { TranscriptionSettings } from '../lib/settingsSchema';
+import type { TranscriptionSettings } from '../config/settingsSchema';
 import { HotkeySettings } from './HotkeySettings';
 import {
   OPTIMIZATION_PRESET_LABELS,
