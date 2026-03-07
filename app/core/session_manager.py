@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.config import AppSettings, resolve_live_profile
+from app.core.settings.config import AppSettings, resolve_live_profile
 from app.core.logging_utils import configure_logging
 from app.core.models import AudioDeviceInfo, SessionHealth, SessionState, TranscriptSegment, utc_now
 from app.stem.postprocess import StemNoteProcessor
@@ -976,3 +976,4 @@ def _normalize_transcript_text(text: str) -> str:
             for character in text
         ).split()
     )
+

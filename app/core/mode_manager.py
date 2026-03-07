@@ -19,7 +19,7 @@ from typing import Any, Callable, Protocol
 
 from app.audio.system_pipeline import SystemPipeline, SystemPipelineConfig
 from app.audio.wispr_pipeline import WisprPipeline, WisprPipelineConfig
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 from app.core.logging_utils import configure_logging
 from app.core.modes import (
     ModeConfiguration,
@@ -1038,4 +1038,5 @@ def reset_mode_manager() -> None:
     with _global_lock:
         _global_mode_manager = None
         ModeManager._instance = None
+
 

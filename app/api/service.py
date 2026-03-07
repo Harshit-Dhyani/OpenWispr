@@ -13,7 +13,7 @@ from app.api.model_service import ModelService
 from app.api.refinement_queue import RefinementQueue
 from app.api.streaming_metrics import StreamingMetrics
 from app.audio.capture import LoopbackAudioSource
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 from app.core.language_profiles import available_language_codes
 from app.core.model_catalog import MODEL_CATALOG, get_model_catalog_entry, runtime_name_for_model
 from app.core.models import (
@@ -670,4 +670,5 @@ def serialize_session(state: SessionState) -> dict[str, Any]:
     payload["needs_review"] = [serialize_segment(segment) for segment in state.needs_review]
     payload["health"] = serialize_health(state.health)
     return payload
+
 

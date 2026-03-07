@@ -63,7 +63,7 @@ from app.api.services import (
 from app.storage.history_db import HistoryDatabase
 from app.audio.capture import LoopbackAudioSource
 from app.audio.devices import list_audio_devices
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 from app.core.model_catalog import runtime_name_for_model
 from app.core.system_profiler import SystemProfiler
 from app.core.auto_optimizer import AutoOptimizer, get_recommended_settings
@@ -1350,7 +1350,7 @@ class HotkeyTranscriptionService:
         """Create transcriber with hotkey-optimized settings."""
         # Import here to avoid circular dependencies
         from app.stt.fast_engine import FastTranscriber
-        from app.core.config import resolve_live_profile
+        from app.core.settings.config import resolve_live_profile
 
         # Resolve the profile so low-latency defaults stay aligned with settings.
         resolve_live_profile("low_latency", self.settings)
@@ -3132,5 +3132,6 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
 
 

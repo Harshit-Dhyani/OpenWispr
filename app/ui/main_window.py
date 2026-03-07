@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 from app.core.models import AudioDeviceInfo, SessionHealth, SessionState, TranscriptSegment
 from app.core.session_manager import SessionManager
 
@@ -217,3 +217,4 @@ class MainWindow(QMainWindow):
             self.review_list.addItem(
                 f"[{segment.start:.2f} - {segment.end:.2f}] {segment.text} :: {', '.join(segment.review_reasons)}"
             )
+

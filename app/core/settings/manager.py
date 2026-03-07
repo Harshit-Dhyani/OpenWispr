@@ -23,7 +23,7 @@ from app.config.settings import (
 )
 from app.config.coach_prompts import get_default_coach_templates
 from app.core.model_catalog import MODEL_CATALOG_BY_ID
-from app.core.config import ModeConfig, SettingsContainer, create_default_mode_configs
+from app.core.settings.config import ModeConfig, SettingsContainer, create_default_mode_configs
 from app.core.modes import (
     ModeSettings,
     SystemModeDefaults,
@@ -976,4 +976,5 @@ def reset_settings_manager() -> None:
     global _settings_manager
     with _settings_lock:
         _settings_manager = None
+
 

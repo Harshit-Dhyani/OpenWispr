@@ -41,7 +41,7 @@ import numpy as np
 from app.audio.backends.base import to_mono
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.config import AppSettings, resolve_live_profile
+from app.core.settings.config import AppSettings, resolve_live_profile
 from app.core.logging_utils import configure_logging
 from app.core.models import (
     AudioDeviceInfo,
@@ -2086,3 +2086,4 @@ def load_session_from_disk(session_dir: Path) -> dict[str, Any]:
         result["formulas"] = json.loads(formulas_path.read_text(encoding="utf-8"))
 
     return result
+
