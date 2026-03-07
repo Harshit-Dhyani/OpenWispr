@@ -72,6 +72,11 @@ Keep this file short. Only add rules that prevent repeat regressions.
 - Why it happened: the external import path was shimmed, but the module's internal equire() paths were not validated after the directory move.
 - Detect earlier: after any Node/Electron module move, require both the new canonical path and the old shim path once, then run the colocated unit test from the new location.
 - Prevention rule: when moving Electron/Node modules across directories, update internal relative imports in the same change and prove both canonical and shim imports still load.
+- What went wrong: moving Electron preload scripts into main/preload/ would have left packaged builds incomplete because pp/electron/package.json still whitelisted only the old root preload files.
+- Why it happened: the runtime move updated source paths and shims, but the Electron builder file allowlist was not updated in the same batch.
+- Detect earlier: after any Electron file move, compare the moved paths against pp/electron/package.json uild.files and verify every new canonical directory is included.
+- Prevention rule: whenever Electron main/preload files move, update pp/electron/package.json packaging globs in the same change so packaged apps include the canonical files, not just legacy shims.
+
 
 
 ## Regression Checklist
@@ -111,3 +116,7 @@ Keep this file short. Only add rules that prevent repeat regressions.
 
 
 
+- What went wrong: moving Electron preload scripts into `main/preload/` would have left packaged builds incomplete because `app/electron/package.json` still whitelisted only the old root preload files.
+- Why it happened: the runtime move updated source paths and shims, but the Electron builder file allowlist was not updated in the same batch.
+- Detect earlier: after any Electron file move, compare the moved paths against `app/electron/package.json` `build.files` and verify every new canonical directory is included.
+- Prevention rule: whenever Electron main/preload files move, update `app/electron/package.json` packaging globs in the same change so packaged apps include the canonical files, not just legacy shims.
