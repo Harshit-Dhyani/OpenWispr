@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityFeed } from './components/ActivityFeed';
 import { AppSidebar } from './components/AppSidebar';
-import { DictionaryPage } from './components/pages/DictionaryPage';
-import { HomePage } from './components/pages/HomePage';
+import { DictionaryPage } from './pages/DictionaryPage';
+import { HomePage } from './pages/HomePage';
 import { ModeCardsRow } from './components/ModeCardsRow';
 import { QuickSettingsDrawer } from './components/QuickSettingsDrawer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MainContent } from './components/MainContent';
-import { SnippetsPage } from './components/pages/SnippetsPage';
+import { SnippetsPage } from './pages/SnippetsPage';
 import { useEventSource, type EventSourceEvent } from './hooks/useEventSource';
 import {
   applyModelCatalogPayload,
@@ -2131,6 +2131,7 @@ function App() {
 }
 
 export default App;
+
 
 
 
