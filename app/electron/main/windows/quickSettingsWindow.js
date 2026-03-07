@@ -2,11 +2,14 @@
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
+const { getWindowIconPath } = require("../shared/iconPaths");
 
 function createQuickSettingsWindow() {
   if (state.quickSettingsWindow && !state.quickSettingsWindow.isDestroyed()) {
     return state.quickSettingsWindow;
   }
+
+  const windowIcon = getWindowIconPath();
 
   state.quickSettingsWindow = new BrowserWindow({
     width: 420,
@@ -19,6 +22,7 @@ function createQuickSettingsWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     backgroundColor: "#10161f",
+    ...(windowIcon ? { icon: windowIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "..", "preload-quick-settings.js"),
       contextIsolation: true,

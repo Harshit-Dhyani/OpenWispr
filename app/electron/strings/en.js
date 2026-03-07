@@ -36,3 +36,4 @@ const ELECTRON_STRINGS = {
 };
 
 module.exports = { ELECTRON_STRINGS };
+

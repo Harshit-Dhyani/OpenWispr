@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Transcripta</title>
+  <title>OpenWispr</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -238,7 +238,7 @@
     const resultMeta = document.getElementById('resultMeta');
     const cancelBtn = document.getElementById('cancelBtn');
     const finishBtn = document.getElementById('finishBtn');
-    const floatingStrings = window.transcriptaFloating?.strings || {
+    const floatingStrings = window.openwisprFloating?.strings || {
       status: {
         idle: 'Ready',
         listening: 'Listening',
@@ -454,13 +454,13 @@
 
     function handleCancel() {
       if (recordingState === 'result') {
-        if (window.transcriptaFloating?.dismissResult) {
-          window.transcriptaFloating.dismissResult();
+        if (window.openwisprFloating?.dismissResult) {
+          window.openwisprFloating.dismissResult();
         }
         return;
       }
-      if (window.transcriptaFloating?.cancelRecording) {
-        window.transcriptaFloating.cancelRecording();
+      if (window.openwisprFloating?.cancelRecording) {
+        window.openwisprFloating.cancelRecording();
       }
     }
 
@@ -474,8 +474,8 @@
         );
         return;
       }
-      if (window.transcriptaFloating?.finishRecording) {
-        window.transcriptaFloating.finishRecording();
+      if (window.openwisprFloating?.finishRecording) {
+        window.openwisprFloating.finishRecording();
       }
     }
 
@@ -528,8 +528,8 @@
     renderTranscript();
     updateUIState();
 
-    if (window.transcriptaFloating) {
-      window.transcriptaFloating.onRecordingState((state) => {
+    if (window.openwisprFloating) {
+      window.openwisprFloating.onRecordingState((state) => {
         if (state.mode) {
           currentMode = state.mode;
         }
@@ -570,15 +570,15 @@
         setRecordingState('idle');
       });
 
-      window.transcriptaFloating.onTranscription((data) => {
+      window.openwisprFloating.onTranscription((data) => {
         handleTranscriptionUpdate(data);
       });
 
-      window.transcriptaFloating.onAudioVisualizer((data) => {
+      window.openwisprFloating.onAudioVisualizer((data) => {
         handleAudioLevelData(data);
       });
 
-      window.transcriptaFloating.onCoachResult((payload) => {
+      window.openwisprFloating.onCoachResult((payload) => {
         latestCoachPayload = payload || null;
         committedText =
           payload?.coach_result?.polished ||
@@ -596,7 +596,7 @@
         renderTranscript();
       });
 
-      window.transcriptaFloating.onCoachResultClear(() => {
+      window.openwisprFloating.onCoachResultClear(() => {
         latestCoachPayload = null;
         resultMeta.textContent = '';
         setRecordingState('idle');
@@ -606,3 +606,5 @@
   </script>
 </body>
 </html>
+
+

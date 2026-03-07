@@ -2,6 +2,7 @@
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
+const { getWindowIconPath } = require("../shared/iconPaths");
 
 function shouldIgnoreRendererConsoleMessage(message) {
   return (
@@ -12,6 +13,8 @@ function shouldIgnoreRendererConsoleMessage(message) {
 }
 
 function createMainWindow() {
+  const windowIcon = getWindowIconPath();
+
   state.mainWindow = new BrowserWindow({
     width: 1480,
     height: 960,
@@ -20,6 +23,7 @@ function createMainWindow() {
     backgroundColor: "#0e141b",
     autoHideMenuBar: true,
     title: state.APP_NAME,
+    ...(windowIcon ? { icon: windowIcon } : {}),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
@@ -65,7 +69,7 @@ function createMainWindow() {
     }
   });
 
-  const explicitRendererUrl = process.env.TRANSCRIPTA_RENDERER_URL;
+  const explicitRendererUrl = process.env.OPENWISPR_RENDERER_URL;
   if (explicitRendererUrl) {
     state.mainWindow.loadURL(explicitRendererUrl);
   } else {

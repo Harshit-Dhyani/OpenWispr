@@ -1,7 +1,13 @@
 // Main entry point for Electron
 const { app, ipcMain, globalShortcut } = require("electron");
-if (process.env.TRANSCRIPTA_DISABLE_GPU === "1") {
+const { APP_NAME, APP_SLUG } = require("./shared/generated/appMeta");
+if (process.env.OPENWISPR_DISABLE_GPU === "1") {
   app.disableHardwareAcceleration();
+}
+
+app.setName(APP_NAME);
+if (process.platform === 'win32') {
+  app.setAppUserModelId(`com.${APP_SLUG}.desktop`);
 }
 const state = require("./shared/state");
 const { startBackend, waitForBackendReady, stopBackend } = require("./services/backendSpawn");
@@ -106,3 +112,4 @@ ipcMain.on("transcription-result", (event, data) => {
 });
 
 console.log("[main] Electron main process started");
+

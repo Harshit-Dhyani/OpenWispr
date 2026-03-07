@@ -1,8 +1,21 @@
 // Tray utility functions - no circular dependencies
 const { nativeImage } = require("electron");
 const state = require("../shared/state");
+const { getTrayIconPath } = require("../shared/iconPaths");
 
 function createTrayIcons() {
+  const trayIconPath = getTrayIconPath();
+  if (trayIconPath) {
+    const image = nativeImage.createFromPath(trayIconPath);
+    if (!image.isEmpty()) {
+      const targetSize = process.platform === 'win32' ? 20 : 18;
+      const resized = image.resize({ width: targetSize, height: targetSize, quality: 'best' });
+      state.trayIconIdle = resized;
+      state.trayIconRecording = resized;
+      return;
+    }
+  }
+
   const size = 16;
   state.trayIconIdle = createCircleIcon(size, "#10b981");
   state.trayIconRecording = createCircleIcon(size, "#ef4444");

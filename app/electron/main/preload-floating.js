@@ -38,7 +38,7 @@ try {
 }
 
 const debugEnabled =
-  String(process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug";
+  String(process.env.OPENWISPR_LOG_LEVEL || "").toLowerCase() === "debug";
 
 function logFloatingEvent(label, payload) {
   if (!debugEnabled) {
@@ -87,7 +87,7 @@ ipcRenderer.on("coach-result-clear", () => {
   logFloatingEvent("coach-result-clear");
 });
 
-contextBridge.exposeInMainWorld("transcriptaFloating", {
+contextBridge.exposeInMainWorld("openwisprFloating", {
   // Recording state
   onRecordingState: (callback) => {
     const handler = (event, state) => callback(state);

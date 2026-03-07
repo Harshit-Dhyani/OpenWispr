@@ -116,7 +116,7 @@ function broadcastToWindows(channel, payload) {
 }
 
 function isDebugLoggingEnabled() {
-  if ((process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug") {
+  if ((process.env.OPENWISPR_LOG_LEVEL || "").toLowerCase() === "debug") {
     return true;
   }
 

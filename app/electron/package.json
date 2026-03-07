@@ -1,22 +1,19 @@
 {
-  "name": "transcripta-electron",
+  "name": "openwispr-electron",
   "version": "0.1.0",
   "private": true,
-  "description": "Electron desktop shell for Transcripta",
+  "description": "Electron desktop shell for OpenWispr",
   "main": "main/index.js",
   "scripts": {
     "build:frontend": "node ./scripts/build-frontend.js",
     "dev": "node ./scripts/dev.js",
     "start": "node ./node_modules/electron/cli.js .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder --win portable nsis"
+    "pack": "node ./node_modules/electron-builder/cli.js --dir",
+    "dist": "node ./node_modules/electron-builder/cli.js"
   },
   "build": {
-    "appId": "local.transcripta.desktop",
-    "productName": "Transcripta",
-    "directories": {
-      "output": "dist"
-    },
+    "appId": "com.openwispr.desktop",
+    "productName": "OpenWispr",
     "files": [
       "main/index.js",
       "main/main.js",
@@ -39,8 +36,39 @@
       "target": [
         "portable",
         "nsis"
-      ]
-    }
+      ],
+      "icon": "icon.ico"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "../../build"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OpenWispr"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "extraResources": [
+      {
+        "filter": [
+          "**/*",
+          "!electron{,/**}",
+          "!**/__pycache__",
+          "!**/*.pyc"
+        ],
+        "from": "../../app",
+        "to": "backend/app"
+      }
+    ]
   },
   "dependencies": {
     "node-key-sender": "^1.0.11",
@@ -53,5 +81,6 @@
   "optionalDependencies": {
     "iohook": "^0.9.3",
     "robotjs": "^0.6.0"
-  }
+  },
+  "author": "OpenWispr Team"
 }

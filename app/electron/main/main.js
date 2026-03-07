@@ -7,7 +7,7 @@ const { ModelDownloadManager } = require("./model-download-manager");
 const { ModelDownloadService } = require("./services/modelDownloadService");
 const { APP_NAME } = require("./shared/generated/appMeta");
 const isDebugRendererLogging =
-  (process.env.TRANSCRIPTA_LOG_LEVEL || "").toLowerCase() === "debug";
+  (process.env.OPENWISPR_LOG_LEVEL || "").toLowerCase() === "debug";
 
 function shouldIgnoreRendererConsoleMessage(message) {
   return (
@@ -107,9 +107,9 @@ function resolvePythonLaunch() {
   }
 
   // Prefer venv Python if it exists
-  if (process.env.TRANSCRIPTA_PYTHON) {
-    console.log(`[main] Using TRANSCRIPTA_PYTHON: ${process.env.TRANSCRIPTA_PYTHON}`);
-    return { command: process.env.TRANSCRIPTA_PYTHON, args: [apiMainPath] };
+  if (process.env.OPENWISPR_PYTHON) {
+    console.log(`[main] Using OPENWISPR_PYTHON: ${process.env.OPENWISPR_PYTHON}`);
+    return { command: process.env.OPENWISPR_PYTHON, args: [apiMainPath] };
   }
   if (fs.existsSync(venvPython)) {
     console.log(`[main] Using venv Python: ${venvPython}`);
@@ -165,7 +165,7 @@ async function startBackend() {
     env: {
       ...process.env,
       PYTHONPATH: pythonPath,
-      TRANSCRIPTA_DOWNLOAD_ROOT: modelsRoot,
+      OPENWISPR_DOWNLOAD_ROOT: modelsRoot,
     },
     stdio: "pipe",
     windowsHide: true
@@ -1049,7 +1049,7 @@ function createMainWindow() {
     }
   });
 
-  const explicitRendererUrl = process.env.TRANSCRIPTA_RENDERER_URL;
+  const explicitRendererUrl = process.env.OPENWISPR_RENDERER_URL;
   if (explicitRendererUrl) {
     mainWindow.loadURL(explicitRendererUrl);
   } else {

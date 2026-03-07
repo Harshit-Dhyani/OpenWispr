@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("transcriptaDesktop", {
+contextBridge.exposeInMainWorld("openwisprDesktop", {
   // Existing APIs
   chooseDirectory: () => ipcRenderer.invoke("choose-directory"),
   choosePdf: () => ipcRenderer.invoke("choose-pdf"),

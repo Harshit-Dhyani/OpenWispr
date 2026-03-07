@@ -278,13 +278,13 @@ function shouldMuteAppAudioDuringDictation(captureSource) {
   if (captureSource !== "microphone") {
     return false;
   }
-  if (state.hotkeyConfigState?.mute_transcripta_audio_during_dictation !== undefined) {
-    return Boolean(state.hotkeyConfigState.mute_transcripta_audio_during_dictation);
+  if (state.hotkeyConfigState?.mute_openwispr_audio_during_dictation !== undefined) {
+    return Boolean(state.hotkeyConfigState.mute_openwispr_audio_during_dictation);
   }
-  return Boolean(state.cachedSettings?.audio?.mute_transcripta_audio_during_dictation);
+  return Boolean(state.cachedSettings?.audio?.mute_openwispr_audio_during_dictation);
 }
 
-function setTranscriptaWindowAudioMuted(muted) {
+function setOpenwisprWindowAudioMuted(muted) {
   const windows = [state.mainWindow, state.floatingWindow, state.quickSettingsWindow];
   for (const win of windows) {
     if (!win || win.isDestroyed()) {
@@ -780,20 +780,20 @@ async function connectHotkeyWebSocket(sessionId) {
               });
             }
           }
-          const showFloatingCoachResult =
+          const shouldEnableFloatingCoachResult =
             state.hotkeyConfigState.show_floating_coach_result ??
             state.cachedSettings?.coach?.show_floating_coach_result;
           const coachStatus = payload.coach_status || "disabled";
           const hasCoachFailure = coachStatus === "failed" || coachStatus === "fallback";
           const shouldShowCoachResult =
-            Boolean(showFloatingCoachResult) &&
+            Boolean(shouldEnableFloatingCoachResult) &&
             !state.floatingWindowSuppressResult &&
             (Boolean(payload.coach_result) || hasCoachFailure);
           if (state.isDebugLoggingEnabled()) {
             console.log(
               "[main] Coach floating decision:",
               JSON.stringify({
-                showFloatingCoachResult: Boolean(showFloatingCoachResult),
+                showFloatingCoachResult: Boolean(shouldEnableFloatingCoachResult),
                 suppressed: Boolean(state.floatingWindowSuppressResult),
                 coachStatus,
                 hasCoachResult: Boolean(payload.coach_result),
@@ -959,7 +959,7 @@ async function startRecording(source = resolveCaptureSource()) {
   state.hotkeyPastedLiveCandidate = false;
   state.floatingWindowSuppressResult = false;
   if (muteAppAudio) {
-    setTranscriptaWindowAudioMuted(true);
+    setOpenwisprWindowAudioMuted(true);
     state.hotkeyMutedAppAudio = true;
   }
   applyLifecycleState("starting", {
@@ -1007,7 +1007,7 @@ async function startRecording(source = resolveCaptureSource()) {
     });
   } catch (error) {
     if (state.hotkeyMutedAppAudio) {
-      setTranscriptaWindowAudioMuted(false);
+      setOpenwisprWindowAudioMuted(false);
       state.hotkeyMutedAppAudio = false;
     }
     throw error;
@@ -1015,7 +1015,7 @@ async function startRecording(source = resolveCaptureSource()) {
 
   if (!response.ok) {
     if (state.hotkeyMutedAppAudio) {
-      setTranscriptaWindowAudioMuted(false);
+      setOpenwisprWindowAudioMuted(false);
       state.hotkeyMutedAppAudio = false;
     }
     throw new Error(`Start failed: ${response.status}`);
@@ -1164,7 +1164,7 @@ async function stopRecording(options = {}) {
     throw error;
   } finally {
     if (state.hotkeyMutedAppAudio) {
-      setTranscriptaWindowAudioMuted(false);
+      setOpenwisprWindowAudioMuted(false);
       state.hotkeyMutedAppAudio = false;
     }
     stopInFlightPromise = null;
@@ -1203,3 +1203,4 @@ module.exports = {
   emitStateChange,
   playStopSound,
 };
+

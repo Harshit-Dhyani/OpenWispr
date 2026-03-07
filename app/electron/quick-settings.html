@@ -315,7 +315,7 @@
 
     (async () => {
       const data = await window.transcriptaQuickSettings.getData();
-      const appName = data?.appName || "Transcripta";
+      const appName = data?.appName || "OpenWispr";
       document.title = `${appName} Quick Settings`;
       appNameHeading.textContent = appName;
       document.documentElement.dataset.theme = data?.settings?.general?.theme || "light";

@@ -2,6 +2,7 @@
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const { app } = require("electron");
 const state = require("../shared/state");
 
 let restartTimer = null;
@@ -9,34 +10,67 @@ let suppressRestart = false;
 let restartAttempts = 0;
 const MAX_BACKEND_RESTARTS = 3;
 
+function resolveBackendLayout() {
+  const devRepoRoot = path.resolve(__dirname, "..", "..", "..", "..");
+  const packagedBackendRoot = path.join(process.resourcesPath, "backend");
+  const packagedAppRoot = path.join(packagedBackendRoot, "app");
+  const devAppRoot = path.join(devRepoRoot, "app");
+  const isPackagedBackend = app.isPackaged && fs.existsSync(path.join(packagedAppRoot, "api_main.py"));
+
+  if (isPackagedBackend) {
+    return {
+      mode: "packaged",
+      projectRoot: packagedBackendRoot,
+      appRoot: packagedAppRoot,
+      apiMainPath: path.join(packagedAppRoot, "api_main.py"),
+      bundledPython: path.join(packagedBackendRoot, ".venv", "Scripts", "python.exe"),
+    };
+  }
+
+  return {
+    mode: "dev",
+    projectRoot: devRepoRoot,
+    appRoot: devAppRoot,
+    apiMainPath: path.join(devAppRoot, "api_main.py"),
+    bundledPython: path.join(devRepoRoot, ".venv", "Scripts", "python.exe"),
+  };
+}
+
 function resolvePythonLaunch() {
-  const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
-  const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
-  const apiMainPath = path.join(repoRoot, "app", "api_main.py");
+  const layout = resolveBackendLayout();
+  const fallbackRepoRoot = path.resolve(process.resourcesPath, "..", "..", "..", "..", "..");
+  const fallbackVenvPython = path.join(fallbackRepoRoot, ".venv", "Scripts", "python.exe");
 
-  // Verify api_main.py exists for debugging
-  if (!fs.existsSync(apiMainPath)) {
-    console.error("[backend] Cannot find api_main.py at:", apiMainPath);
-    console.error("[backend] repoRoot calculated as:", repoRoot);
+  if (process.env.OPENWISPR_PYTHON) {
+    if (state.isDebugLoggingEnabled()) {
+      console.log(`[backend] Using OPENWISPR_PYTHON: ${process.env.OPENWISPR_PYTHON}`);
+    }
+    return { command: process.env.OPENWISPR_PYTHON, args: [layout.apiMainPath], layout };
   }
 
-  // Prefer venv Python if it exists
-  if (process.env.TRANSCRIPTA_PYTHON) {
+  if (fs.existsSync(layout.bundledPython)) {
     if (state.isDebugLoggingEnabled()) {
-      console.log(`[backend] Using TRANSCRIPTA_PYTHON: ${process.env.TRANSCRIPTA_PYTHON}`);
+      console.log(`[backend] Using bundled Python: ${layout.bundledPython}`);
     }
-    return { command: process.env.TRANSCRIPTA_PYTHON, args: [apiMainPath] };
+    return { command: layout.bundledPython, args: [layout.apiMainPath], layout };
   }
-  if (fs.existsSync(venvPython)) {
+
+  if (layout.mode === "packaged" && fs.existsSync(fallbackVenvPython)) {
     if (state.isDebugLoggingEnabled()) {
-      console.log(`[backend] Using venv Python: ${venvPython}`);
+      console.log(`[backend] Using fallback repo venv Python: ${fallbackVenvPython}`);
     }
-    return { command: venvPython, args: [apiMainPath] };
+    return { command: fallbackVenvPython, args: [layout.apiMainPath], layout };
   }
+
+  if (!fs.existsSync(layout.apiMainPath)) {
+    console.error("[backend] Cannot find api_main.py at:", layout.apiMainPath);
+    console.error("[backend] Backend layout:", layout);
+  }
+
   if (state.isDebugLoggingEnabled()) {
-    console.log(`[backend] Falling back to system Python (py -3)`);
+    console.log("[backend] Falling back to system Python (py -3)");
   }
-  return { command: "py", args: ["-3", apiMainPath] };
+  return { command: "py", args: ["-3", layout.apiMainPath], layout };
 }
 
 async function backendAlreadyRunning() {
@@ -73,39 +107,37 @@ async function startBackend() {
     restartAttempts = 0;
     return;
   }
-  suppressRestart = false;
-  const repoRoot = path.resolve(__dirname, "..", "..", "..", "..");
-  const { command, args } = resolvePythonLaunch();
-  const { app } = require("electron");
-  const modelsRoot = path.join(app.getPath("userData"), "models");
 
-  // Build PYTHONPATH explicitly for Windows (; separator) or Unix (: separator)
+  suppressRestart = false;
+  const { command, args, layout } = resolvePythonLaunch();
+  const modelsRoot = path.join(app.getPath("userData"), "models");
   const pathSeparator = process.platform === "win32" ? ";" : ":";
-  const pythonPath = repoRoot + (process.env.PYTHONPATH ? pathSeparator + process.env.PYTHONPATH : "");
+  const pythonPath = layout.projectRoot + (process.env.PYTHONPATH ? pathSeparator + process.env.PYTHONPATH : "");
 
   if (state.isDebugLoggingEnabled()) {
-    console.log(`[backend] Starting Python backend:`);
+    console.log("[backend] Starting Python backend:");
     console.log(`[backend]   Command: ${command}`);
     console.log(`[backend]   Args: ${JSON.stringify(args)}`);
-    console.log(`[backend]   CWD: ${repoRoot}`);
+    console.log(`[backend]   Mode: ${layout.mode}`);
+    console.log(`[backend]   CWD: ${layout.projectRoot}`);
     console.log(`[backend]   PYTHONPATH: ${pythonPath}`);
   }
 
   const backendEnv = {
     ...process.env,
     PYTHONPATH: pythonPath,
-    TRANSCRIPTA_DOWNLOAD_ROOT: modelsRoot,
+    OPENWISPR_DOWNLOAD_ROOT: modelsRoot,
   };
 
-  if (process.env.TRANSCRIPTA_LOG_LEVEL) {
-    backendEnv.TRANSCRIPTA_LOG_LEVEL = process.env.TRANSCRIPTA_LOG_LEVEL;
+  if (process.env.OPENWISPR_LOG_LEVEL) {
+    backendEnv.OPENWISPR_LOG_LEVEL = process.env.OPENWISPR_LOG_LEVEL;
   }
 
   state.backendProcess = spawn(command, args, {
-    cwd: repoRoot,
+    cwd: layout.projectRoot,
     env: backendEnv,
     stdio: "pipe",
-    windowsHide: true
+    windowsHide: true,
   });
 
   state.backendProcess.stdout.on("data", (chunk) => {
@@ -116,7 +148,12 @@ async function startBackend() {
     process.stderr.write(`[backend] ${chunk}`);
   });
 
-  state.backendProcess.on("exit", () => {
+  state.backendProcess.on("error", (error) => {
+    console.error("[backend] Spawn failed", error);
+  });
+
+  state.backendProcess.on("exit", (code, signal) => {
+    console.error(`[backend] Process exited code=${code} signal=${signal}`);
     state.backendProcess = null;
     state.backendReady = false;
     if (state.mainWindow && !state.mainWindow.isDestroyed()) {
@@ -148,6 +185,7 @@ function stopBackend() {
 }
 
 module.exports = {
+  resolveBackendLayout,
   resolvePythonLaunch,
   backendAlreadyRunning,
   waitForBackendReady,
