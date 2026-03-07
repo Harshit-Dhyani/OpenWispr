@@ -32,8 +32,8 @@ from app.core.modes import (
     get_mode_configuration,
     get_mode_defaults,
 )
-from app.core.settings_migrations import migrate_to_current, needs_migration
-from app.core.settings_validator import SettingsValidator, ValidationResult
+from app.core.settings.migrations import migrate_to_current, needs_migration
+from app.core.settings.validator import SettingsValidator, ValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -976,3 +976,4 @@ def reset_settings_manager() -> None:
     global _settings_manager
     with _settings_lock:
         _settings_manager = None
+
