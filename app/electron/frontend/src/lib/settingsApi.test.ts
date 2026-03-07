@@ -13,8 +13,8 @@ import {
   getPendingChanges,
   clearPendingChanges,
   type SettingsExportData,
-} from './settingsApi';
-import { createMockSettings } from './factories';
+} from '../api/settings';
+import { createMockSettings } from '../test/factories';
 import type { SettingsState } from '../config/settingsSchema';
 
 describe('settingsApi', () => {

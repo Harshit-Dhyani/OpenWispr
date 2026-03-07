@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeSettings } from './settingsMigration';
+import { sanitizeSettings } from '../config/settingsMigration';
 
 describe('settingsMigration source-aware defaults', () => {
   it('maps legacy hotkey model_name into microphone_asr_model_id', () => {
