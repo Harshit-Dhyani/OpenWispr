@@ -68,6 +68,11 @@ Keep this file short. Only add rules that prevent repeat regressions.
 - Why it happened: the root wrapper assumed a package-level validation contract that did not exist.
 - Detect earlier: whenever adding or relying on a root validation command, run the package-level command directly once and confirm it fails on real type errors.
 - Prevention rule: do not add wrapper validation scripts that silently downgrade to echo/fallback behavior for required checks; renderer TypeScript validation must resolve to a real package command.
+- What went wrong: moving pp/electron/main/model-download-manager.js into services/ initially broke its own internal relative import to shared/state.
+- Why it happened: the external import path was shimmed, but the module's internal equire() paths were not validated after the directory move.
+- Detect earlier: after any Node/Electron module move, require both the new canonical path and the old shim path once, then run the colocated unit test from the new location.
+- Prevention rule: when moving Electron/Node modules across directories, update internal relative imports in the same change and prove both canonical and shim imports still load.
+
 
 ## Regression Checklist
 

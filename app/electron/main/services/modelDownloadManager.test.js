@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { ModelDownloadManager } = require("./model-download-manager");
+const { ModelDownloadManager } = require("./modelDownloadManager");
 
 function createManager() {
   return new ModelDownloadManager({
@@ -102,3 +102,4 @@ test("adds HF token authorization header when configured", () => {
   assert.equal(headers.Authorization, "Bearer test-token");
   assert.equal(headers.Range, "bytes=0-");
 });
+

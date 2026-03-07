@@ -12,7 +12,7 @@ if (process.platform === 'win32') {
 const state = require("./shared/state");
 const { startBackend, waitForBackendReady, stopBackend } = require("./services/backendSpawn");
 const { initTextInjector } = require("./services/textInjector");
-const { ModelDownloadManager } = require("./model-download-manager");
+const { ModelDownloadManager } = require("./services/modelDownloadManager");
 const { createMainWindow, showMainWindowAndFocus } = require("./windows/mainWindow");
 const { createTray } = require("./windows/tray");
 const { hideFloatingWindow, updateFloatingTranscription } = require("./windows/floatingWindow");
@@ -112,4 +112,5 @@ ipcMain.on("transcription-result", (event, data) => {
 });
 
 console.log("[main] Electron main process started");
+
 
