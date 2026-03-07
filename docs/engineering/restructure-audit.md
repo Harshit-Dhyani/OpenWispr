@@ -1,6 +1,16 @@
-# Restructure Audit
+---
+title: Restructure Audit
+owner: docs/ux
+audience: developers
+last_verified: 2026-03-07
+review_cadence: quarterly
+source_of_truth:
+  - app/
+  - docs/
+critical: false
+---
 
-Last verified: 2026-03-07
+# Restructure Audit
 
 This document is the discovery baseline for the ongoing architecture cleanup. It records what currently exists, what appears duplicated or ambiguous, and which areas should not be moved casually.
 

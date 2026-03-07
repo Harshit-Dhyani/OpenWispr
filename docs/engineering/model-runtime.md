@@ -6,7 +6,7 @@ source_of_truth:
   - app/core/model_catalog.py
   - app/api/model_service.py
   - app/stt/model_pool.py
-  - app/electron/main/model-download-manager.js
+  - app/electron/main/services/modelDownloadManager.js
   - app/core/system_profiler.py
 ---
 
@@ -262,7 +262,7 @@ def _warmup_model(self, model: WhisperModel, model_name: str) -> bool:
 
 ## Download Flow
 
-Source: `app/electron/main/model-download-manager.js`
+Source: `app/electron/main/services/modelDownloadManager.js`
 
 The `ModelDownloadManager` handles model downloads in the Electron main process:
 

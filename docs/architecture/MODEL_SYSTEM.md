@@ -30,7 +30,7 @@ source_of_truth:
 
 - Downloaded models live under the backend download root, grouped by `category/id`.
 - Install verification is performed in `ModelService._install_state()`.
-- Electron main owns the download workflow in `app/electron/main/model-download-manager.js`.
+- Electron main owns the download workflow in `app/electron/main/services/modelDownloadManager.js`.
 - The downloader should not hardcode model lists; it should work from the backend catalog payload.
 
 ## Selection and persistence

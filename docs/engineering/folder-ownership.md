@@ -1,6 +1,16 @@
-# Folder Ownership
+---
+title: Folder Ownership
+owner: docs/ux
+audience: developers
+last_verified: 2026-03-07
+review_cadence: quarterly
+source_of_truth:
+  - app/
+  - docs/
+critical: false
+---
 
-Last verified: 2026-03-07
+# Folder Ownership
 
 This is the target ownership model for the gradual cleanup. It is a guide for where new code should go and how existing code should be migrated in small batches.
 

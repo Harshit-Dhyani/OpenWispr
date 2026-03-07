@@ -1,3 +1,15 @@
+---
+title: Brand Asset Pipeline
+owner: docs/ux
+audience: developers
+last_verified: 2026-03-07
+review_cadence: quarterly
+source_of_truth:
+  - scripts/generate_brand_assets.py
+  - package.json
+critical: false
+---
+
 # Brand Asset Pipeline
 
 Use one command to regenerate all packaging icons and frontend logo assets from a source logo.

@@ -3,7 +3,7 @@ title: Electron-Backend Contract
 audience: developers
 last_verified: 2026-03-04
 source_of_truth:
-  - app/electron/main/preload.js
+  - app/electron/main/preload/main.js
   - app/api/websocket_server.py
   - app/api/server.py
   - app/electron/main/ipc/handlers.js

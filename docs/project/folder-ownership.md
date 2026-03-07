@@ -1,3 +1,19 @@
+---
+title: Folder Ownership (Working Guide)
+owner: docs/ux
+audience: developers
+last_verified: 2026-03-07
+review_cadence: quarterly
+critical: false
+source_of_truth:
+  - app/
+  - docs/
+tags:
+  - migration
+  - restructure
+  - folder-ownership
+---
+
 # Folder Ownership
 
 This is the working ownership guide for the restructure program. It is meant to reduce confusion when editing the repo during migration.

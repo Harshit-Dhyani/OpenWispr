@@ -16,7 +16,7 @@ The floating window regression was introduced during the Electron main-process r
 
 - `app/electron/main/windows/floatingWindow.js`
 - `app/electron/main/ipc/hotkeyHandlers.js`
-- `app/electron/main/preload-floating.js`
+- `app/electron/main/preload/floating.js`
 
 The backend hotkey pipeline continued to emit valid websocket events and transcript payloads, but the floating renderer stayed stuck on `Waiting for speech...`.
 

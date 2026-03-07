@@ -4,7 +4,7 @@ audience: security
 last_verified: 2026-03-05
 source_of_truth:
   - app/api/server.py
-  - app/electron/main/preload.js
+  - app/electron/main/preload/main.js
   - app/core/logging_utils.py
 ---
 
@@ -88,7 +88,7 @@ User Action → Settings Check → OS Permission Prompt → Backend Initializati
 
 ### 3.1 Context Isolation Architecture
 
-The preload script (`app/electron/main/preload.js`) uses `contextBridge` to expose only explicitly defined APIs to the renderer:
+The preload script (`app/electron/main/preload/main.js`) uses `contextBridge` to expose only explicitly defined APIs to the renderer:
 
 ```javascript
 // Exposed API surface (from preload.js:3-181)
@@ -170,7 +170,7 @@ contextBridge.exposeInMainWorld("transcriptaDesktop", {
 
 ### 4.1 Download Security
 
-Model downloads are handled by `app/electron/main/model-download-manager.js`:
+Model downloads are handled by `app/electron/main/services/modelDownloadManager.js`:
 
 | Security Measure | Implementation |
 |-----------------|----------------|
