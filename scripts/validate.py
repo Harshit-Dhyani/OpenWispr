@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""System validation script for Transcripta.
+"""System validation script for OpenWispr.
 
 This script performs comprehensive validation of all system components:
 - Integration validation
@@ -110,7 +110,9 @@ class SystemValidator:
         self.report = ValidationReport(timestamp=time.strftime("%Y-%m-%dT%H:%M:%S"))
         self._stop_event = threading.Event()
 
-    def _run_test(self, name: str, test_func: Callable[[], tuple[bool, str, dict]]) -> ValidationResult:
+    def _run_test(
+        self, name: str, test_func: Callable[[], tuple[bool, str, dict]]
+    ) -> ValidationResult:
         """Run a single test and record result."""
         start = time.perf_counter()
         try:
@@ -140,7 +142,12 @@ class SystemValidator:
     def validate_mode_manager_initialization(self) -> tuple[bool, str, dict]:
         """Validate ModeManager initializes correctly."""
         try:
-            from app.core.mode_manager import ModeLifecycleState, ModeManager, get_mode_manager, reset_mode_manager
+            from app.core.mode_manager import (
+                ModeLifecycleState,
+                ModeManager,
+                get_mode_manager,
+                reset_mode_manager,
+            )
 
             reset_mode_manager()
 
@@ -149,8 +156,12 @@ class SystemValidator:
 
                 # Check initial state
                 assert manager.get_current_mode() is None
-                assert manager._state.wispr_status.lifecycle_state == ModeLifecycleState.UNINITIALIZED
-                assert manager._state.system_status.lifecycle_state == ModeLifecycleState.UNINITIALIZED
+                assert (
+                    manager._state.wispr_status.lifecycle_state == ModeLifecycleState.UNINITIALIZED
+                )
+                assert (
+                    manager._state.system_status.lifecycle_state == ModeLifecycleState.UNINITIALIZED
+                )
 
                 return True, "ModeManager initializes correctly", {}
         except Exception as e:
@@ -171,9 +182,15 @@ class SystemValidator:
             async def test_switch():
                 manager = get_mode_manager()
 
-                with patch.object(manager, "_initialize_transcription_engine", new_callable=AsyncMock):
-                    with patch.object(manager, "_initialize_mode_configurations", new_callable=AsyncMock):
-                        with patch.object(manager, "_initialize_audio_pipelines", new_callable=AsyncMock):
+                with patch.object(
+                    manager, "_initialize_transcription_engine", new_callable=AsyncMock
+                ):
+                    with patch.object(
+                        manager, "_initialize_mode_configurations", new_callable=AsyncMock
+                    ):
+                        with patch.object(
+                            manager, "_initialize_audio_pipelines", new_callable=AsyncMock
+                        ):
                             await manager.initialize()
 
                 with patch.object(manager, "_start_mode", new_callable=AsyncMock):
@@ -208,9 +225,15 @@ class SystemValidator:
                 settings_manager = SettingsManager()
                 manager = get_mode_manager(settings_manager=settings_manager)
 
-                with patch.object(manager, "_initialize_transcription_engine", new_callable=AsyncMock):
-                    with patch.object(manager, "_initialize_mode_configurations", new_callable=AsyncMock):
-                        with patch.object(manager, "_initialize_audio_pipelines", new_callable=AsyncMock):
+                with patch.object(
+                    manager, "_initialize_transcription_engine", new_callable=AsyncMock
+                ):
+                    with patch.object(
+                        manager, "_initialize_mode_configurations", new_callable=AsyncMock
+                    ):
+                        with patch.object(
+                            manager, "_initialize_audio_pipelines", new_callable=AsyncMock
+                        ):
                             await manager.initialize()
 
                 # Test settings sync
@@ -227,16 +250,27 @@ class SystemValidator:
     def validate_error_recovery(self) -> tuple[bool, str, dict]:
         """Validate error recovery mechanisms."""
         try:
-            from app.core.mode_manager import ModeLifecycleState, TranscriptionMode, get_mode_manager, reset_mode_manager
+            from app.core.mode_manager import (
+                ModeLifecycleState,
+                TranscriptionMode,
+                get_mode_manager,
+                reset_mode_manager,
+            )
 
             reset_mode_manager()
 
             async def test_recovery():
                 manager = get_mode_manager()
 
-                with patch.object(manager, "_initialize_transcription_engine", new_callable=AsyncMock):
-                    with patch.object(manager, "_initialize_mode_configurations", new_callable=AsyncMock):
-                        with patch.object(manager, "_initialize_audio_pipelines", new_callable=AsyncMock):
+                with patch.object(
+                    manager, "_initialize_transcription_engine", new_callable=AsyncMock
+                ):
+                    with patch.object(
+                        manager, "_initialize_mode_configurations", new_callable=AsyncMock
+                    ):
+                        with patch.object(
+                            manager, "_initialize_audio_pipelines", new_callable=AsyncMock
+                        ):
                             await manager.initialize()
 
                 # Simulate an error state
@@ -361,7 +395,11 @@ class SystemValidator:
             return (
                 passed,
                 f"Memory growth: {memory_growth:.1f}MB (initial: {initial_memory:.1f}MB, final: {final_memory:.1f}MB)",
-                {"initial_mb": initial_memory, "final_mb": final_memory, "growth_mb": memory_growth},
+                {
+                    "initial_mb": initial_memory,
+                    "final_mb": final_memory,
+                    "growth_mb": memory_growth,
+                },
             )
         except ImportError:
             return True, "psutil not available, skipping memory test", {}
@@ -390,7 +428,11 @@ class SystemValidator:
             return (
                 passed,
                 f"Audio buffer handled {total_pushed} samples, retrieved {len(retrieved)} (capacity: {buffer.max_samples})",
-                {"total_pushed": total_pushed, "retrieved": len(retrieved), "capacity": buffer.max_samples},
+                {
+                    "total_pushed": total_pushed,
+                    "retrieved": len(retrieved),
+                    "capacity": buffer.max_samples,
+                },
             )
         except Exception as e:
             return False, str(e), {}
@@ -412,9 +454,15 @@ class SystemValidator:
             async def test_threads():
                 manager = get_mode_manager()
 
-                with patch.object(manager, "_initialize_transcription_engine", new_callable=AsyncMock):
-                    with patch.object(manager, "_initialize_mode_configurations", new_callable=AsyncMock):
-                        with patch.object(manager, "_initialize_audio_pipelines", new_callable=AsyncMock):
+                with patch.object(
+                    manager, "_initialize_transcription_engine", new_callable=AsyncMock
+                ):
+                    with patch.object(
+                        manager, "_initialize_mode_configurations", new_callable=AsyncMock
+                    ):
+                        with patch.object(
+                            manager, "_initialize_audio_pipelines", new_callable=AsyncMock
+                        ):
                             await manager.initialize()
 
                 await manager.shutdown()
@@ -476,7 +524,11 @@ class SystemValidator:
     def validate_hotkey_session_lifecycle(self) -> tuple[bool, str, dict]:
         """Validate hotkey session lifecycle."""
         try:
-            from app.core.hotkey_session import HotkeySession, HotkeySessionConfig, HotkeySessionState
+            from app.core.hotkey_session import (
+                HotkeySession,
+                HotkeySessionConfig,
+                HotkeySessionState,
+            )
 
             config = HotkeySessionConfig()
             session = HotkeySession(config=config)
@@ -660,13 +712,15 @@ class SystemValidator:
 
         self.report.recommendations = self.generate_recommendations()
 
-        logger.info(f"Validation complete: {self.report.passed_tests}/{self.report.total_tests} tests passed")
+        logger.info(
+            f"Validation complete: {self.report.passed_tests}/{self.report.total_tests} tests passed"
+        )
 
         return self.report
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Validate Transcripta system")
+    parser = argparse.ArgumentParser(description="Validate OpenWispr system")
     parser.add_argument("--full", action="store_true", help="Run all validation tests")
     parser.add_argument("--performance", action="store_true", help="Run only performance tests")
     parser.add_argument("--integration", action="store_true", help="Run only integration tests")

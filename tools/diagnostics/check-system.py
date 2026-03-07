@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-System Diagnostics for Transcripta
+System Diagnostics for OpenWispr
 Checks CUDA availability across all transcription dependencies
 
 Usage:
@@ -30,7 +30,7 @@ class CheckResult:
 
 
 class SystemDiagnostics:
-    """System diagnostics for Transcripta."""
+    """System diagnostics for OpenWispr."""
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
@@ -279,7 +279,7 @@ class SystemDiagnostics:
 
     def run_all(self) -> list[CheckResult]:
         """Run all system diagnostics."""
-        self._print_header("System Diagnostics for Transcripta")
+        self._print_header("System Diagnostics for OpenWispr")
 
         if self.verbose:
             print(f"  Platform: {sys.platform}")
@@ -338,7 +338,7 @@ class SystemDiagnostics:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="System diagnostics for Transcripta",
+        description="System diagnostics for OpenWispr",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--json", action="store_true", help="Output JSON")

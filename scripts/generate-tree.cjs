@@ -59,7 +59,7 @@ for (const file of fileList) {
 }
 
 const lines = [
-  '# Transcripta Tree',
+  '# OpenWispr Tree',
   '',
   `Generated: ${new Date().toISOString()}`,
   `Files: ${fileList.length}`,

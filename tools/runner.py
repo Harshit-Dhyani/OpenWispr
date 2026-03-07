@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Transcripta Tools Runner - Unified interface for all development tools.
+OpenWispr Tools Runner - Unified interface for all development tools.
 
 Usage:
     python tools/runner.py --all              # Run all checks
@@ -39,7 +39,7 @@ class ToolResult:
 
 
 class ToolRunner:
-    """Runner for Transcripta development tools."""
+    """Runner for OpenWispr development tools."""
 
     TOOLS_DIR = Path(__file__).parent
 
@@ -196,7 +196,7 @@ class ToolRunner:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Transcripta Tools Runner - Unified tool interface",
+        description="OpenWispr Tools Runner - Unified tool interface",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

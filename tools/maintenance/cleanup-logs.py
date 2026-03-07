@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Log Cleanup Tool for Transcripta
+Log Cleanup Tool for OpenWispr
 Removes old log files and temporary data
 
 Usage:
@@ -154,7 +154,7 @@ class LogCleaner:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Clean up old log files for Transcripta",
+        description="Clean up old log files for OpenWispr",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

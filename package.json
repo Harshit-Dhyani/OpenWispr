@@ -1,9 +1,9 @@
 {
-  "name": "transcripta",
+  "name": "openwispr",
   "version": "0.1.0",
   "private": true,
-  "description": "Transcripta - AI-powered transcription and translation desktop application",
-  "author": "Transcripta Team",
+  "description": "OpenWispr - AI-powered transcription and translation desktop application",
+  "author": "OpenWispr Team",
   "license": "MIT",
   "main": "app/electron/main/index.js",
   "engines": {
@@ -15,42 +15,34 @@
     "install:ui": "pnpm --dir app/electron install",
     "install:backend": "python -m pip install -e . || echo 'Backend optional'",
     "postinstall": "pnpm run install:all",
-    
     "dev": "node scripts/dev.cjs",
     "dev:electron": "pnpm --dir app/electron run dev",
     "dev:frontend": "pnpm --dir app/electron/frontend run dev",
     "dev:backend": "node scripts/run-backend-dev.cjs",
-    
     "build": "pnpm run build:clean && pnpm run build:frontend && pnpm run build:electron",
     "build:clean": "rimraf app/electron/renderer/dist app/electron/dist dist release",
     "build:frontend": "pnpm --dir app/electron/frontend run build",
     "build:electron": "pnpm --dir app/electron run build:frontend",
     "build:production": "cross-env NODE_ENV=production pnpm run build",
     "build:analyze": "pnpm --dir app/electron/frontend run build -- --mode analyze",
-    
     "watch": "pnpm run build:frontend && pnpm run dev:electron",
     "watch:frontend": "pnpm --dir app/electron/frontend run dev",
-    
     "test": "pnpm run test:frontend && pnpm run test:backend",
     "test:frontend": "pnpm --dir app/electron/frontend run test",
     "test:backend": "pytest || echo 'Backend tests optional'",
     "test:e2e": "playwright test",
     "test:coverage": "pnpm --dir app/electron/frontend run test:coverage",
-    
     "lint": "pnpm run lint:frontend && pnpm run lint:electron && pnpm run lint:python && pnpm run check:renderer-strings",
     "lint:frontend": "pnpm --dir app/electron/frontend run lint || echo 'No lint script'",
     "lint:electron": "eslint app/electron/main --ext .js,.ts || echo 'ESLint optional'",
     "lint:python": "ruff check . || echo 'Ruff optional'",
     "check:renderer-strings": "python tools/check_renderer_strings.py",
     "lint:fix": "pnpm run lint:frontend -- --fix && pnpm run lint:electron -- --fix",
-    
     "typecheck": "pnpm --dir app/electron/frontend run typecheck || echo 'No typecheck script'",
     "tree:generate": "node scripts/generate-tree.cjs",
     "changes:since-last-commit": "node scripts/generate-changes-since-last-commit.cjs",
-    
     "pack": "pnpm --dir app/electron run pack",
     "pack:all": "pnpm run build:production && pnpm run dist:all",
-    
     "dist": "pnpm run build:production && pnpm run dist:current",
     "dist:current": "pnpm --dir app/electron run dist",
     "dist:all": "pnpm run build:production && pnpm run dist:win && pnpm run dist:mac && pnpm run dist:linux",
@@ -58,34 +50,29 @@
     "dist:mac": "pnpm --dir app/electron run dist -- --mac",
     "dist:linux": "pnpm --dir app/electron run dist -- --linux",
     "dist:portable": "pnpm run build:production && pnpm --dir app/electron run dist -- --win portable",
-    
     "scripts:build": "python scripts/build.py",
     "scripts:package": "python scripts/package.py",
     "scripts:release": "python scripts/release.py",
-    
     "version": "node scripts/version.js",
     "version:bump": "npm version patch -m \"chore(release): bump version to %s\"",
     "version:minor": "npm version minor -m \"chore(release): bump version to %s\"",
     "version:major": "npm version major -m \"chore(release): bump version to %s\"",
-    
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "changelog:generate": "git log --pretty=format:\"%h %s (%an)\" --no-merges > CHANGELOG.txt",
-    
     "release": "pnpm run build:production && pnpm run dist:all && pnpm run release:publish",
     "release:draft": "pnpm run build:production && pnpm run dist:all && pnpm run release:publish -- --draft",
     "release:publish": "node scripts/publish-release.js",
-    
     "clean": "rimraf app/electron/renderer/dist app/electron/dist dist release node_modules app/electron/node_modules app/electron/frontend/node_modules",
     "clean:cache": "rimraf .cache .parcel-cache .turbo",
     "clean:all": "pnpm run clean && pnpm run clean:cache",
-    
-    "postbuild": "node scripts/postbuild.js",
-    "postversion": "pnpm run changelog && git push && git push --tags"
+    "postversion": "pnpm run changelog && git push && git push --tags",
+    "brand:icons": "python scripts/generate_brand_assets.py",
+    "brand:icons:default": "python scripts/generate_brand_assets.py"
   },
   "build": {
-    "appId": "com.transcripta.desktop",
-    "productName": "Transcripta",
-    "copyright": "Copyright © 2026 Transcripta Team",
+    "appId": "com.openwispr.desktop",
+    "productName": "OpenWispr",
+    "copyright": "Copyright Â© 2026 OpenWispr Team",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -103,7 +90,11 @@
       {
         "from": "backend",
         "to": "backend",
-        "filter": ["**/*", "!**/__pycache__", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/*.pyc"
+        ]
       }
     ],
     "asar": true,
@@ -116,19 +107,26 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "msi",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
-      "publisherName": "Transcripta Team",
+      "publisherName": "OpenWispr Team",
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "requireAdministrator"
     },
@@ -141,7 +139,7 @@
       "installerHeaderIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Transcripta",
+      "shortcutName": "OpenWispr",
       "license": "LICENSE",
       "artifactName": "${productName}-${version}-setup.${ext}"
     },
@@ -152,15 +150,25 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64", "universal"]
+          "arch": [
+            "x64",
+            "arm64",
+            "universal"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "pkg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "build/icon.icns",
@@ -169,7 +177,9 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "signIgnore": ["node_modules/node-key-sender/**/*"]
+      "signIgnore": [
+        "node_modules/node-key-sender/**/*"
+      ]
     },
     "dmg": {
       "contents": [
@@ -194,43 +204,55 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "snap",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "build/icons",
       "category": "Office",
-      "maintainer": "Transcripta Team",
-      "vendor": "Transcripta",
+      "maintainer": "OpenWispr Team",
+      "vendor": "OpenWispr",
       "synopsis": "AI-powered transcription and translation",
-      "description": "Transcripta is an AI-powered desktop application for transcription and translation.",
+      "description": "OpenWispr is an AI-powered desktop application for transcription and translation.",
       "desktop": {
-        "Name": "Transcripta",
+        "Name": "OpenWispr",
         "Comment": "AI-powered transcription and translation",
         "Categories": "Office;AudioVideo;",
-        "StartupWMClass": "transcripta"
+        "StartupWMClass": "openwispr"
       },
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
-      "owner": "transcripta",
-      "repo": "transcripta-desktop",
+      "owner": "Harshit-Dhyani",
+      "repo": "OpenWispr",
       "releaseType": "release",
       "publishAutoUpdate": true
     },

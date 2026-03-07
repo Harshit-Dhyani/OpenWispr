@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Installs FFmpeg for Transcripta audio processing.
+    Installs FFmpeg for OpenWispr audio processing.
 .DESCRIPTION
     Downloads and installs FFmpeg for Windows if not already present.
     Adds FFmpeg to PATH if needed.
@@ -28,7 +28,7 @@ function Write-Warn { param([string]$Message) Write-Host "${Yellow}[WARN]${Reset
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  FFmpeg Installer for Transcripta" -ForegroundColor Cyan
+Write-Host "  FFmpeg Installer for OpenWispr" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 

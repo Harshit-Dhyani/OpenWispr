@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "transcripta"
+name = "openwispr"
 version = "0.1.0"
 description = "Local privacy-first real-time system-audio transcription with STEM verification for Windows 11."
 readme = "README.md"
@@ -93,3 +93,4 @@ select = ["E", "F", "I", "B", "UP"]
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
+

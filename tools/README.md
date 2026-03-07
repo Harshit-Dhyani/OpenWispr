@@ -1,6 +1,6 @@
-# Transcripta Development Tools
+# OpenWispr Development Tools
 
-This directory contains development, diagnostic, and maintenance tools for the Transcripta project.
+This directory contains development, diagnostic, and maintenance tools for the OpenWispr project.
 
 ## Quick Start
 
@@ -94,7 +94,7 @@ python tools/diagnostics/check-system.py [--json] [--verbose]
 **Example Output:**
 ```
 ==================================================
-  System Diagnostics for Transcripta
+  System Diagnostics for OpenWispr
 ==================================================
   Platform: win32
   Python: 3.12.1
@@ -137,7 +137,7 @@ python tools/diagnostics/check-audio.py [--json] [--verbose] [--test DEVICE_ID]
 **Example Output:**
 ```
 ============================================================
-  Audio Diagnostics for Transcripta
+  Audio Diagnostics for OpenWispr
 ============================================================
   ✓ soundcard module installed
 

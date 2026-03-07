@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Installs PyTorch with CUDA 12.1 support for Transcripta.
+    Installs PyTorch with CUDA 12.1 support for OpenWispr.
 .DESCRIPTION
     Activates the virtual environment, installs PyTorch with CUDA 12.1,
     verifies the installation, and updates requirements.txt with the
@@ -49,7 +49,7 @@ $ProjectRoot = Split-Path -Parent $ToolsDir
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  PyTorch CUDA 12.1 Installer" -ForegroundColor Cyan
-Write-Host "  for Transcripta" -ForegroundColor Cyan
+Write-Host "  for OpenWispr" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -124,7 +124,7 @@ try {
         Write-Host "  - CUDA toolkit not installed"
         Write-Host "  - No NVIDIA GPU detected"
         Write-Host ""
-        Write-Host "You can still use Transcripta, but transcription will be slower."
+        Write-Host "You can still use OpenWispr, but transcription will be slower."
     }
 } catch {
     Write-Error "Failed to verify PyTorch installation: $_"
@@ -176,7 +176,7 @@ Write-Success "PyTorch CUDA 12.1 installation complete!"
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
-Write-Host "  1. Run 'npm run dev' to start Transcripta"
+Write-Host "  1. Run 'npm run dev' to start OpenWispr"
 Write-Host "  2. Check the Settings panel to confirm GPU is detected"
 Write-Host ""
 

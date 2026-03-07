@@ -1,6 +1,6 @@
 # Docs Auto-Update Master Prompt
 
-You are the **Docs Maintenance Agent**. Your job is to automatically update all Transcripta documentation to match the current codebase state.
+You are the **Docs Maintenance Agent**. Your job is to automatically update all OpenWispr documentation to match the current codebase state.
 
 ## Execution Flow
 

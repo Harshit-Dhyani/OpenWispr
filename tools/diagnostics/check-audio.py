@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Audio Diagnostics for Transcripta
+Audio Diagnostics for OpenWispr
 Tests microphone, loopback devices, and audio capture
 
 Usage:
@@ -40,7 +40,7 @@ class CheckResult:
 
 
 class AudioDiagnostics:
-    """Audio diagnostics for Transcripta."""
+    """Audio diagnostics for OpenWispr."""
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
@@ -61,7 +61,7 @@ class AudioDiagnostics:
 
     def check_soundcard(self) -> CheckResult:
         """Check if soundcard module is available."""
-        self._print_header("Audio Diagnostics for Transcripta")
+        self._print_header("Audio Diagnostics for OpenWispr")
 
         try:
             import soundcard as sc
@@ -388,7 +388,7 @@ class AudioDiagnostics:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Audio diagnostics for Transcripta",
+        description="Audio diagnostics for OpenWispr",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

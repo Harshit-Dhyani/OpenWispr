@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-API Documentation Generator for Transcripta
+API Documentation Generator for OpenWispr
 
 Parses app/api/server.py for route decorators and generates markdown table of routes.
 Can be run with --check to verify against docs/api/endpoints.md
