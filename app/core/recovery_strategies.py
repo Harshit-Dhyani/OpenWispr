@@ -1,4 +1,4 @@
-"""Recovery strategies and automatic failure recovery for Transcripta.
+"""Recovery strategies and automatic failure recovery for OpenWispr.
 
 Provides RecoveryManager for coordinating recovery attempts, FallbackChain for
 cascading fallbacks, and specific recovery strategies for each error category.
@@ -25,11 +25,11 @@ from app.core.error_handler import (
     NetworkError,
     RetryConfig,
     SessionError,
-    TranscriptaError,
+    OpenWisprError,
     with_retry,
 )
 
-logger = logging.getLogger("transcripta.recovery")
+logger = logging.getLogger("openwispr.recovery")
 
 
 # ============================================
@@ -262,13 +262,13 @@ class RecoveryStrategy(ABC):
         self._failure_count = 0
 
     @abstractmethod
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         """Check if this strategy can handle the error."""
         pass
 
     @abstractmethod
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         """Attempt to recover from the error."""
         pass
@@ -336,14 +336,14 @@ class AudioDeviceRecoveryStrategy(RecoveryStrategy):
         self.device_manager = device_manager
         self._fallback_device_id: Optional[str] = None
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return (
             isinstance(error, AudioError)
             and error.category == ErrorCategory.AUDIO_DEVICE_DISCONNECTED
         )
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         ctx = context or {}
         available_devices = ctx.get("available_devices", [])
@@ -386,14 +386,14 @@ class AudioPermissionRecoveryStrategy(RecoveryStrategy):
     def __init__(self):
         super().__init__("audio_permission_guidance", priority=20)
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return (
             isinstance(error, AudioError)
             and error.category == ErrorCategory.AUDIO_PERMISSION_DENIED
         )
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         # Permission errors require user action - provide guidance
         platform = (context or {}).get("platform", "unknown")
@@ -426,7 +426,7 @@ class ModelOOMRecoveryStrategy(RecoveryStrategy):
         self.compute_fallback = compute_fallback or create_compute_fallback_chain()
         self.batch_fallback = batch_fallback or create_batch_size_fallback_chain()
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         if not isinstance(error, ModelError):
             return False
 
@@ -438,7 +438,7 @@ class ModelOOMRecoveryStrategy(RecoveryStrategy):
         return any(kw in msg_lower for kw in GPU_FALLBACK_KEYWORDS) and "memory" in msg_lower
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         start_time = time.time()
         applied_fallbacks = []
@@ -489,7 +489,7 @@ class ModelDownloadStrategy(RecoveryStrategy):
         self.model_cache_dir = model_cache_dir or Path.home() / ".transcripta" / "models"
         self._download_progress: dict[str, float] = {}
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return isinstance(error, ModelError) and error.category in {
             ErrorCategory.MODEL_NOT_FOUND,
             ErrorCategory.MODEL_CORRUPTED,
@@ -524,7 +524,7 @@ class ModelDownloadStrategy(RecoveryStrategy):
         return True
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         if not isinstance(error, ModelError) or not error.model_name:
             return self._failed(error.error_id, "Cannot download: unknown model name")
@@ -559,14 +559,14 @@ class ModelFallbackStrategy(RecoveryStrategy):
         super().__init__("model_size_fallback", priority=15)
         self.model_fallback = model_fallback or create_model_size_fallback_chain()
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return isinstance(error, ModelError) and error.category in {
             ErrorCategory.MODEL_LOAD_FAILED,
             ErrorCategory.MODEL_CORRUPTED,
         }
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         success, new_model = self.model_fallback.fallback()
 
@@ -600,7 +600,7 @@ class NetworkRetryStrategy(RecoveryStrategy):
         self.base_delay = base_delay
         self._retry_counts: dict[str, int] = {}
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return (
             isinstance(error, NetworkError)
             and error.category
@@ -613,7 +613,7 @@ class NetworkRetryStrategy(RecoveryStrategy):
         )
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         error_key = f"{error.category.value}:{error.endpoint or 'unknown'}"
         retry_count = self._retry_counts.get(error_key, 0) + 1
@@ -655,14 +655,14 @@ class OfflineModeStrategy(RecoveryStrategy):
         super().__init__("offline_mode_switch", priority=20)
         self._offline_mode_active = False
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return (
             isinstance(error, NetworkError)
             and error.category == ErrorCategory.NETWORK_BACKEND_UNAVAILABLE
         )
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         if self._offline_mode_active:
             return self._partial(
@@ -705,11 +705,11 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
         super().__init__("disk_full_handler", priority=5)
         self.min_free_mb = min_free_mb
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return isinstance(error, SessionError) and error.category == ErrorCategory.SESSION_DISK_FULL
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         ctx = context or {}
         session_manager = ctx.get("session_manager")
@@ -786,11 +786,11 @@ class SessionCorruptionRecoveryStrategy(RecoveryStrategy):
     def __init__(self):
         super().__init__("session_corruption_recovery", priority=10)
 
-    def can_handle(self, error: TranscriptaError) -> bool:
+    def can_handle(self, error: OpenWisprError) -> bool:
         return isinstance(error, SessionError) and error.category == ErrorCategory.SESSION_CORRUPTED
 
     def recover(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> RecoveryResult:
         file_path = error.file_path
 
@@ -896,7 +896,7 @@ class RecoveryManager:
 
     def attempt_recovery(
         self,
-        error: TranscriptaError,
+        error: OpenWisprError,
         context: Optional[dict[str, Any]] = None,
     ) -> RecoveryResult:
         """Attempt to recover from an error using registered strategies."""

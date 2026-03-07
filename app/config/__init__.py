@@ -1,4 +1,4 @@
-"""Centralized configuration package for Transcripta.
+"""Centralized configuration package for OpenWispr.
 
 This package provides a single source of truth for all configuration values,
 text strings, and constants used throughout the application.
@@ -129,3 +129,4 @@ __all__ = [
     "STATUS_LABELS",
     "SECTION_HEADERS",
 ]
+

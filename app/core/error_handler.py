@@ -1,4 +1,4 @@
-"""Central error handling system for Transcripta.
+"""Central error handling system for OpenWispr.
 
 Provides structured error types, centralized error dispatch, user notification,
 and crash reporting with full stack trace preservation.
@@ -17,7 +17,7 @@ from typing import Any, Callable, Coroutine, Optional, Union
 
 from app.core.logging_utils import JsonFormatter
 
-logger = logging.getLogger("transcripta.errors")
+logger = logging.getLogger("openwispr.errors")
 
 
 # ============================================
@@ -200,7 +200,7 @@ class SessionError(AppError):
 
 
 # Type alias for all error types
-TranscriptaError = Union[AppError, AudioError, ModelError, NetworkError, SessionError]
+OpenWisprError = Union[AppError, AudioError, ModelError, NetworkError, SessionError]
 
 
 # ============================================
@@ -214,7 +214,7 @@ USER_MESSAGES: dict[ErrorCategory, dict[str, str]] = {
     },
     ErrorCategory.AUDIO_PERMISSION_DENIED: {
         "title": "Microphone Access Denied",
-        "message": "Transcripta needs microphone access to transcribe audio.",
+        "message": "OpenWispr needs microphone access to transcribe audio.",
         "action": "Please grant microphone permission in your system settings.",
     },
     ErrorCategory.AUDIO_BACKEND_FAILURE: {
@@ -291,7 +291,7 @@ class UserNotifier:
         self._notification_history: list[dict[str, Any]] = []
         self._suppressed_categories: set[ErrorCategory] = set()
 
-    def notify(self, error: TranscriptaError) -> None:
+    def notify(self, error: OpenWisprError) -> None:
         """Notify user of an error if severity meets threshold."""
         if error.severity < self.min_severity:
             logger.debug(f"Suppressed notification for {error.error_id} (below threshold)")
@@ -318,7 +318,7 @@ class UserNotifier:
             except Exception as e:
                 logger.error(f"Notification callback failed: {e}")
 
-    def _format_message(self, error: TranscriptaError) -> dict[str, str]:
+    def _format_message(self, error: OpenWisprError) -> dict[str, str]:
         """Format error into user-friendly message."""
         template = USER_MESSAGES.get(error.category, USER_MESSAGES[ErrorCategory.SYSTEM_UNKNOWN])
 
@@ -375,7 +375,7 @@ class ErrorReporter:
         enable_telemetry: bool = True,
         enable_crash_dumps: bool = True,
     ):
-        self.report_dir = report_dir or Path.home() / ".transcripta" / "reports"
+        self.report_dir = report_dir or Path.home() / ".openwispr" / "reports"
         self.enable_telemetry = enable_telemetry
         self.enable_crash_dumps = enable_crash_dumps
         self._error_counts: dict[ErrorCategory, int] = {}
@@ -385,7 +385,7 @@ class ErrorReporter:
             self.report_dir.mkdir(parents=True, exist_ok=True)
 
     def report(
-        self, error: TranscriptaError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
     ) -> Optional[str]:
         """Report an error to telemetry and optionally save crash dump."""
         self._error_counts[error.category] = self._error_counts.get(error.category, 0) + 1
@@ -410,7 +410,7 @@ class ErrorReporter:
 
         return None
 
-    def _save_crash_dump(self, error: TranscriptaError, context: Optional[dict[str, Any]]) -> str:
+    def _save_crash_dump(self, error: OpenWisprError, context: Optional[dict[str, Any]]) -> str:
         """Save crash dump file for analysis."""
         dump_path = (
             self.report_dir
@@ -587,15 +587,15 @@ class ErrorHandler:
     ):
         self.notifier = notifier or UserNotifier()
         self.reporter = reporter or ErrorReporter()
-        self._handlers: dict[ErrorCategory, list[Callable[[TranscriptaError], None]]] = {}
-        self._global_handlers: list[Callable[[TranscriptaError], None]] = []
+        self._handlers: dict[ErrorCategory, list[Callable[[OpenWisprError], None]]] = {}
+        self._global_handlers: list[Callable[[OpenWisprError], None]] = []
         self._error_counts: dict[str, int] = {}
         self._rate_limits: dict[ErrorCategory, tuple[int, float]] = {}
 
     def register_handler(
         self,
         category: ErrorCategory,
-        handler: Callable[[TranscriptaError], None],
+        handler: Callable[[OpenWisprError], None],
     ) -> None:
         """Register a handler for a specific error category."""
         if category not in self._handlers:
@@ -603,7 +603,7 @@ class ErrorHandler:
         self._handlers[category].append(handler)
         logger.debug(f"Registered handler for {category.value}")
 
-    def register_global_handler(self, handler: Callable[[TranscriptaError], None]) -> None:
+    def register_global_handler(self, handler: Callable[[OpenWisprError], None]) -> None:
         """Register a global handler for all errors."""
         self._global_handlers.append(handler)
         logger.debug("Registered global error handler")
@@ -616,7 +616,7 @@ class ErrorHandler:
 
     def handle(
         self,
-        error: TranscriptaError,
+        error: OpenWisprError,
         context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Handle an error through all registered handlers."""
@@ -668,7 +668,7 @@ class ErrorHandler:
             )
             self.handle(error, context)
 
-    def _is_rate_limited(self, error: TranscriptaError) -> bool:
+    def _is_rate_limited(self, error: OpenWisprError) -> bool:
         """Check if error category is rate limited."""
         if error.category not in self._rate_limits:
             return False
@@ -708,18 +708,16 @@ def set_default_handler(handler: ErrorHandler) -> None:
 
 
 # Convenience functions
-def handle_error(error: TranscriptaError, context: Optional[dict[str, Any]] = None) -> None:
+def handle_error(error: OpenWisprError, context: Optional[dict[str, Any]] = None) -> None:
     """Handle an error using the default handler."""
     get_error_handler().handle(error, context)
 
 
-def notify_user(error: TranscriptaError) -> None:
+def notify_user(error: OpenWisprError) -> None:
     """Notify user of an error using the default notifier."""
     get_error_handler().notifier.notify(error)
 
 
-def report_error(
-    error: TranscriptaError, context: Optional[dict[str, Any]] = None
-) -> Optional[str]:
+def report_error(error: OpenWisprError, context: Optional[dict[str, Any]] = None) -> Optional[str]:
     """Report an error using the default reporter."""
     return get_error_handler().reporter.report(error, context)

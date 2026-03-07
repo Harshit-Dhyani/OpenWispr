@@ -1,4 +1,4 @@
-"""Centralized constants for Transcripta backend.
+"""Centralized constants for OpenWispr backend.
 
 This module contains all hardcoded values that were previously scattered
 across the codebase. All modules should import from here.
@@ -11,8 +11,8 @@ across the codebase. All modules should import from here.
 class AppConstants:
     """Application branding constants."""
 
-    APP_NAME = "Transcripta"
-    APP_SLUG = "transcripta"
+    APP_NAME = "OpenWispr"
+    APP_SLUG = "openwispr"
     LOCAL_API_TITLE_SUFFIX = "Local API"
     DOWNLOAD_USER_AGENT = f"{APP_NAME}/1.0"
 
@@ -362,7 +362,7 @@ class RefinerConstants:
     VALID_ENGINES = {"llamacpp", "ollama"}
     DEFAULT_REFINEMENT_MODE = "off"
     VALID_REFINEMENT_MODES = {"off", "strict", "polished"}
-    DEFAULT_REFINEMENT_PROFILE = "raw"
+    DEFAULT_REFINEMENT_PROFILE = "clean_dictation"
     VALID_REFINEMENT_PROFILES = {
         "raw",
         "clean_dictation",
@@ -392,3 +392,5 @@ GPU_FALLBACK_KEYWORDS = [
     "no kernel image",
     "nvidia",
 ]
+
+

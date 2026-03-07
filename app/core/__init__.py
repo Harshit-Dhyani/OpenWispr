@@ -11,7 +11,7 @@ from app.core.error_handler import (
     NetworkError,
     RetryConfig,
     SessionError,
-    TranscriptaError,
+    OpenWisprError,
     UserNotifier,
     get_error_handler,
     handle_error,
@@ -50,7 +50,7 @@ __all__ = [
     "ModelError",
     "NetworkError",
     "SessionError",
-    "TranscriptaError",
+    "OpenWisprError",
     # Error handling
     "ErrorCategory",
     "ErrorHandler",

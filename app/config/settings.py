@@ -549,7 +549,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         type="boolean",
         default=False,
         label="Mute App Audio During Dictation",
-        description="Mute Transcripta renderer audio while microphone dictation is active",
+        description="Mute OpenWispr renderer audio while microphone dictation is active",
     ),
     # ============================================
     # Hotkey Settings
@@ -896,7 +896,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default=True,
         label="Enable Style Pipeline",
         description="Apply style profile transform during final transcript composition",
-    ),    # ============================================
+    ),  # ============================================
     # Advanced Settings
     # ============================================
     "debugMode": SettingDefinition(
@@ -1140,4 +1140,3 @@ CURRENT_SETTINGS_VERSION = UIConstants.SETTINGS_VERSION
 def get_settings_version() -> int:
     """Get the current settings version."""
     return CURRENT_SETTINGS_VERSION
-

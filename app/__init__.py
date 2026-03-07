@@ -1,4 +1,4 @@
-"""Transcripta application package."""
+"""OpenWispr application package."""
 
 from __future__ import annotations
 
@@ -18,3 +18,4 @@ def _patch_numpy_fromstring_binary_mode() -> None:
 
 
 _patch_numpy_fromstring_binary_mode()
+

@@ -1,4 +1,4 @@
-"""Persistent settings management for Transcripta with mode support.
+"""Persistent settings management for OpenWispr with mode support.
 
 This module handles loading, saving, and migrating user settings
 with support for mode-specific configurations (Hotkey and System modes).
@@ -82,13 +82,13 @@ def _normalize_settings_payload(data: dict[str, Any]) -> dict[str, Any]:
     )
     microphone_hotkey = hotkey.get("microphone_key_combination") or hotkey.get("key_combination")
     hotkey["microphone_key_combination"] = (
-        str(microphone_hotkey).strip() if microphone_hotkey else get_setting("key_combination").default
+        str(microphone_hotkey).strip()
+        if microphone_hotkey
+        else get_setting("key_combination").default
     )
     system_hotkey = hotkey.get("system_key_combination")
     hotkey["system_key_combination"] = (
-        str(system_hotkey).strip()
-        if system_hotkey
-        else "CommandOrControl+Shift+Y"
+        str(system_hotkey).strip() if system_hotkey else "CommandOrControl+Shift+Y"
     )
 
     fallback_model_id = (
@@ -126,6 +126,7 @@ def _build_coach_settings(raw: dict[str, Any] | None) -> "CoachSettings":
             ],
         }
     )
+
 
 __all__ = [
     "GeneralSettings",
@@ -278,9 +279,7 @@ class HotkeySettings:
     enable_refiner_on_stop: bool = field(
         default_factory=lambda: get_setting("enable_refiner_on_stop").default
     )
-    save_debug_wav: bool = field(
-        default_factory=lambda: get_setting("save_debug_wav").default
-    )
+    save_debug_wav: bool = field(default_factory=lambda: get_setting("save_debug_wav").default)
     show_floating_window: bool = field(
         default_factory=lambda: get_setting("show_floating_window").default
     )
@@ -390,9 +389,7 @@ class DictionarySettings:
 class SnippetsSettings:
     """Snippet pipeline settings."""
 
-    snippets_enabled: bool = field(
-        default_factory=lambda: get_setting("snippets_enabled").default
-    )
+    snippets_enabled: bool = field(default_factory=lambda: get_setting("snippets_enabled").default)
     snippets_quick_insert: bool = field(
         default_factory=lambda: get_setting("snippets_quick_insert").default
     )
@@ -408,6 +405,7 @@ class StyleSettings:
     style_apply_enabled: bool = field(
         default_factory=lambda: get_setting("style_apply_enabled").default
     )
+
 
 @dataclass
 class AdvancedSettings:
@@ -900,7 +898,19 @@ class SettingsManager:
         try:
             with self._lock:
                 # Validate required categories
-                required = ["general", "transcription", "refiner", "audio", "hotkey", "coach", "history", "dictionary", "snippets", "style", "advanced"]
+                required = [
+                    "general",
+                    "transcription",
+                    "refiner",
+                    "audio",
+                    "hotkey",
+                    "coach",
+                    "history",
+                    "dictionary",
+                    "snippets",
+                    "style",
+                    "advanced",
+                ]
                 for cat in required:
                     if cat not in data:
                         data[cat] = {}
@@ -966,8 +976,3 @@ def reset_settings_manager() -> None:
     global _settings_manager
     with _settings_lock:
         _settings_manager = None
-
-
-
-
-
