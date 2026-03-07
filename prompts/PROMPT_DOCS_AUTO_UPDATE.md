@@ -256,7 +256,36 @@ Verify all links work and point to existing files.
 
 ---
 
-## STEP 5: UPDATE DATES
+## STEP 5: ADD FRONTMATTER TO MISSING DOCS
+
+If verification reports files missing frontmatter, add the required frontmatter block to each:
+
+```yaml
+---
+title: Title
+owner: docs/ux
+audience: developers|operators|all|security
+last_verified: YYYY-MM-DD
+review_cadence: monthly|quarterly
+source_of_truth:
+  - list/of/source/files.py
+critical: true|false
+---
+```
+
+Files that need frontmatter (verify with verify-docs.py):
+- docs/branding/brand-assets.md
+- docs/engineering/folder-ownership.md
+- docs/engineering/restructure-audit.md
+- docs/engineering/restructure-discovery.md
+- docs/engineering/settings-source-of-truth.md
+- docs/project/folder-ownership.md
+
+Set appropriate values for each based on the doc's content and purpose.
+
+---
+
+## STEP 6: UPDATE DATES
 
 For every doc you modified, update the frontmatter:
 ```yaml
@@ -265,15 +294,26 @@ last_verified: YYYY-MM-DD  # Today's date
 
 ---
 
-## STEP 6: UPDATE INVENTORY
+## STEP 7: UPDATE INVENTORY
 
 Update `docs/_inventory.yml`:
 1. Update `last_updated: YYYY-MM-DD` at top
 2. For each doc you changed, update its `last_verified` date
+3. Add any new docs that are not yet in the inventory:
+
+### New docs to add to inventory:
+- docs/branding/brand-assets.md
+- docs/engineering/folder-ownership.md
+- docs/engineering/restructure-audit.md
+- docs/engineering/restructure-discovery.md
+- docs/engineering/settings-source-of-truth.md
+- docs/project/folder-ownership.md
+
+For each new file, determine appropriate ownership, audience, source_of_truth, and critical status based on content.
 
 ---
 
-## STEP 7: FINAL VERIFICATION
+## STEP 8: FINAL VERIFICATION
 
 Run verification again:
 ```bash
@@ -284,7 +324,7 @@ MUST PASS before you're done.
 
 ---
 
-## STEP 8: GENERATE REPORT
+## STEP 9: GENERATE REPORT
 
 Create `reports/docs-update-YYYY-MM-DD.md` with:
 
