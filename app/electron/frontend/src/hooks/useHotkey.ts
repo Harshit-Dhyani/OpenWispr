@@ -45,7 +45,7 @@ export function useHotkey(options: UseHotkeyOptions = {}): UseHotkeyReturn {
   const [error, setError] = useState<string | null>(null);
   const stateRef = useRef(state);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hotkeyApi = window.transcriptaDesktop?.hotkey;
+  const hotkeyApi = window.openwisprDesktop?.hotkey;
   
   // Keep ref in sync with state for event handlers
   useEffect(() => {
@@ -172,7 +172,7 @@ export function useHotkey(options: UseHotkeyOptions = {}): UseHotkeyReturn {
   // Show floating window
   const showFloatingWindow = useCallback(async () => {
     try {
-      await window.transcriptaDesktop.floatingWindow?.show?.();
+      await window.openwisprDesktop.floatingWindow?.show?.();
     } catch (err) {
       console.error('Failed to show floating window:', err);
     }
@@ -181,7 +181,7 @@ export function useHotkey(options: UseHotkeyOptions = {}): UseHotkeyReturn {
   // Hide floating window
   const hideFloatingWindow = useCallback(async () => {
     try {
-      await window.transcriptaDesktop.floatingWindow?.hide?.();
+      await window.openwisprDesktop.floatingWindow?.hide?.();
     } catch (err) {
       console.error('Failed to hide floating window:', err);
     }

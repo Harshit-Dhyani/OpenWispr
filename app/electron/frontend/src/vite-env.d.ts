@@ -2,7 +2,7 @@
 
 declare global {
   interface Window {
-    transcriptaDesktop: {
+    openwisprDesktop: {
       // File system APIs
       chooseDirectory: () => Promise<string | null>;
       choosePdf: () => Promise<string | null>;
@@ -84,7 +84,7 @@ declare global {
       onTranscription?: (event: unknown, text: string) => void;
       onRecordingStateChange?: (event: unknown, state: 'idle' | 'listening' | 'processing') => void;
     };
-    transcriptaFloating?: {
+    openwisprFloating?: {
       onRecordingState: (
         callback: (state: {
           isRecording: boolean;

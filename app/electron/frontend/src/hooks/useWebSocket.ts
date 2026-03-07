@@ -76,7 +76,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     
     // Try to get API origin from Electron API
     const apiOrigin = typeof window !== 'undefined' && 
-      (window as unknown as { transcriptaDesktop?: { getApiOrigin?: () => Promise<string> } })?.transcriptaDesktop?.getApiOrigin
+      (window as unknown as { openwisprDesktop?: { getApiOrigin?: () => Promise<string> } })?.openwisprDesktop?.getApiOrigin
       ? 'http://127.0.0.1:8765'
       : '';
     

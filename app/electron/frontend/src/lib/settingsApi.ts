@@ -54,7 +54,7 @@ export type PendingChange = {
 // ============================================
 
 const API_CONFIG = {
-  baseUrl: typeof window !== 'undefined' && typeof window.transcriptaDesktop?.getApiOrigin === 'function'
+  baseUrl: typeof window !== 'undefined' && typeof window.openwisprDesktop?.getApiOrigin === 'function'
     ? '' // Will be resolved dynamically
     : 'http://127.0.0.1:8765',
   endpoints: {
@@ -110,9 +110,9 @@ async function withRetry<T>(
 // ============================================
 
 async function getApiOrigin(): Promise<string> {
-  if (typeof window !== 'undefined' && window.transcriptaDesktop?.getApiOrigin) {
+  if (typeof window !== 'undefined' && window.openwisprDesktop?.getApiOrigin) {
     try {
-      return await window.transcriptaDesktop.getApiOrigin();
+      return await window.openwisprDesktop.getApiOrigin();
     } catch {
       return API_CONFIG.baseUrl;
     }
@@ -538,7 +538,7 @@ export function createSettingsSyncConnection(
 // Offline Queue Management
 // ============================================
 
-const OFFLINE_QUEUE_KEY = 'transcripta:settings:pending';
+const OFFLINE_QUEUE_KEY = 'openwispr:settings:pending';
 
 /**
  * Queue a settings change for later sync
@@ -874,7 +874,7 @@ export function getCachedSyncStatus(): SyncStatus {
   if (typeof window === 'undefined') return 'offline';
 
   try {
-    const cached = localStorage.getItem('transcripta:settings:syncStatus');
+    const cached = localStorage.getItem('openwispr:settings:syncStatus');
     return (cached as SyncStatus) || 'synced';
   } catch {
     return 'synced';
@@ -888,7 +888,7 @@ export function cacheSyncStatus(status: SyncStatus): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem('transcripta:settings:syncStatus', status);
+    localStorage.setItem('openwispr:settings:syncStatus', status);
   } catch {
     // Ignore storage errors
   }
@@ -901,7 +901,7 @@ export function getCachedSettings(): SettingsState | null {
   if (typeof window === 'undefined') return null;
 
   try {
-    const cached = localStorage.getItem('transcripta:settings:cache');
+    const cached = localStorage.getItem('openwispr:settings:cache');
     if (cached) {
       const parsed = JSON.parse(cached);
       return parsed as SettingsState;
@@ -919,7 +919,7 @@ export function cacheSettings(settings: SettingsState): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem('transcripta:settings:cache', JSON.stringify(settings));
+    localStorage.setItem('openwispr:settings:cache', JSON.stringify(settings));
   } catch {
     // Ignore storage errors
   }

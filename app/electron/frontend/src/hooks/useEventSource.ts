@@ -282,9 +282,9 @@ export function useEventSource(options: UseEventSourceOptions): UseEventSourceRe
         return;
       }
 
-      if (window.transcriptaDesktop?.getApiOrigin) {
+      if (window.openwisprDesktop?.getApiOrigin) {
         try {
-          apiOriginRef.current = await window.transcriptaDesktop.getApiOrigin();
+          apiOriginRef.current = await window.openwisprDesktop.getApiOrigin();
         } catch {
           apiOriginRef.current = 'http://127.0.0.1:8765';
         }

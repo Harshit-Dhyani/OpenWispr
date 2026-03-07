@@ -5,10 +5,10 @@
 // App Constants
 // ============================================
 export const AppConstants = {
-  APP_NAME: 'Transcripta' as const,
-  APP_SLUG: 'transcripta' as const,
+  APP_NAME: 'OpenWispr' as const,
+  APP_SLUG: 'openwispr' as const,
   LOCAL_API_TITLE_SUFFIX: 'Local API' as const,
-  DOWNLOAD_USER_AGENT: 'Transcripta/1.0' as const,
+  DOWNLOAD_USER_AGENT: 'OpenWispr/1.0' as const,
 } as const;
 
 // ============================================
@@ -61,7 +61,7 @@ export const ModelConstants = {
   MIN_SEGMENT_LENGTH: 0.5,
 } as const;
 
-export const VALID_MODEL_NAMES = ["tiny", "turbo", "small", "base", "medium", "large-v3"] as const;
+export const VALID_MODEL_NAMES = ["medium", "base", "turbo", "large-v3", "tiny", "small"] as const;
 export const VALID_COMPUTE_TYPES = ['float16', 'int8', 'int8_float16'] as const;
 
 export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-small", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;

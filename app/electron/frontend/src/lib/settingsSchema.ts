@@ -82,7 +82,7 @@ export const transcriptionSettingsSchema = z.object({
   microphone_asr_model_id: z.string().default('whisper-medium'),
   system_asr_model_id: z.string().default('whisper-medium'),
   refinement_mode: z.enum(VALID_REFINEMENT_MODES).default(RefinerConstants.DEFAULT_REFINEMENT_MODE),
-  refinement_profile: z.enum(['raw', 'clean_dictation', 'professional', 'student_notes', 'code_logs']).default('raw'),
+  refinement_profile: z.enum(['raw', 'clean_dictation', 'professional', 'student_notes', 'code_logs']).default('clean_dictation'),
   transcription_mode: z.enum(['dictation', 'literal', 'session_paragraph']).default('dictation'),
   compute_type: z.enum(VALID_COMPUTE_TYPES).default(ModelConstants.DEFAULT_COMPUTE_TYPE),
   chunk_duration: z.number()
@@ -341,7 +341,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
     microphone_asr_model_id: 'whisper-medium',
     system_asr_model_id: 'whisper-medium',
     refinement_mode: RefinerConstants.DEFAULT_REFINEMENT_MODE,
-    refinement_profile: 'raw',
+    refinement_profile: 'clean_dictation',
     transcription_mode: 'dictation',
     compute_type: ModelConstants.DEFAULT_COMPUTE_TYPE,
     chunk_duration: AudioConstants.DEFAULT_CHUNK_SECONDS,
@@ -566,7 +566,7 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
     { value: 'system', label: CAPTURE_MODE_LABELS.system },
     { value: 'microphone', label: CAPTURE_MODE_LABELS.microphone },
   ]},
-  { key: 'default_capture_source', type: 'enum', label: 'Default Capture Source', description: 'Source Transcripta should preselect for the next session.', category: 'audio', options: [
+  { key: 'default_capture_source', type: 'enum', label: 'Default Capture Source', description: SETTING_DESCRIPTIONS.default_capture_source, category: 'audio', options: [
     { value: 'system', label: CAPTURE_MODE_LABELS.system },
     { value: 'microphone', label: CAPTURE_MODE_LABELS.microphone },
   ]},
@@ -586,7 +586,7 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
   { key: 'noiseFiltering', type: 'boolean', label: SETTING_LABELS.noiseFiltering, description: SETTING_DESCRIPTIONS.noiseFiltering, category: 'audio', isFake: true },
   { key: 'echoCancellation', type: 'boolean', label: SETTING_LABELS.echoCancellation, description: SETTING_DESCRIPTIONS.echoCancellation, category: 'audio', isFake: true },
   { key: 'autoGainControl', type: 'boolean', label: SETTING_LABELS.autoGainControl, description: SETTING_DESCRIPTIONS.autoGainControl, category: 'audio', isFake: true },
-  { key: 'mute_transcripta_audio_during_dictation', type: 'boolean', label: 'Mute App Audio During Dictation', description: 'Silence Transcripta renderer audio while microphone dictation is active.', category: 'audio' },
+  { key: 'mute_transcripta_audio_during_dictation', type: 'boolean', label: 'Mute App Audio During Dictation', description: SETTING_DESCRIPTIONS.mute_transcripta_audio_during_dictation, category: 'audio' },
 
   // Hotkey
   { key: 'enabled', type: 'boolean', label: SETTING_LABELS.enabled, description: SETTING_DESCRIPTIONS.enabled, category: 'hotkey' },
@@ -648,3 +648,5 @@ export function searchSettings(query: string): SettingFieldMeta[] {
     f.key.toLowerCase().includes(q)
   );
 }
+
+

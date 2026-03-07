@@ -4,6 +4,7 @@ import {
   LOG_LEVEL_LABELS,
   REFINEMENT_MODE_LABELS,
   REFINEMENT_PROFILE_LABELS,
+  SETTING_DESCRIPTIONS,
   SETTINGS_SECTION_TEXT,
 } from '../config/text';
 
@@ -46,7 +47,7 @@ export const RENDERER_STRINGS = {
       },
       coach: {
         label: 'Coach',
-        description: 'English coach output, prompts, privacy, and polished copy behavior',
+        description: 'Optional English improvement after dictation finishes',
       },
       history: {
         label: 'History',
@@ -61,8 +62,8 @@ export const RENDERER_STRINGS = {
         description: 'Trigger expansion controls',
       },
       style: {
-        label: 'Style',
-        description: 'Output profile and assignment defaults',
+        label: 'Writing Tone',
+        description: 'Optional tone shaping for final text after cleanup',
       },
       advanced: {
         label: 'Advanced',
@@ -114,7 +115,7 @@ export const RENDERER_STRINGS = {
         preset: 'Preset',
         language: 'Language',
         finish: 'Finish',
-        refinement: 'Refinement',
+        refinement: 'Cleanup',
         microphone: 'Microphone',
         systemAudio: 'System Audio',
       },
@@ -225,9 +226,9 @@ export const RENDERER_STRINGS = {
     },
     audio: {
       recordingDeviceSuffix: ' [rec]',
-      muteTranscriptaAudioDuringDictationTitle: 'Mute app audio during transcription',
-      muteTranscriptaAudioDuringDictationDescription:
-        'Silence Transcripta window audio while microphone dictation is active. Disabled by default.',
+      muteOpenWisprAudioDuringDictationTitle: 'Mute app audio during transcription',
+      muteOpenWisprAudioDuringDictationDescription:
+        SETTING_DESCRIPTIONS.mute_transcripta_audio_during_dictation + ' Disabled by default.',
     },
     advanced: {
       title: 'Advanced Settings',
@@ -266,7 +267,7 @@ export const RENDERER_STRINGS = {
     coach: {
       title: 'English Coach',
       description:
-        'Generate polished dictation text, structured fixes, and a reusable prompt preview after microphone dictation stops.',
+        'Improve English after dictation stops with optional polished text, fixes, and prompt preview.',
       sampleOriginalText:
         'Please rewrite this sample transcript into a cleaner final paragraph while preserving meaning.',
       previewUnavailable: 'Preview unavailable',
@@ -366,17 +367,56 @@ export const RENDERER_STRINGS = {
       quickInsertDescription: 'Prefer snippet expansion in copy/paste output composition.',
     },
     style: {
-      title: 'Style Settings',
-      description: 'Configure default style profile behavior.',
-      enableTitle: 'Enable Style Application',
-      enableDescription: 'Apply style transforms to finalized transcript output.',
-      defaultProfileTitle: 'Default Style Profile',
-      defaultProfileDescription: 'Fallback profile when no context-specific assignment exists.',
+      title: 'Writing Tone',
+      description: 'Optional tone shaping for final text after transcript cleanup has already finished.',
+      enableTitle: 'Enable writing tone',
+      enableDescription: 'Apply an optional tone profile to final output after cleanup and before paste/copy.',
+      enableHint: 'Keep this off unless you want the final wording to sound more formal or casual.',
+      disabledHint: 'Transcript cleanup still works with writing tone off.',
+      defaultProfileTitle: 'Default tone profile',
+      defaultProfileDescription: 'Fallback tone when no context-specific assignment exists.',
       defaultProfileOptions: [
         { value: 'formal', label: 'Formal' },
         { value: 'casual', label: 'Casual' },
         { value: 'very_casual', label: 'Very Casual' },
       ],
+      contextTitle: 'Context assignments',
+      contextDescription: 'Choose which profile each writing context should use.',
+      contextOptions: { personal: 'Personal', work: 'Work', email: 'Email', other: 'Other' },
+      activeProfileLabel: 'Active profile',
+      none: 'None',
+      previewTitle: 'Tone preview',
+      previewDescription: 'Preview how the current writing tone changes final wording. This does not affect recognition accuracy.',
+      previewButton: 'Preview tone',
+      noPreview: 'No preview yet',
+      loading: 'Loading…',
+      libraryTitle: 'Tone library',
+      libraryDescription: 'Built-in tones stay simple. Custom profiles live under Advanced.',
+      emptyLibrary: 'No tone profiles found yet.',
+      setActiveButton: 'Set active',
+      deleteButton: 'Delete',
+      advancedTitle: 'Advanced profile editor',
+      advancedDescription: 'Only open this if you need custom profiles or raw rule editing.',
+      showAdvanced: 'Show advanced',
+      hideAdvanced: 'Hide advanced',
+      createTitle: 'Create custom profile',
+      createDescription: 'Add a custom writing tone without cluttering the main settings flow.',
+      createError: 'Unable to create profile',
+      profileNamePlaceholder: 'Profile name',
+      addButton: 'Add profile',
+      editorTitle: 'Selected profile',
+      editorDescription: 'Built-in profiles are simple. Custom profiles can be edited here.',
+      enabledCheckbox: 'Enabled',
+      saveButton: 'Save profile',
+      selectProfile: 'Select a profile to edit.',
+      savedMessage: 'Saved',
+      invalidRules: 'Invalid rule JSON',
+      loadError: 'Unable to load tone profiles',
+      assignmentError: 'Unable to update context assignment',
+      previewError: 'Unable to preview tone',
+      deleteError: 'Unable to delete profile',
+      customDescription: (name: string) => `${name} tone profile`,
+      defaultPreviewInput: 'hey are you free tomorrow lets do lunch',
     },
     generated: {
       sectionText: SETTINGS_SECTION_TEXT,
@@ -556,3 +596,7 @@ export const RENDERER_STRINGS = {
     },
   },
 } as const;
+
+
+
+

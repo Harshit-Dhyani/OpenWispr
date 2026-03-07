@@ -353,6 +353,7 @@ export type HotkeyStopResponse = {
   refined_transcription?: string | null;
   coach_result?: CoachResult | null;
   coach_status?: 'disabled' | 'queued' | 'running' | 'failed' | 'fallback' | 'cache_hit' | 'generated' | 'success';
+  coach_display_source?: 'coach' | 'fallback' | 'faithful';
   coach_error?: string | null;
   coach_cache_hit?: boolean;
   debug_wav_path?: string | null;
@@ -684,3 +685,4 @@ export type StyleAssignments = Record<string, string>;
 // Import them from there to use Zod-inferred types as the single source of truth.
 //
 // Example: import type { SettingsState } from '../lib/settingsSchema';
+
