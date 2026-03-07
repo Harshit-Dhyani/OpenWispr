@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from app.audio.devices import list_audio_devices
-from app.core.settings_manager import get_settings_manager
+from app.core.settings.manager import get_settings_manager
 
 
 def resolve_capture_source_setting(
@@ -53,3 +53,4 @@ def resolve_input_device_for_source(
         if selected is not None:
             return selected.id
     return microphones[0].id
+

@@ -80,7 +80,7 @@ from app.stt.deterministic_postprocess import (
     postprocess_live_text,
 )
 from app.stt.utterance_aggregator import UtteranceAggregator
-from app.core.settings_manager import (
+from app.core.settings.manager import (
     SettingsManager,
     SettingsState,
     DEFAULT_SETTINGS_STATE,
@@ -3132,4 +3132,5 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
 

@@ -24,7 +24,7 @@ from app.core.models import (
     TranscriptSegment,
 )
 from app.core.session_manager import SessionManager
-from app.core.settings_manager import get_settings_manager
+from app.core.settings.manager import get_settings_manager
 from app.stt.stability import PartialStabilizer, build_stream_payload
 
 logger = logging.getLogger(__name__)
@@ -670,3 +670,4 @@ def serialize_session(state: SessionState) -> dict[str, Any]:
     payload["needs_review"] = [serialize_segment(segment) for segment in state.needs_review]
     payload["health"] = serialize_health(state.health)
     return payload
+

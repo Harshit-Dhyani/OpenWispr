@@ -32,7 +32,7 @@ from app.core.modes import (
 )
 from app.core.models import SessionHealth, SessionState, TranscriptSegment
 from app.core.session_manager import SessionManager
-from app.core.settings_manager import SettingsManager, get_settings_manager
+from app.core.settings.manager import SettingsManager, get_settings_manager
 from app.stt.streaming_engine import (
     DualModeTranscriptionEngine,
     EngineState,
@@ -1038,3 +1038,4 @@ def reset_mode_manager() -> None:
     with _global_lock:
         _global_mode_manager = None
         ModeManager._instance = None
+

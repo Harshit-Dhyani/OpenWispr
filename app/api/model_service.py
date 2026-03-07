@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.model_catalog import MODEL_CATALOG, ModelCatalogEntry, get_default_model_id
-from app.core.settings_manager import SettingsState
+from app.core.settings.manager import SettingsState
 from app.core.system_profiler import SystemProfiler
 
 
@@ -106,3 +106,4 @@ class ModelService:
             size_bytes=size_bytes,
             last_checked_at=timestamp,
         )
+
