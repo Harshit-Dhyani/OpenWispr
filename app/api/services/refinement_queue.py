@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock, Timer
 from typing import Any, Callable
 
-from app.api.refiner_service import RefinerService
+from app.api.services.refiner_service import RefinerService
 
 
 class RefinementQueue:
@@ -137,3 +137,4 @@ class RefinementQueue:
                 "segment": refined_segment,
             },
         )
+

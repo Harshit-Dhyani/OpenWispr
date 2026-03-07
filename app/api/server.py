@@ -25,7 +25,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.json_utils import make_json_safe
-from app.api.coach_service import CoachRequestContext, CoachResult, CoachService
+from app.api.services.coach_service import CoachRequestContext, CoachResult, CoachService
 import app.api.deps as api_deps
 from app.api.deps import get_history_service, get_hotkey_service, get_service
 from app.api.route_utils import (
@@ -53,7 +53,7 @@ from app.api.schemas import (
 )
 from app.api.strings.en import API_STRINGS
 from app.api.services.backend_service import BackendService
-from app.api.refiner_service import RefinerService, is_llama_cpp_available
+from app.api.services.refiner_service import RefinerService, is_llama_cpp_available
 from app.api.services import (
     DictionaryService,
     SnippetService,
@@ -3132,6 +3132,7 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
 
 
 
