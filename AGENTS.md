@@ -1,8 +1,7 @@
-# Transcripta Agent Guidance
+# OpenWispr Agent Guidance
 
 Keep this file short. Only add rules that prevent repeat regressions.
 
-See `agent_engine.md` for the fuller workflow and implementation playbook. Keep the rules here short, but do not omit repo-critical engineering standards.
 
 ## Engineering Standards
 
@@ -38,6 +37,16 @@ See `agent_engine.md` for the fuller workflow and implementation playbook. Keep 
 - Do not let floating-window transcript UX regress. The transcript surface must stay scrollable, auto-scroll only while pinned to bottom, and Cancel/Finish must respect discard vs configured finish behavior without reopening stale result state.
 - Do not split transcription behavior settings across unrelated sections. Language, presets, finish action, refinement intensity/profile, and cleanup instructions belong under Transcription; Models is only for download/cache/runtime controls.
 - Do not let finish-time cleanup profiles corrupt technical text. Protect decimals, percentages, version-like strings, hotkeys, uppercase tokens, and code/log tokens with placeholders before runtime cleanup and restore them exactly afterward.
+- Do not reintroduce `Style` as a top-level workflow page. Writing tone is configured inside Settings; top-level navigation is for workflows (`Home`, `Microphone`, `System Audio`, `Dictionary`, `Snippets`, `Settings`).
+- Do not let transcript cleanup and writing tone overlap in UI copy. Cleanup/refinement controls govern transcript fidelity and finalization; writing tone is optional post-cleanup wording only.
+- Do not default normal microphone dictation to code/log cleanup behavior. Spoken-English defaults must stay faithful-first (`clean_dictation`-style cleanup) unless the user explicitly switches profiles.
+- Do not leave Settings wiring half-removed. If `App.tsx` passes model/settings callbacks into `SettingsPanel`, the corresponding functions must exist and use the current Electron/backend contract.
+- What went wrong: frontend settings defaults and validation drifted away from the backend settings registry.
+- Why it happened: handwritten renderer schema layers duplicated ownership that already existed in `app/config/settings.py` and generated settings outputs.
+- Detect earlier: whenever a setting is added, renamed, or re-categorized, compare the backend registry, generated frontend settings output, and renderer consumers in the same change.
+- Prevention rule: do not maintain parallel handwritten frontend settings defaults or validation rules unless the divergence is explicitly justified; `app/config/settings.py` remains the leading registry and generated settings outputs must be updated in the same change.
+- Do not shadow imported Electron window/service helpers with local booleans or config flags. Keep decision flags and callable helpers named distinctly, especially around floating window and coach result flows.
+- Do not maintain a hand-written frontend settings schema/default source in parallel with `app/config/settings.py` and `app/config/generate_ts.py` outputs. What went wrong: settings ownership drifted across backend registry, generated TS metadata, and `app/electron/frontend/src/lib/settingsSchema.ts`; why: renderer validation/defaults were maintained separately from the declared registry; detect earlier: compare added or renamed settings against `config/generated/settings.ts` and renderer consumers before merging; prevention rule: backend registry stays authoritative and any frontend schema layer must be generated from it or proved necessary with sync coverage.
 
 ## Required Rules For New Work
 
@@ -90,3 +99,6 @@ See `agent_engine.md` for the fuller workflow and implementation playbook. Keep 
 - Run the smallest relevant backend/frontend tests for the touched area.
 - If you changed hotkey/session flows, verify both transcript correctness and model routing in logs.
 - If you changed downloads, verify resume/retry behavior and monotonic progress.
+
+
+

@@ -1,0 +1,6 @@
+name: openwispr-settings-wiring-check
+description: Audits OpenWispr settings end-to-end so schema, migrations, API sync, generated frontend metadata, and UI controls do not drift.
+instructions: |
+  Read AGENTS.md first.
+  Inspect schema/defaults, migrations, validator, API sync, generated settings outputs, and frontend controls together.
+  Flag ignored, partially wired, misleading, or nonfunctional settings explicitly.

@@ -1,0 +1,10 @@
+name: openwispr-repo-discovery
+description: Maps the OpenWispr repo before changes by tracing real ownership, entrypoints, generated config flow, and risky boundaries.
+instructions: |
+  Read AGENTS.md first.
+  Inspect the repo before proposing changes.
+  Map entrypoints, settings ownership, generated config flow, runtime boundaries, duplicate modules, and risky areas.
+  Treat docs as references and code as source of truth.
+owned_paths:
+  - docs/engineering/restructure-audit.md
+  - docs/engineering/folder-ownership.md

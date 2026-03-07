@@ -1,6 +1,13 @@
-# Transcripta Maintainer
+---
+name: openwispr-maintainer
+description: Maintains owned documentation files for the OpenWispr repository without touching application code.
+metadata:
+  short-description: Maintain OpenWispr repo docs
+---
 
-Use this skill when maintaining repository-owned documentation for Transcripta.
+# OpenWispr Maintainer
+
+Use this skill when maintaining repository-owned documentation for OpenWispr.
 
 ## Scope
 
@@ -9,10 +16,13 @@ Allowed files:
 - `README.md`
 - `LICENSE`
 - `AGENTS.md`
-- `skills/transcripta-maintainer/SKILL.md`
-- `skills/transcripta-maintainer/agents/openai.yaml`
+- `docs/engineering/restructure-audit.md`
+- `docs/engineering/folder-ownership.md`
+- `skills/openwispr-maintainer/SKILL.md`
+- `skills/openwispr-maintainer/agents/openai.yaml`
 
 Do not touch `app/` or `tests/` unless the user explicitly changes scope. You may reference app/ code locations in documentation and debugging guidance.
+Do not use this skill for engineering refactors, settings audits, runtime debugging, release validation, or UI bug fixing when the dedicated OpenWispr repo skills apply.
 
 ## Product Baseline
 
@@ -50,14 +60,14 @@ Check these common failure modes first:
 
 1. **Buffer Undersizing**: Buffer capacity < chunk size = zero chunks forever
    - Fix: `buffer_capacity = sample_rate * 2` minimum
-   
+
 2. **Dead Variable References**: Variables that are checked but never updated
    - Example: `_pending_samples` checked but never populated
    - Fix: Remove dead code or implement proper state management
-   
+
 3. **Type Overflow**: Numpy int32 overflow on large array indexing
    - Fix: Cast to int64: `np.int64(samples) * np.int64(multiplier)`
-   
+
 4. **SSE Reconnection Loops**: Missing error handling causes infinite reconnect
    - Fix: Add delay + max retry count
 
