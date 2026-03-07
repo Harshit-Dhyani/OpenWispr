@@ -10,7 +10,7 @@ import logging
 import time
 
 from app.api.services.model_service import ModelService
-from app.api.refinement_queue import RefinementQueue
+from app.api.services.refinement_queue import RefinementQueue
 from app.api.services.streaming_metrics import StreamingMetrics
 from app.audio.capture import LoopbackAudioSource
 from app.core.settings.config import AppSettings
@@ -670,6 +670,7 @@ def serialize_session(state: SessionState) -> dict[str, Any]:
     payload["needs_review"] = [serialize_segment(segment) for segment in state.needs_review]
     payload["health"] = serialize_health(state.health)
     return payload
+
 
 
 
