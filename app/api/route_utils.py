@@ -21,7 +21,7 @@ def resolve_log_level_from_settings_payload(settings_payload: dict[str, Any]) ->
 
 
 def resolve_runtime_log_level(settings_payload: dict[str, Any]) -> str:
-    env_level = str(os.getenv("TRANSCRIPTA_LOG_LEVEL", "") or "").upper()
+    env_level = str(os.getenv("OPENWISPR_LOG_LEVEL", "") or "").upper()
     valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     if env_level in valid_levels:
         return env_level
@@ -66,9 +66,7 @@ def log_endpoint(func):
     resolved_annotations = inspect.get_annotations(func, eval_str=True)
     original_signature = inspect.signature(func)
     resolved_parameters = [
-        parameter.replace(
-            annotation=resolved_annotations.get(parameter.name, parameter.annotation)
-        )
+        parameter.replace(annotation=resolved_annotations.get(parameter.name, parameter.annotation))
         for parameter in original_signature.parameters.values()
     ]
     resolved_signature = original_signature.replace(

@@ -10,7 +10,7 @@ from app.core.config import AppSettings
 
 def main() -> None:
     settings = AppSettings()
-    env_level = os.getenv("TRANSCRIPTA_LOG_LEVEL")
+    env_level = os.getenv("OPENWISPR_LOG_LEVEL")
     resolved_level = (env_level or settings.log_level or "INFO").upper()
     valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     if resolved_level not in valid_levels:

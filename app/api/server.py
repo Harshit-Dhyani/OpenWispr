@@ -54,7 +54,12 @@ from app.api.schemas import (
 from app.api.strings.en import API_STRINGS
 from app.api.service import BackendService
 from app.api.refiner_service import RefinerService, is_llama_cpp_available
-from app.api.services import DictionaryService, SnippetService, StyleService, TranscriptHistoryService
+from app.api.services import (
+    DictionaryService,
+    SnippetService,
+    StyleService,
+    TranscriptHistoryService,
+)
 from app.storage.history_db import HistoryDatabase
 from app.audio.capture import LoopbackAudioSource
 from app.audio.devices import list_audio_devices
@@ -114,22 +119,20 @@ _ws_manager: WebSocketManager | None = None
 _settings_sync: SettingsSynchronizer | None = None
 _health_broadcast_task: asyncio.Task | None = None
 _HOTKEY_REFINER_TIMEOUT_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_REFINER_TIMEOUT_SECONDS", "0.75")
+    os.getenv("OPENWISPR_HOTKEY_REFINER_TIMEOUT_SECONDS", "0.75")
 )
-_HOTKEY_COACH_TIMEOUT_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_COACH_TIMEOUT_SECONDS", "0.5")
-)
+_HOTKEY_COACH_TIMEOUT_SECONDS = float(os.getenv("OPENWISPR_HOTKEY_COACH_TIMEOUT_SECONDS", "0.5"))
 _HOTKEY_STOP_PROCESSING_WAIT_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_STOP_PROCESSING_WAIT_SECONDS", "0.9")
+    os.getenv("OPENWISPR_HOTKEY_STOP_PROCESSING_WAIT_SECONDS", "0.9")
 )
 _HOTKEY_STOP_DRAIN_WAIT_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_STOP_DRAIN_WAIT_SECONDS", "0.45")
+    os.getenv("OPENWISPR_HOTKEY_STOP_DRAIN_WAIT_SECONDS", "0.45")
 )
 _HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS", "0.2")
+    os.getenv("OPENWISPR_HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS", "0.2")
 )
 _HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS = float(
-    os.getenv("TRANSCRIPTA_HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS", "0.1")
+    os.getenv("OPENWISPR_HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS", "0.1")
 )
 
 # Compatibility aliases for refactored helpers.
@@ -178,7 +181,10 @@ class HotkeyStopResponse(BaseModel):
     raw_transcription: str = ""
     refined_transcription: str | None = None
     coach_result: CoachResult | None = None
-    coach_status: Literal["disabled", "queued", "running", "failed", "fallback", "cache_hit", "generated", "success"] = "disabled"
+    coach_status: Literal[
+        "disabled", "queued", "running", "failed", "fallback", "cache_hit", "generated", "success"
+    ] = "disabled"
+    coach_display_source: Literal["coach", "fallback", "faithful"] = "faithful"
     coach_error: str | None = None
     coach_cache_hit: bool = False
     debug_wav_path: str | None = None
@@ -385,7 +391,9 @@ class HotkeyTranscriptionService:
                 language_mode=language_mode,
                 execution_mode=execution_mode,
                 transcription_mode=transcription_mode,
-                refinement_profile=getattr(user_settings.transcription, "refinement_profile", "raw"),
+                refinement_profile=getattr(
+                    user_settings.transcription, "refinement_profile", "raw"
+                ),
                 started_at=time.time(),
                 is_recording=True,
                 state="starting",
@@ -400,7 +408,11 @@ class HotkeyTranscriptionService:
                 )
                 session.resolved_device_id = getattr(session.audio_source, "device_id", device_id)
                 resolved_device = next(
-                    (device for device in list_audio_devices() if device.id == session.resolved_device_id),
+                    (
+                        device
+                        for device in list_audio_devices()
+                        if device.id == session.resolved_device_id
+                    ),
                     None,
                 )
                 logger.info(
@@ -600,14 +612,20 @@ class HotkeyTranscriptionService:
         warnings = [session.finalization_error] if session.finalization_error else []
         return HotkeyStopResponse(
             session_id=session.session_id,
-            status=status or ("stopping" if session.finalize_task and not session.finalize_task.done() else "idle"),
+            status=status
+            or (
+                "stopping" if session.finalize_task and not session.finalize_task.done() else "idle"
+            ),
             transcription_mode=getattr(session, "transcription_mode", "dictation"),
             composed_text=session.composed_text or "",
             final_transcription=session.composed_text or "",
             aggregated_raw_text=session.aggregated_raw_text or session.raw_composed_text or "",
             aggregated_clean_text=session.aggregated_clean_text or session.composed_text or "",
             postprocessed_text=session.postprocessed_text or session.composed_text or "",
-            paste_text=session.paste_text or session.postprocessed_text or session.composed_text or "",
+            paste_text=session.paste_text
+            or session.postprocessed_text
+            or session.composed_text
+            or "",
             live_paste_text=(
                 ""
                 if session.cancel_requested
@@ -623,7 +641,9 @@ class HotkeyTranscriptionService:
             raw_transcription=session.raw_composed_text or "",
             refined_transcription=None,
             coach_result=session.coach_result,
-            coach_status="cache_hit" if session.coach_cache_hit else ("success" if session.coach_result else "disabled"),
+            coach_status="cache_hit"
+            if session.coach_cache_hit
+            else ("success" if session.coach_result else "disabled"),
             coach_error=session.coach_error,
             coach_cache_hit=session.coach_cache_hit,
             debug_wav_path=session.debug_wav_path,
@@ -746,7 +766,11 @@ class HotkeyTranscriptionService:
                     if transcription_mode == "literal"
                     else aggregated_clean_text or aggregated_raw_text or raw_text
                 )
-                final_text = postprocess_final_text(base_text, mode=transcription_mode)
+                final_text = postprocess_final_text(
+                    base_text,
+                    mode=transcription_mode,
+                    profile=getattr(session, "refinement_profile", "clean_dictation"),
+                )
                 session.raw_composed_text = raw_text
                 session.composed_text = final_text
                 self._log_hotkey_debug_text(
@@ -759,18 +783,28 @@ class HotkeyTranscriptionService:
             refinement_mode = "off"
             refiner_model_id: str | None = None
             coach_result: CoachResult | None = None
-            coach_status: Literal["disabled", "queued", "running", "failed", "fallback", "cache_hit", "generated", "success"] = "disabled"
+            coach_status: Literal[
+                "disabled",
+                "queued",
+                "running",
+                "failed",
+                "fallback",
+                "cache_hit",
+                "generated",
+                "success",
+            ] = "disabled"
+            coach_display_source: Literal["coach", "fallback", "faithful"] = "faithful"
             coach_error: str | None = None
             coach_cache_hit = False
             user_settings = get_settings_manager().get_settings()
             hotkey_settings = getattr(user_settings, "hotkey", None)
             coach_settings = getattr(user_settings, "coach", None)
             transcription_mode = getattr(session, "transcription_mode", "dictation")
-            should_refine_on_stop = bool(
-                getattr(hotkey_settings, "enable_refiner_on_stop", False)
-            )
+            should_refine_on_stop = bool(getattr(hotkey_settings, "enable_refiner_on_stop", False))
             should_write_debug_wav = bool(getattr(hotkey_settings, "save_debug_wav", False))
-            response_warnings = list(getattr(aggregated, "warnings", [])) if not session.cancel_requested else []
+            response_warnings = (
+                list(getattr(aggregated, "warnings", [])) if not session.cancel_requested else []
+            )
             final_text_present = bool((final_text or "").strip())
 
             try:
@@ -862,22 +896,27 @@ class HotkeyTranscriptionService:
                                 else dict(prompt_overrides or {})
                             ),
                             privacy_mode=privacy_mode,
-                            runtime_enabled=bool(getattr(user_settings.refiner, "runtime_enabled", False)),
+                            runtime_enabled=bool(
+                                getattr(user_settings.refiner, "runtime_enabled", False)
+                            ),
                             model_id=getattr(user_settings.refiner, "selected_model_id", None),
                             custom_user_template=custom_prompt_text,
                             templates=[
-                                template.__dict__ if hasattr(template, "__dict__") else dict(template)
+                                template.__dict__
+                                if hasattr(template, "__dict__")
+                                else dict(template)
                                 for template in (prompt_templates or [])
                             ],
                         )
                         coach_status = "queued"
                         logger.info(
-                            "Coach queued: session=%s source=%s template=%s detail=%s privacy=%s",
+                            "Coach queued: session=%s source=%s template=%s detail=%s privacy=%s text_chars=%d",
                             session.session_id,
                             session.capture_source,
                             template_id,
                             detail_level,
                             privacy_mode,
+                            len(context.text or ""),
                         )
                         try:
                             coach_status = "running"
@@ -915,15 +954,19 @@ class HotkeyTranscriptionService:
                                     else "fallback"
                                 )
                             )
-                            if raw_coach_result.meta.provider.startswith("fallback") or raw_coach_result.meta.provider.startswith("disabled"):
+                            if raw_coach_result.meta.provider.startswith(
+                                "fallback"
+                            ) or raw_coach_result.meta.provider.startswith("disabled"):
+                                coach_display_source = "fallback"
                                 coach_error = raw_coach_result.meta.provider
-                                coach_result = None
+                                coach_result = raw_coach_result
                                 logger.warning(
                                     "Coach fallback provider: session=%s provider=%s",
                                     session.session_id,
                                     raw_coach_result.meta.provider,
                                 )
                             else:
+                                coach_display_source = "coach"
                                 coach_result = raw_coach_result
                                 logger.info(
                                     "Coach success: session=%s provider=%s cache_hit=%s",
@@ -936,18 +979,30 @@ class HotkeyTranscriptionService:
                         session.coach_error = coach_error
                 except Exception as exc:
                     coach_status = "failed"
+                    coach_display_source = "faithful"
                     coach_error = str(exc)
                     session.coach_error = coach_error
                     logger.warning("Coach failed: session=%s error=%s", session.session_id, exc)
 
-            paste_text = final_text
-            if coach_result is not None and bool(getattr(coach_settings, "copy_polished_by_default", True)):
-                paste_text = coach_result.polished or final_text
+            faithful_text = aggregated_clean_text or final_text
+            paste_text = faithful_text
+            paste_source = "faithful_clean"
+            if coach_result is not None and bool(
+                getattr(coach_settings, "copy_polished_by_default", True)
+            ):
+                paste_text = coach_result.polished or faithful_text
+                paste_source = (
+                    "coach_polished" if coach_display_source == "coach" else "coach_fallback"
+                )
             logger.info(
-                "Hotkey finalize paste source: session=%s coach_status=%s selected=%s",
+                "Hotkey finalize paste source: session=%s coach_status=%s display_source=%s selected=%s faithful_chars=%d final_chars=%d paste_chars=%d",
                 session.session_id,
                 coach_status,
-                "coach_polished" if coach_result is not None and bool(getattr(coach_settings, "copy_polished_by_default", True)) else "postprocessed",
+                coach_display_source,
+                paste_source,
+                len(faithful_text or ""),
+                len(final_text or ""),
+                len(paste_text or ""),
             )
 
             session.paste_text = paste_text
@@ -970,12 +1025,15 @@ class HotkeyTranscriptionService:
                 aggregated_clean_text=aggregated_clean_text,
                 postprocessed_text=final_text,
                 paste_text=paste_text,
-                live_paste_text="" if session.cancel_requested else (session.latest_live_buffer_text or paste_text),
+                live_paste_text=""
+                if session.cancel_requested
+                else (session.latest_live_buffer_text or paste_text),
                 final_cleanup_applied=not session.cancel_requested,
                 raw_transcription=raw_text,
                 refined_transcription=refined_text,
                 coach_result=coach_result,
                 coach_status=coach_status,
+                coach_display_source=coach_display_source,
                 coach_error=coach_error,
                 coach_cache_hit=coach_cache_hit,
                 debug_wav_path=session.debug_wav_path,
@@ -1000,12 +1058,17 @@ class HotkeyTranscriptionService:
                     "aggregated_clean_text": aggregated_clean_text,
                     "postprocessed_text": final_text,
                     "paste_text": paste_text,
-                    "live_paste_text": "" if session.cancel_requested else (session.latest_live_buffer_text or paste_text),
+                    "live_paste_text": ""
+                    if session.cancel_requested
+                    else (session.latest_live_buffer_text or paste_text),
                     "final_cleanup_applied": not session.cancel_requested,
                     "raw_transcription": raw_text,
                     "refined_transcription": refined_text,
-                    "coach_result": coach_result.model_dump(by_alias=True) if coach_result else None,
+                    "coach_result": coach_result.model_dump(by_alias=True)
+                    if coach_result
+                    else None,
                     "coach_status": coach_status,
+                    "coach_display_source": coach_display_source,
                     "coach_error": coach_error,
                     "coach_cache_hit": coach_cache_hit,
                     "segment_count": len(session.final_segments),
@@ -1183,7 +1246,9 @@ class HotkeyTranscriptionService:
         if targets is None:
             active_websockets = list(self._websockets)
         else:
-            active_websockets = [websocket for websocket in list(targets) if websocket in self._websockets]
+            active_websockets = [
+                websocket for websocket in list(targets) if websocket in self._websockets
+            ]
         for websocket in active_websockets:
             try:
                 await websocket.close(code=code, reason=reason)
@@ -1329,9 +1394,7 @@ class HotkeyTranscriptionService:
             session.source_backend = session.audio_source.backend_name or "unknown"
 
             chunk_samples = int(self._config.chunk_seconds * self.settings.sample_rate)
-            overlap_samples = max(
-                0, int(self._config.overlap_seconds * self.settings.sample_rate)
-            )
+            overlap_samples = max(0, int(self._config.overlap_seconds * self.settings.sample_rate))
             step_samples = max(1, chunk_samples - overlap_samples)
             audio_buffer = np.array([], dtype=np.float32)
 
@@ -1400,7 +1463,10 @@ class HotkeyTranscriptionService:
                     await asyncio.sleep(0.01)
 
             # Process any remaining audio
-            if not session.cancel_requested and len(audio_buffer) > self.settings.sample_rate * 0.18:
+            if (
+                not session.cancel_requested
+                and len(audio_buffer) > self.settings.sample_rate * 0.18
+            ):
                 await self._transcribe_chunk(session, audio_buffer)
 
         except Exception as exc:
@@ -1516,9 +1582,9 @@ class HotkeyTranscriptionService:
             )
             if should_skip:
                 session.skipped_silent_chunks += 1
-                session.silence_skip_streak = int(
-                    getattr(session, "silence_skip_streak", 0) or 0
-                ) + 1
+                session.silence_skip_streak = (
+                    int(getattr(session, "silence_skip_streak", 0) or 0) + 1
+                )
                 if (
                     getattr(session, "capture_source", "microphone") == "microphone"
                     and not getattr(session, "final_segments", [])
@@ -1565,9 +1631,7 @@ class HotkeyTranscriptionService:
                 return
 
             queue_depth = getattr(status, "queue_depth", None)
-            estimated_backlog = float(
-                getattr(status, "estimated_backlog_seconds", 0.0) or 0.0
-            )
+            estimated_backlog = float(getattr(status, "estimated_backlog_seconds", 0.0) or 0.0)
             logger.debug(
                 "Chunk submitted: queue_depth=%s backlog=%.2fs",
                 queue_depth,
@@ -1591,10 +1655,7 @@ class HotkeyTranscriptionService:
 
     def _on_transcription_segment(self, session: HotkeySession, segment: Any) -> None:
         """Capture completed hotkey segments for the floating window and stop payload."""
-        if (
-            session.cancel_requested
-            or self._session is not session
-        ):
+        if session.cancel_requested or self._session is not session:
             return
 
         raw_text = normalize_dictation_text(getattr(segment, "text", "") or "")
@@ -1708,12 +1769,19 @@ class HotkeyTranscriptionService:
                 self._preview_debug_text(session.raw_composed_text),
             )
         if not session.suppress_stream_events:
-            draft_state = session.draft_stabilizer.consume_final_text(
-                payload["text"],
-                start=payload["start"],
-                end=payload["end"],
-            ) if session.draft_stabilizer else None
-            if draft_state is not None and getattr(session, "transcription_mode", "dictation") != "session_paragraph":
+            draft_state = (
+                session.draft_stabilizer.consume_final_text(
+                    payload["text"],
+                    start=payload["start"],
+                    end=payload["end"],
+                )
+                if session.draft_stabilizer
+                else None
+            )
+            if (
+                draft_state is not None
+                and getattr(session, "transcription_mode", "dictation") != "session_paragraph"
+            ):
                 self._publish_event(
                     "hotkey_commit_final",
                     {
@@ -1725,10 +1793,10 @@ class HotkeyTranscriptionService:
                             text=payload["text"],
                             start=payload["start"],
                             end=payload["end"],
-                        committed_text=draft_state.committed_text,
-                    ),
-                    "live_buffer_text": session.latest_live_buffer_text,
-                    "transcription_mode": getattr(session, "transcription_mode", "dictation"),
+                            committed_text=draft_state.committed_text,
+                        ),
+                        "live_buffer_text": session.latest_live_buffer_text,
+                        "transcription_mode": getattr(session, "transcription_mode", "dictation"),
                         "segment": payload,
                     },
                 )
@@ -1944,7 +2012,11 @@ class HotkeyTranscriptionService:
         if not self._should_collect_hotkey_audio_debug():
             return
         now = time.time()
-        if phase == "submit" and session.debug_last_audio_log_at and now - session.debug_last_audio_log_at < 0.75:
+        if (
+            phase == "submit"
+            and session.debug_last_audio_log_at
+            and now - session.debug_last_audio_log_at < 0.75
+        ):
             return
         session.debug_last_audio_log_at = now
         stats = self._audio_chunk_diagnostics(audio, self.settings.sample_rate)
@@ -1972,7 +2044,11 @@ class HotkeyTranscriptionService:
         debug_dir = Path("logs") / "hotkey-debug"
         debug_dir.mkdir(parents=True, exist_ok=True)
         wav_path = debug_dir / f"{session.session_id}.wav"
-        combined = np.concatenate(session.debug_audio_chunks) if len(session.debug_audio_chunks) > 1 else session.debug_audio_chunks[0]
+        combined = (
+            np.concatenate(session.debug_audio_chunks)
+            if len(session.debug_audio_chunks) > 1
+            else session.debug_audio_chunks[0]
+        )
         safe_audio = np.nan_to_num(
             np.clip(np.asarray(combined, dtype=np.float32), -1.0, 1.0),
             nan=0.0,
@@ -2033,6 +2109,7 @@ class HotkeyTranscriptionService:
                             )
             except Exception:
                 continue
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -2192,7 +2269,9 @@ async def hotkey_stop(
     )
 
     try:
-        history_svc.ingest_hotkey_result(result, settings_snapshot=get_settings_manager().get_settings_dict())
+        history_svc.ingest_hotkey_result(
+            result, settings_snapshot=get_settings_manager().get_settings_dict()
+        )
     except Exception as exc:
         logger.warning("History ingest failed for hotkey stop: %s", exc)
 
@@ -2394,7 +2473,9 @@ async def hotkey_websocket(websocket: WebSocket):
                         "raw_partial_text": status.raw_partial_text,
                         "display_partial_text": status.display_partial_text,
                         "audio_level": status.audio_level,
-                        "levels": [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36,
+                        "levels": [status.audio_level] * 36
+                        if status.audio_level > 0
+                        else [0.0] * 36,
                         "session_id": status.session_id,
                         "duration_ms": status.duration_ms,
                     }
@@ -2480,7 +2561,9 @@ async def hotkey_events(
                         "raw_partial_text": status.raw_partial_text,
                         "display_partial_text": status.display_partial_text,
                         "audio_level": status.audio_level,
-                        "levels": [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36,
+                        "levels": [status.audio_level] * 36
+                        if status.audio_level > 0
+                        else [0.0] * 36,
                     },
                 }
             )
@@ -2494,11 +2577,11 @@ async def hotkey_events(
                     event_type, data = await asyncio.wait_for(queue.get(), timeout=15.0)
                     payload = json.dumps(
                         _make_json_safe(
-                        {
-                            "type": event_type,
-                            "payload": data,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        }
+                            {
+                                "type": event_type,
+                                "payload": data,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            }
                         )
                     )
                     yield f"data: {payload}\n\n"
@@ -3049,9 +3132,3 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
-
-
-
-
-
-

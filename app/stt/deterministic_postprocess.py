@@ -6,6 +6,9 @@ from typing import Literal
 from app.stt.repetition_guard import trim_repetitive_segment
 
 TranscriptionMode = Literal["dictation", "literal", "session_paragraph"]
+RefinementProfile = Literal[
+    "raw", "clean_dictation", "professional", "student_notes", "code_log", "code_logs"
+]
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _DECIMAL_WORD_RE = re.compile(
@@ -32,6 +35,8 @@ _SINGLE_LETTER_ACRONYM_RE = re.compile(
     r"\b(?:[A-Za-z]\s+){2,}[A-Za-z]\b",
 )
 _KNOWN_TOKEN_PREFIXES = ("HTTP", "HTTPS", "API", "SDK", "URL", "UUID", "JSON", "XML")
+_NUMERIC_DOT_RE = re.compile(r"(?<=\d)\.(?=\d)")
+_NUMERIC_DOT_PLACEHOLDER = "__OPENWISPR_NUMERIC_DOT__"
 
 _DIGIT_WORDS = {
     "zero": "0",
@@ -87,23 +92,39 @@ def postprocess_live_text(text: str, *, mode: TranscriptionMode) -> str:
     return normalize_postprocess_text(text)
 
 
-def postprocess_final_text(text: str, *, mode: TranscriptionMode) -> str:
-    normalized = normalize_postprocess_text(trim_repetitive_segment(text))
+def postprocess_final_text(
+    text: str,
+    *,
+    mode: TranscriptionMode,
+    profile: RefinementProfile = "clean_dictation",
+) -> str:
+    normalized = normalize_postprocess_text(text)
     if not normalized:
         return ""
 
-    normalized = _collapse_repeated_sentences(normalized)
-    normalized = normalize_postprocess_text(normalized)
+    # Normalize numeric and literal tokens before repetition trimming so decimal
+    # runs, dotted versions, and hotkey-like phrases are preserved.
     normalized = spoken_numbers_to_symbols(normalized, mode=mode)
     normalized = normalize_acronyms_and_tokens(normalized, mode=mode)
-    normalized = normalize_postprocess_text(normalized)
+    has_numeric_dots = bool(_NUMERIC_DOT_RE.search(normalized))
+    if has_numeric_dots:
+        normalized = normalize_postprocess_text(normalized)
+    else:
+        normalized = normalize_postprocess_text(trim_repetitive_segment(normalized))
+        normalized = _collapse_repeated_sentences(normalized)
+        normalized = normalize_postprocess_text(normalized)
 
     if not normalized:
         return ""
 
-    if mode != "literal":
+    conservative_profile = profile in {"clean_dictation", "professional", "student_notes"}
+    if mode != "literal" and profile not in {"code_log", "code_logs"}:
         normalized = _capitalize_first(normalized)
-        if normalized and normalized[-1].isalnum():
+        if (
+            normalized
+            and (normalized[-1].isalnum() or normalized[-1] == "%")
+            and conservative_profile
+        ):
             normalized = f"{normalized}."
     return normalized
 
@@ -255,5 +276,13 @@ def _parse_small_number_phrase(value: str) -> str | None:
 def _capitalize_first(text: str) -> str:
     for index, char in enumerate(text):
         if char.isalpha():
-            return f"{text[:index]}{char.upper()}{text[index + 1:]}"
+            return f"{text[:index]}{char.upper()}{text[index + 1 :]}"
     return text
+
+
+def _protect_numeric_dots(text: str) -> str:
+    return _NUMERIC_DOT_RE.sub(_NUMERIC_DOT_PLACEHOLDER, text)
+
+
+def _restore_numeric_dots(text: str) -> str:
+    return text.replace(_NUMERIC_DOT_PLACEHOLDER, ".")
