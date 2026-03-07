@@ -1,0 +1,31 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="184" y1="862" x2="802" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1D1D37"/>
+      <stop offset="1" stop-color="#655682"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <filter id="barShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.24"/>
+    </filter>
+    <mask id="crescentMask">
+      <rect width="1024" height="1024" fill="black"/>
+      <circle cx="495" cy="500" r="210" fill="white"/>
+      <circle cx="550" cy="521" r="185" fill="black"/>
+      <rect x="630" y="250" width="170" height="420" fill="black"/>
+    </mask>
+  </defs>
+  <rect x="126" y="110" width="772" height="772" rx="150" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <rect width="1024" height="1024" fill="#F4F2EC" mask="url(#crescentMask)"/>
+  </g>
+  <g filter="url(#barShadow)">
+    <rect x="557" y="455" width="32" height="85" rx="16" fill="#82DD8A"/>
+    <rect x="600" y="422" width="32" height="145" rx="16" fill="#72D380"/>
+    <rect x="644" y="370" width="34" height="256" rx="17" fill="#72D380"/>
+    <rect x="689" y="422" width="32" height="145" rx="16" fill="#72D380"/>
+    <rect x="733" y="455" width="32" height="85" rx="16" fill="#82DD8A"/>
+  </g>
+</svg>
