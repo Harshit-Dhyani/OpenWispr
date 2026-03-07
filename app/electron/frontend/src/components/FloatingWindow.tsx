@@ -4,7 +4,7 @@ import type { HotkeyStopResponse } from '../types/api';
 type FloatingPhase = 'idle' | 'listening' | 'transcribing' | 'finalizing' | 'done' | 'error';
 type FloatingStyle = CSSProperties & { WebkitAppRegion?: 'drag' | 'no-drag' };
 
-type FloatingStrings = NonNullable<Window['transcriptaFloating']>['strings'];
+type FloatingStrings = NonNullable<Window['openwisprFloating']>['strings'];
 
 interface AudioLevelData {
   levels: number[];
@@ -80,7 +80,7 @@ function formatElapsed(elapsedMs: number): string {
 }
 
 export function FloatingWindow() {
-  const floatingApi = window.transcriptaFloating;
+  const floatingApi = window.openwisprFloating;
   const strings = useMemo<FloatingStrings>(() => {
     const fallback = {
       status: {
@@ -327,6 +327,15 @@ export function FloatingWindow() {
         return;
       }
 
+      if (phaseRef.current === 'done' || phaseRef.current === 'error') {
+        traceEvent('recording-state-preserved-result', {
+          phase: phaseRef.current,
+          sessionId: activeSessionIdRef.current,
+          incomingSessionId: nextSessionId,
+        });
+        return;
+      }
+
       phaseRef.current = 'idle';
       setPhase('idle');
       clearSession();
@@ -441,15 +450,15 @@ export function FloatingWindow() {
       if (event.key === 'Escape') {
         event.preventDefault();
         if (isActive) {
-          window.transcriptaFloating?.cancelRecording?.();
+          window.openwisprFloating?.cancelRecording?.();
         } else {
-          window.transcriptaFloating?.dismissResult?.();
+          window.openwisprFloating?.dismissResult?.();
         }
       }
 
       if (event.key === 'Enter' && (phase === 'listening' || phase === 'transcribing')) {
         event.preventDefault();
-        window.transcriptaFloating?.finishRecording?.();
+        window.openwisprFloating?.finishRecording?.();
       }
     };
 
@@ -729,14 +738,14 @@ export function FloatingWindow() {
             <>
               <button
                 type="button"
-                onClick={() => window.transcriptaFloating?.cancelRecording?.()}
+                onClick={() => window.openwisprFloating?.cancelRecording?.()}
                 style={buttonStyle('secondary')}
               >
                 {strings?.actions?.cancel || 'Cancel'}
               </button>
               <button
                 type="button"
-                onClick={() => window.transcriptaFloating?.finishRecording?.()}
+                onClick={() => window.openwisprFloating?.finishRecording?.()}
                 disabled={phase === 'finalizing'}
                 style={buttonStyle('primary', phase === 'finalizing')}
               >
@@ -748,7 +757,7 @@ export function FloatingWindow() {
           {showClose ? (
             <button
               type="button"
-              onClick={() => window.transcriptaFloating?.dismissResult?.()}
+              onClick={() => window.openwisprFloating?.dismissResult?.()}
               style={buttonStyle('primary')}
             >
               {strings?.actions?.close || 'Close'}
@@ -787,3 +796,4 @@ function buttonStyle(variant: 'primary' | 'secondary', disabled = false): Floati
     cursor: 'pointer',
   };
 }
+

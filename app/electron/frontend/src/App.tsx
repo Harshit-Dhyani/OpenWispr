@@ -128,6 +128,7 @@ function App() {
   const [dictationPostprocessedText, setDictationPostprocessedText] = useState('');
   const [dictationPasteText, setDictationPasteText] = useState('');
   const [dictationCoachStatus, setDictationCoachStatus] = useState<HotkeyStopResponse['coach_status'] | null>(null);
+  const [dictationCoachDisplaySource, setDictationCoachDisplaySource] = useState<HotkeyStopResponse['coach_display_source'] | null>(null);
   const [dictationCoachError, setDictationCoachError] = useState<string | null>(null);
   const [hotkeyState, setHotkeyState] = useState<HotkeyState | null>(null);
   const [transcriptDebugEvents, setTranscriptDebugEvents] = useState<TranscriptDebugEvent[]>([]);
@@ -453,7 +454,7 @@ function App() {
       });
 
       // Apply hotkey config to Electron main process
-      const hotkeyApi = window.transcriptaDesktop?.hotkey;
+      const hotkeyApi = window.openwisprDesktop?.hotkey;
       if (hotkeyApi) {
         await hotkeyApi.updateConfig({
           enabled: migrated.hotkey.enabled,
@@ -610,7 +611,7 @@ function App() {
       });
 
       // Apply hotkey config to Electron main process
-      const hotkeyApi = window.transcriptaDesktop.hotkey;
+      const hotkeyApi = window.openwisprDesktop.hotkey;
       if (hotkeyApi) {
         const hotkeyResult = await hotkeyApi.updateConfig({
           enabled: persistedSettings.hotkey.enabled,
@@ -736,7 +737,7 @@ function App() {
 
   const loadHotkeyConfig = useCallback(async () => {
     try {
-      const hotkeyApi = window.transcriptaDesktop.hotkey;
+      const hotkeyApi = window.openwisprDesktop.hotkey;
       if (!hotkeyApi) return;
       const hotkeyStatePayload = (await hotkeyApi.getState()) as HotkeyState | null | undefined;
       setHotkeyState(hotkeyStatePayload ?? null);
@@ -829,6 +830,10 @@ function App() {
       scheduleNextPoll(2500);
     }
   }, [modelManager.catalog, modelManager.selectedAsrModelId]);
+  const availableModels = useMemo(
+    () => modelManager.catalog.map((entry) => entry.id),
+    [modelManager.catalog],
+  );
 
   useEffect(() => {
     if (bootstrapStartedRef.current) {
@@ -856,7 +861,7 @@ function App() {
     let hotkeyStateListener:
       | ((event: unknown, state: HotkeyState | null | undefined) => void)
       | undefined;
-    const disposeModelDownloads = window.transcriptaDesktop.models.onDownloadEvent((eventPayload) => {
+    const disposeModelDownloads = window.openwisprDesktop.models.onDownloadEvent((eventPayload) => {
       const downloadPayload = eventPayload.payload as import('./types/api').ModelDownloadState & {
         model_id?: string;
       };
@@ -879,7 +884,7 @@ function App() {
         void loadModelCatalog();
       }
     });
-    const disposeHotkeyTranscriptEvents = window.transcriptaDesktop.hotkey.onTranscriptEvent?.(
+    const disposeHotkeyTranscriptEvents = window.openwisprDesktop.hotkey.onTranscriptEvent?.(
       ({ type, payload }) => {
         if (!payload || typeof payload !== 'object') {
           return;
@@ -974,28 +979,27 @@ function App() {
           const resolvedCoachStatus =
             stopPayload.coach_status === 'generated' || stopPayload.coach_status === 'cache_hit'
               ? 'success'
-              : stopPayload.coach_status === 'fallback'
-                ? 'failed'
-                : stopPayload.coach_status ?? null;
+              : stopPayload.coach_status ?? null;
           setDictationCoachStatus(resolvedCoachStatus);
+          setDictationCoachDisplaySource(stopPayload.coach_display_source ?? (resolvedCoachStatus === 'fallback' ? 'fallback' : 'faithful'));
           setDictationCoachError(stopPayload.coach_error ?? null);
         }
       },
     );
-    disposeBackendExit = window.transcriptaDesktop.onBackendExit(() => {
+    disposeBackendExit = window.openwisprDesktop.onBackendExit(() => {
       setBackendReady(false);
       setStatusMessage('Backend exited. Reconnecting…');
       disconnect();
       scheduleNextPoll(1000);
     });
-    disposeOpenSettings = window.transcriptaDesktop.onOpenSettings(() => {
+    disposeOpenSettings = window.openwisprDesktop.onOpenSettings(() => {
       setActivePage('settings');
       setQuickSettingsMode(null);
     });
     hotkeyStateListener = (_event, state) => {
       setHotkeyState(state ?? null);
     };
-    window.transcriptaDesktop.hotkey.onStateChange?.(hotkeyStateListener);
+    window.openwisprDesktop.hotkey.onStateChange?.(hotkeyStateListener);
     return () => {
       if (pollTimerRef.current !== null) {
         window.clearTimeout(pollTimerRef.current);
@@ -1003,7 +1007,7 @@ function App() {
       disposeBackendExit?.();
       disposeOpenSettings?.();
       if (hotkeyStateListener) {
-        window.transcriptaDesktop.hotkey.removeStateChangeListener?.(hotkeyStateListener);
+        window.openwisprDesktop.hotkey.removeStateChangeListener?.(hotkeyStateListener);
       }
       disposeModelDownloads?.();
       disposeHotkeyTranscriptEvents?.();
@@ -1042,11 +1046,13 @@ function App() {
     }
     console.debug('[renderer] Coach panel state', {
       coachStatus: dictationCoachStatus,
+      coachDisplaySource: dictationCoachDisplaySource,
       hasResult: Boolean(dictationCoachResult),
       coachError: dictationCoachError,
       pasteTextChars: dictationPasteText.length,
     });
   }, [
+    dictationCoachDisplaySource,
     dictationCoachError,
     dictationCoachResult,
     dictationCoachStatus,
@@ -1085,7 +1091,7 @@ function App() {
   }, [theme, settingsLoading, settings]); // Include settings dependency to fix stale closure
 
   const backendRequest = useCallback(async <T,>(path: string, options?: RequestInit): Promise<T> => {
-    return window.transcriptaDesktop.fetchJson(path, options) as Promise<T>;
+    return window.openwisprDesktop.fetchJson(path, options) as Promise<T>;
   }, []);
 
   async function preloadPreferredModel(modelName?: string, executionMode?: string) {
@@ -1195,12 +1201,29 @@ function App() {
   }
 
   async function chooseDirectory() {
-    const folder = await window.transcriptaDesktop.chooseDirectory();
+    const folder = await window.openwisprDesktop.chooseDirectory();
     if (folder) {
       updateFormField('exportRoot', folder);
     }
   }
 
+  async function downloadModel(modelId: string) {
+    await window.openwisprDesktop.models.download(modelId);
+    setStatusMessage(`Queued download for ${modelId}.`);
+    await loadModelCatalog();
+  }
+
+  async function cancelModelDownload(modelId: string) {
+    await window.openwisprDesktop.models.cancel(modelId);
+    setStatusMessage(`Cancelled download for ${modelId}.`);
+    await loadModelCatalog();
+  }
+
+  async function removeModel(modelId: string) {
+    await window.openwisprDesktop.models.remove(modelId);
+    setStatusMessage(`Removed ${modelId}.`);
+    await loadModelCatalog();
+  }
   async function preloadModel() {
     const resolvedModelName = resolveSourceModelId(settings, form.captureMode) || form.modelName;
     setPreloadStatus({
@@ -1303,7 +1326,7 @@ function App() {
   }
 
   async function attachPdf() {
-    const file = await window.transcriptaDesktop.choosePdf();
+    const file = await window.openwisprDesktop.choosePdf();
     if (!file) {
       return;
     }
@@ -1383,14 +1406,6 @@ function App() {
               : preloadStatus.stage === 'failed'
                 ? 'Preload failed'
                 : 'Preload off';
-  const dictationActivityFeedNode = (
-    <ActivityFeed
-      session={dictationSnapshot.session}
-      transcript={dictationSnapshot.transcript}
-      health={dictationSnapshot.health}
-    />
-  );
-
   const persistSettingsUpdate = useCallback(
     async (updater: (current: SettingsState) => SettingsState) => {
       const nextSettings = sanitizeSettings(updater(settings));
@@ -1478,9 +1493,10 @@ function App() {
       setDictationPostprocessedText('');
       setDictationPasteText('');
       setDictationCoachStatus(null);
+      setDictationCoachDisplaySource(null);
       setDictationCoachError(null);
       activeDictationSessionIdRef.current = null;
-      await window.transcriptaDesktop.hotkey.start?.(dictationCaptureSource);
+      await window.openwisprDesktop.hotkey.start?.(dictationCaptureSource);
     } catch (error) {
       setHotkeyState((current) =>
         current
@@ -1521,11 +1537,13 @@ function App() {
       );
       if (settings.coach.coach_enabled) {
         setDictationCoachStatus('queued');
+        setDictationCoachDisplaySource('faithful');
         setDictationCoachError(null);
       } else {
         setDictationCoachStatus('disabled');
+        setDictationCoachDisplaySource('faithful');
       }
-      await window.transcriptaDesktop.hotkey.stop?.();
+      await window.openwisprDesktop.hotkey.stop?.();
     } catch (error) {
       setHotkeyState((current) =>
         current
@@ -1544,10 +1562,21 @@ function App() {
       );
       setStatusMessage(error instanceof Error ? error.message : 'Unable to stop dictation.');
       setDictationCoachStatus('failed');
+      setDictationCoachDisplaySource('faithful');
       setDictationCoachError(error instanceof Error ? error.message : 'stop_failed');
     }
   }, [settings.coach.coach_enabled]);
 
+  const homeView = (
+    <HomePage
+      request={backendRequest}
+      onOpenSettings={() => setActivePage('settings')}
+      onStatus={setStatusMessage}
+      defaultRangeDays={settings.history.default_analytics_range_days}
+      allowRetry={settings.history.allow_retry}
+      persistAudio={settings.history.persist_audio}
+    />
+  );
   const dictationView = (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
@@ -1648,25 +1677,35 @@ function App() {
           </div>
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 gap-4 p-4 xl:grid-cols-[minmax(0,1.2fr)_380px]">
-        <MainContent
-          scope="dictation"
-          snapshot={dictationSnapshot}
-          liveLatency={liveLatency}
-          liveDraft={dictationLiveDraft}
-          transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
-          coachResult={dictationCoachResult ?? null}
-          coachStatus={dictationCoachStatus ?? null}
-          coachError={dictationCoachError}
-          originalText={dictationAggregatedText}
-          pasteText={dictationPasteText || dictationPostprocessedText}
-          showCoachDiff={settings.coach.show_diff_view}
-          workspaceLabel="Dictation"
-          workspaceTitle="Mic / hotkey timeline"
-          workspaceDescription="Quick dictation, low-latency feedback, and one shared timeline for recent spoken text."
-        />
+      <div className="grid min-h-0 flex-1 gap-4 p-4 2xl:grid-cols-[minmax(0,1.1fr)_340px]">
         <div className="min-h-0 overflow-hidden">
-          <div className="h-full min-h-0 overflow-hidden">{dictationActivityFeedNode}</div>
+          <MainContent
+            scope="dictation"
+            snapshot={dictationSnapshot}
+            liveLatency={liveLatency}
+            liveDraft={dictationLiveDraft}
+            transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
+            coachResult={dictationCoachResult ?? null}
+            coachStatus={dictationCoachStatus ?? null}
+            coachDisplaySource={dictationCoachDisplaySource ?? null}
+            coachError={dictationCoachError}
+            originalText={dictationAggregatedText}
+            pasteText={dictationPasteText || dictationPostprocessedText}
+            showCoachDiff={settings.coach.show_diff_view}
+            workspaceLabel="Dictation"
+            workspaceTitle="Mic / hotkey timeline"
+            workspaceDescription="Quick dictation, low-latency feedback, and one shared timeline for recent spoken text."
+          />
+        </div>
+        <div className="min-h-0 overflow-hidden">
+          <div className="h-full min-h-0 overflow-hidden">
+            <ActivityFeed
+              session={dictationSnapshot.session}
+              transcript={dictationSnapshot.transcript}
+              health={dictationSnapshot.health}
+              variant="sidebar"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1813,41 +1852,23 @@ function App() {
             await saveSettings(newSettings);
           }}
           onSettingsReset={async () => {
-            await backendRequest('/api/settings/reset', { method: 'POST' });
-            await loadSettings();
+            await saveSettings(DEFAULT_SETTINGS);
           }}
           hardwareProfile={hardwareProfile}
-          availableModels={snapshot.available_models}
+          availableModels={availableModels}
           modelManager={modelManager}
           onDownloadModel={async (modelId) => {
-            await window.transcriptaDesktop.models.download(modelId);
-            await loadModelCatalog();
+            await downloadModel(modelId);
           }}
           onCancelModelDownload={async (modelId) => {
-            await window.transcriptaDesktop.models.cancel(modelId);
+            await cancelModelDownload(modelId);
           }}
           onRemoveModel={async (modelId) => {
-            await window.transcriptaDesktop.models.remove(modelId);
-            await loadModelCatalog();
+            await removeModel(modelId);
           }}
           availableLanguages={snapshot.available_languages}
           audioDevices={devices}
-        />
-      </div>
-    </div>
-  );
-
-  const homeView = (
-    <div className="flex h-full min-h-0 flex-col p-4">
-      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
-        <HomePage
           request={backendRequest}
-          onOpenSettings={() => setActivePage('settings')}
-          onStatus={setStatusMessage}
-          defaultRangeDays={settings.history.default_analytics_range_days}
-          allowRetry={settings.history.allow_retry}
-          persistAudio={settings.history.persist_audio}
-          variant="full"
         />
       </div>
     </div>
@@ -2101,7 +2122,7 @@ function App() {
               ? dictionaryView
               : activePage === 'snippets'
                 ? snippetsView
-                  : settingsView}
+                : settingsView}
         </div>
       </div>
       {quickSettingsDrawer}
@@ -2110,3 +2131,10 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+

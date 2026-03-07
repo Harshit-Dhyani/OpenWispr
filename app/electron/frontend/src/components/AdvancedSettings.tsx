@@ -98,7 +98,7 @@ export function AdvancedSettings({ isOpen, onClose, onApplySettings, currentSett
 
   const loadSystemProfile = async () => {
     try {
-      const data = await window.transcriptaDesktop.fetchJson('/api/system/profile') as SystemProfile;
+      const data = await window.openwisprDesktop.fetchJson('/api/system/profile') as SystemProfile;
       setProfile(data);
     } catch (error) {
       console.error('Failed to load system profile:', error);
@@ -109,7 +109,7 @@ export function AdvancedSettings({ isOpen, onClose, onApplySettings, currentSett
   const loadOptimizedSettings = async (mode: string, hotkey = false) => {
     setOptimizing(true);
     try {
-      const data = await window.transcriptaDesktop.fetchJson(
+      const data = await window.openwisprDesktop.fetchJson(
         `/api/system/optimize?mode=${encodeURIComponent(mode)}&hotkey=${String(hotkey)}`
       ) as OptimizationResult;
       setOptimizationResult(data);

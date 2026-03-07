@@ -1,5 +1,6 @@
 import { Activity, BookText, Cpu, Home, Mic, RefreshCw, ScissorsSquareDashedBottom, Settings, Volume2, Wifi, WifiOff } from 'lucide-react';
 import { RENDERER_STRINGS } from '../strings/en';
+import openWisprLogo from '../assets/openwispr-logo.png';
 
 type AppPage = 'home' | 'microphone' | 'systemAudio' | 'dictionary' | 'snippets' | 'settings';
 type ConnectionStatus = 'sse-connected' | 'sse-reconnecting' | 'polling-fallback';
@@ -60,6 +61,11 @@ export function AppSidebar({
   return (
     <aside className="flex h-full w-full shrink-0 flex-col border-b-2 border-lawn-border bg-lawn-dark p-4 text-white xl:w-[280px] xl:border-b-0 xl:border-r-2">
       <div className="border-2 border-lawn-bg/15 bg-black/20 p-4 shadow-brutal-sm">
+        <img
+          src={openWisprLogo}
+          alt={`${appName} logo`}
+          className="mb-4 h-14 w-14 rounded-2xl border border-lawn-bg/10 bg-lawn-bg/5 object-cover shadow-brutal-sm"
+        />
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-accent">
           {SIDEBAR_STRINGS.heroEyebrow}
         </p>
@@ -85,7 +91,7 @@ export function AppSidebar({
                 ? BookText
               : page === 'snippets'
                 ? ScissorsSquareDashedBottom
-                  : Settings;
+                : Settings;
           return (
             <button
               key={page}
@@ -149,3 +155,5 @@ export function AppSidebar({
     </aside>
   );
 }
+
+

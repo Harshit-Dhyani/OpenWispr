@@ -89,7 +89,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 export function HotkeySettings({ onConfigChange }: HotkeySettingsProps) {
-  const hotkeyApi = window.transcriptaDesktop?.hotkey;
+  const hotkeyApi = window.openwisprDesktop?.hotkey;
 
   const [hotkeyState, setHotkeyState] = useState<HotkeyState | null>(null);
   const [currentCombo, setCurrentCombo] = useState<string>('');

@@ -36,6 +36,7 @@ export interface SettingsPanelProps {
   onRemoveModel?: (modelId: string) => void | Promise<void>;
   availableLanguages?: string[];
   audioDevices?: Device[];
+  request?: <T>(path: string, options?: RequestInit) => Promise<T>;
 }
 
 export interface SectionProps {
@@ -52,6 +53,7 @@ export interface SectionProps {
   onDownloadModel?: (modelId: string) => void | Promise<void>;
   onCancelModelDownload?: (modelId: string) => void | Promise<void>;
   onRemoveModel?: (modelId: string) => void | Promise<void>;
+  request?: <T>(path: string, options?: RequestInit) => Promise<T>;
 }
 
 export type {

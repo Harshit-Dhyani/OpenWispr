@@ -40,6 +40,7 @@ type MainContentProps = {
   }>;
   coachResult?: CoachResult | null;
   coachStatus?: 'disabled' | 'queued' | 'running' | 'failed' | 'fallback' | 'cache_hit' | 'generated' | 'success' | null;
+  coachDisplaySource?: 'coach' | 'fallback' | 'faithful' | null;
   coachError?: string | null;
   originalText?: string | null;
   pasteText?: string | null;
@@ -98,6 +99,7 @@ export function MainContent({
   transcriptDebugEvents = [],
   coachResult = null,
   coachStatus = null,
+  coachDisplaySource = null,
   coachError = null,
   originalText = null,
   pasteText = null,
@@ -257,7 +259,7 @@ export function MainContent({
 
       <div
         className={
-          scope === 'dictation' && inspectorCollapsed
+          scope === 'dictation'
             ? 'grid min-h-0 flex-1 gap-4 overflow-hidden'
             : 'grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]'
         }
@@ -345,68 +347,69 @@ export function MainContent({
           </div>
         ) : null}
         {!inspectorCollapsed ? (
-          <aside className="flex min-h-0 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
-          <div className="border-b-2 border-lawn-border bg-lawn-bg p-3">
-            <div className="mb-3 flex items-center gap-2">
-              <Waves size={14} className="text-lawn-accent" />
-              <span className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-border">
-                Inspector
-              </span>
+          <section className="flex min-h-0 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
+            <div className="border-b-2 border-lawn-border bg-lawn-bg p-3">
+              <div className="mb-3 flex items-center gap-2">
+                <Waves size={14} className="text-lawn-accent" />
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-border">
+                  Inspector
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+                {panels.map((panel) => (
+                  <button
+                    key={panel.key}
+                    type="button"
+                    onClick={() => setActivePanel(panel.key)}
+                    className={[
+                      'border-2 px-2 py-2 text-left shadow-brutal-sm transition-all',
+                      activePanel === panel.key
+                        ? 'border-lawn-border bg-lawn-accent text-lawn-bg'
+                        : panel.accent
+                          ? 'border-lawn-border bg-lawn-bg text-lawn-border hover:-translate-y-0.5'
+                          : 'border-lawn-border bg-lawn-bg/70 text-lawn-border hover:-translate-y-0.5',
+                    ].join(' ')}
+                  >
+                    <div className="text-[9px] font-black uppercase tracking-widest opacity-70">{panel.label}</div>
+                    <div className="mt-1 text-lg font-black leading-none">{panel.count}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {panels.map((panel) => (
-                <button
-                  key={panel.key}
-                  type="button"
-                  onClick={() => setActivePanel(panel.key)}
-                  className={[
-                    'border-2 px-2 py-2 text-left shadow-brutal-sm transition-all',
-                    activePanel === panel.key
-                      ? 'border-lawn-border bg-lawn-accent text-lawn-bg'
-                      : panel.accent
-                        ? 'border-lawn-border bg-lawn-bg text-lawn-border hover:-translate-y-0.5'
-                        : 'border-lawn-border bg-lawn-bg/70 text-lawn-border hover:-translate-y-0.5',
-                  ].join(' ')}
-                >
-                  <div className="text-[9px] font-black uppercase tracking-widest opacity-70">{panel.label}</div>
-                  <div className="mt-1 text-lg font-black leading-none">{panel.count}</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
-            {activePanel === 'review' && <ReviewPanel segments={snapshot.needs_review} />}
-            {activePanel === 'formulas' && <FormulasPanel formulas={snapshot.formulas} />}
-            {activePanel === 'suppressed' && <SuppressedPanel segments={snapshot.suppressed_transcript} />}
-            {activePanel === 'errors' && (
-              <ErrorsPanel error={snapshot.health.last_error} warning={snapshot.health.last_warning ?? null} />
-            )}
-            {activePanel === 'combined' && <CombinedPanel combinedText={combinedTranscriptText} />}
-            {activePanel === 'coach' && (
-              <CoachPanel
-                coachResult={coachResult}
-                coachStatus={coachStatus}
-                coachError={coachError}
-                originalText={originalText}
-                pasteText={pasteText}
-                showDiff={showCoachDiff}
-              />
-            )}
-            {activePanel === 'session' && (
-              <SessionPanel
-                session={snapshot.session}
-                acceptedCount={acceptedCount}
-                reviewCount={reviewCount}
-                formulaCount={formulaCount}
-                suppressedCount={suppressedCount}
-                lastTranscriptAt={snapshot.health.last_transcript_at}
-                runtimeDevice={snapshot.health.model_runtime_device ?? null}
-                audioActive={snapshot.health.audio_stream_active ?? false}
-              />
-            )}
-          </div>
-          </aside>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
+              {activePanel === 'review' && <ReviewPanel segments={snapshot.needs_review} />}
+              {activePanel === 'formulas' && <FormulasPanel formulas={snapshot.formulas} />}
+              {activePanel === 'suppressed' && <SuppressedPanel segments={snapshot.suppressed_transcript} />}
+              {activePanel === 'errors' && (
+                <ErrorsPanel error={snapshot.health.last_error} warning={snapshot.health.last_warning ?? null} />
+              )}
+              {activePanel === 'combined' && <CombinedPanel combinedText={combinedTranscriptText} />}
+              {activePanel === 'coach' && (
+                <CoachPanel
+                  coachResult={coachResult}
+                  coachStatus={coachStatus}
+                  coachDisplaySource={coachDisplaySource}
+                  coachError={coachError}
+                  originalText={originalText}
+                  pasteText={pasteText}
+                  showDiff={showCoachDiff}
+                />
+              )}
+              {activePanel === 'session' && (
+                <SessionPanel
+                  session={snapshot.session}
+                  acceptedCount={acceptedCount}
+                  reviewCount={reviewCount}
+                  formulaCount={formulaCount}
+                  suppressedCount={suppressedCount}
+                  lastTranscriptAt={snapshot.health.last_transcript_at}
+                  runtimeDevice={snapshot.health.model_runtime_device ?? null}
+                  audioActive={snapshot.health.audio_stream_active ?? false}
+                />
+              )}
+            </div>
+          </section>
         ) : null}
       </div>
     </main>
@@ -449,6 +452,7 @@ function CombinedPanel({ combinedText }: { combinedText: string }) {
 function CoachPanel({
   coachResult,
   coachStatus,
+  coachDisplaySource,
   coachError,
   originalText,
   pasteText,
@@ -456,6 +460,7 @@ function CoachPanel({
 }: {
   coachResult: CoachResult | null;
   coachStatus: 'disabled' | 'queued' | 'running' | 'failed' | 'fallback' | 'cache_hit' | 'generated' | 'success' | null;
+  coachDisplaySource: 'coach' | 'fallback' | 'faithful' | null;
   coachError: string | null;
   originalText: string | null;
   pasteText: string | null;
@@ -465,33 +470,46 @@ function CoachPanel({
     return <EmptyState title="No coach result yet" body="Stop a microphone dictation to generate a polished paragraph and coaching notes here." />;
   }
 
+  const heading =
+    coachStatus === 'queued'
+      ? 'Coach Queued'
+      : coachStatus === 'running'
+        ? 'Coach Running'
+        : coachStatus === 'generated' || coachStatus === 'cache_hit' || coachStatus === 'success'
+          ? 'Coach Result'
+          : coachStatus === 'fallback'
+            ? 'Fallback Output'
+            : coachStatus === 'failed'
+              ? 'Coach Failed'
+              : 'Transcript Ready';
+  const summaryText =
+    coachResult?.polished ||
+    pasteText ||
+    originalText ||
+    (coachStatus === 'queued'
+      ? 'Coach queued. Preparing prompt and transcript payload.'
+      : coachStatus === 'running'
+        ? 'Coach is running. This can take a few seconds depending on the local runtime.'
+        : coachStatus === 'failed'
+          ? 'Coach could not finish. The faithful transcript is still available below.'
+          : '');
+
   return (
     <div className="space-y-3">
       <article className="border-2 border-lawn-border bg-lawn-bg p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Sparkles size={14} className="text-lawn-accent" />
-          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-border">
-            {coachStatus === 'queued'
-              ? 'Coach Queued'
-              : coachStatus === 'running'
-                ? 'Coach Running'
-                : coachStatus === 'generated' || coachStatus === 'cache_hit' || coachStatus === 'success'
-                  ? 'Polished Output'
-                  : coachStatus === 'failed' || coachStatus === 'fallback'
-                    ? 'Coach Failed'
-                    : 'Transcript Ready'}
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-lawn-accent" />
+            <span className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-border">{heading}</span>
+          </div>
+          <span className="border border-lawn-border px-2 py-1 text-[9px] font-black uppercase tracking-widest text-lawn-muted">
+            {(coachDisplaySource || 'faithful').replace(/_/g, ' ')}
           </span>
         </div>
-        <p className="text-sm font-bold leading-6 text-lawn-border">
-          {coachResult?.polished ||
-            pasteText ||
-            originalText ||
-            (coachStatus === 'queued'
-              ? 'Coach queued. Preparing prompt and transcript payload…'
-              : coachStatus === 'running'
-                ? 'Coach is running. This can take a few seconds depending on model/runtime.'
-                : '')}
-        </p>
+        <p className="text-sm font-bold leading-6 text-lawn-border">{summaryText}</p>
+        {coachStatus === 'fallback' ? (
+          <p className="mt-2 text-xs font-bold text-lawn-muted">Coach was unavailable, so this panel is showing deterministic fallback output instead.</p>
+        ) : null}
         {coachError ? <p className="mt-2 text-xs font-bold text-theme-warning">Coach error: {coachError}</p> : null}
       </article>
       <article className="border-2 border-lawn-border bg-lawn-panel p-3">

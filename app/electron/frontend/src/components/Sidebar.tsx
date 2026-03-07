@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, Cpu, FolderOpen, LoaderCircle, Mic2, Play, Ref
 import type { Device, DeviceProbeResult, Health, ModelCatalogEntry, ModelPreloadStatus } from '../types/api';
 import { AppConstants } from '../lib/constants';
 import { getLanguageLabel } from '../lib/languages';
+import openWisprLogo from '../assets/openwispr-logo.png';
 
 type ConnectionStatus = 'sse-connected' | 'sse-reconnecting' | 'polling-fallback';
 type GpuStatus = 'gpu-active' | 'cpu-fallback' | 'gpu-only-failed';
@@ -90,7 +91,7 @@ export function Sidebar({
     setProbeError(null);
     setProbeResult(null);
     try {
-      const result = (await window.transcriptaDesktop.fetchJson(
+      const result = (await window.openwisprDesktop.fetchJson(
         `/api/devices/${encodeURIComponent(form.deviceId)}/probe`,
       )) as DeviceProbeResult & { ok?: boolean; error?: string };
       if (result.ok === false) {
@@ -189,6 +190,11 @@ export function Sidebar({
       <section className="border-2 border-lawn-border bg-lawn-dark p-4 shadow-brutal text-white mb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            <img
+              src={openWisprLogo}
+              alt={`${AppConstants.APP_NAME} logo`}
+              className="mb-3 h-14 w-14 rounded-2xl border border-lawn-bg/15 bg-lawn-bg/5 object-cover shadow-brutal-sm"
+            />
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-lawn-accent">
               Local Transcription
             </p>
@@ -752,3 +758,5 @@ const inputClass =
 
 const sideButtonClass =
   'flex h-9 w-9 flex-shrink-0 items-center justify-center border-2 border-lawn-border bg-lawn-panel text-lawn-border transition hover:-translate-y-[1px] hover:shadow-brutal-sm active:translate-y-0 active:shadow-none focus-visible:ring-2 focus-visible:ring-lawn-accent/50 rounded-none cursor-pointer';
+
+

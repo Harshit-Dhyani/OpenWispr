@@ -48,7 +48,7 @@ export function CoachSection({
 
     async function loadPreview() {
       try {
-        const response = await window.transcriptaDesktop.fetchJson('/api/coach/prompt-preview', {
+        const response = await window.openwisprDesktop.fetchJson('/api/coach/prompt-preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

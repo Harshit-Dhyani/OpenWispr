@@ -107,8 +107,8 @@ export function AudioSection({
         </SettingCard>
 
         <SettingCard
-          title={audioText.muteTranscriptaAudioDuringDictationTitle}
-          description={audioText.muteTranscriptaAudioDuringDictationDescription}
+          title={audioText.muteOpenWisprAudioDuringDictationTitle}
+          description={audioText.muteOpenWisprAudioDuringDictationDescription}
           changed={isChanged('audio', 'mute_transcripta_audio_during_dictation')}
           onReset={() => resetSetting('audio', 'mute_transcripta_audio_during_dictation')}
         >

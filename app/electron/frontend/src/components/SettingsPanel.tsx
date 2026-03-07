@@ -49,6 +49,7 @@ interface SettingsPanelProps {
   onRemoveModel?: (modelId: string) => void | Promise<void>;
   availableLanguages?: string[];
   audioDevices?: Device[];
+  request?: <T>(path: string, options?: RequestInit) => Promise<T>;
 }
 
 export function SettingsPanel({
@@ -75,6 +76,7 @@ export function SettingsPanel({
       sample_rate: 16000,
     },
   ],
+  request,
 }: SettingsPanelProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general');
   const [searchQuery, setSearchQuery] = useState('');
@@ -280,6 +282,7 @@ export function SettingsPanel({
     onDownloadModel,
     onCancelModelDownload,
     onRemoveModel,
+    request,
   };
 
   if (!isOpen && !inline) return null;
@@ -499,3 +502,5 @@ export function SettingsPanel({
 }
 
 export default SettingsPanel;
+
+

@@ -92,7 +92,7 @@ export function GeneralSection({
             />
             <button
               onClick={async () => {
-                const folder = await window.transcriptaDesktop?.chooseDirectory?.();
+                const folder = await window.openwisprDesktop?.chooseDirectory?.();
                 if (folder) {
                   updateSetting('general', 'exportDirectory', folder);
                 }
