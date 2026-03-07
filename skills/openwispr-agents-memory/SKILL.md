@@ -7,23 +7,25 @@ description: Use when a verified OpenWispr bug, regression, security issue, or u
 
 Use this skill only after verifying a real issue.
 
-## Goal
+## Entry Template (Required)
 
-Turn a concrete failure into a short regression-prevention rule in `AGENTS.md`.
+Every new `AGENTS.md` prevention entry must include exactly:
 
-## Required Entry Shape
+- What went wrong
+- Why it happened
+- Detect earlier
+- Prevention rule
 
-Each new entry must capture:
+## Minimal Workflow
 
-- what went wrong
-- why it happened
-- how to detect it earlier
-- the prevention rule
+1. Confirm the issue is real (not hypothesis) via code, test, logs, or reproducible behavior.
+2. Verify the issue is not already captured by an existing AGENTS rule.
+3. Add one concise entry tied to the specific failure mode.
+4. Link the rule to the changed files/flow in the summary for traceability.
 
 ## Rules
 
 - Add only specific, actionable rules.
-- Do not add broad process notes.
-- Keep `AGENTS.md` short.
-- Prefer one rule per verified failure mode.
-- If the issue is not yet verified, do not add the rule.
+- Do not add generic process advice.
+- Keep AGENTS short; dedupe while adding new entries.
+- If issue is unverified, do not add a prevention rule.

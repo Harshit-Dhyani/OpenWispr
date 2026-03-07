@@ -7,39 +7,34 @@ description: Use when validating OpenWispr changes before merge or release. Cove
 
 Use this skill before merge and before packaging-sensitive changes.
 
-## Primary Commands
-
-- `pnpm run typecheck`
-- `pnpm run test:frontend`
-- `pytest`
-- `python tools/check_renderer_strings.py`
-- `python scripts/validate.py --quick`
-
-## Packaging And Release References
-
-- `package.json`
-- `scripts/build.py`
-- `app/electron/package.json`
-- `tools/runner.py`
-
-## Validation Matrix
+## Validation Buckets
 
 - Renderer/UI change:
-  - typecheck
+  - `pnpm run typecheck`
   - focused renderer tests
-  - renderer strings check
+  - `python tools/check_renderer_strings.py`
 - Backend/service change:
-  - focused pytest targets
-  - runtime or integration smoke validation
-- Structural move:
+  - focused `pytest` selection
+  - runtime/integration smoke checks for touched routes/flows
+- Structural move/rename/split:
   - import/reference verification
-  - smallest relevant test set
+  - canonical + compatibility shim import checks
+  - smallest relevant tests
 - Build/release change:
-  - package/build script sanity
-  - artifact-related smoke checks
+  - package/build config sanity
+  - packaging smoke checks
 
-## Rules
+## Required References
 
-- Run the smallest relevant checks, not a blind full suite by default.
-- If a changed area is hotkey/session/model-download related, validate the specific flow in logs or smoke tests.
-- Report what was not validated.
+- `package.json`
+- `app/electron/package.json`
+- `scripts/build.py`
+- `scripts/validate.py`
+- `tools/runner.py`
+
+## Execution Rules
+
+- Run the smallest relevant set, not a blind full suite.
+- If you skip a check, state it explicitly in the result.
+- For hotkey/session/model-download changes, include flow-specific runtime verification notes.
+- For settings/config/text changes, include generated-output verification.
