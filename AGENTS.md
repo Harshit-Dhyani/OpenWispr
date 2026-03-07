@@ -1,122 +1,84 @@
 # OpenWispr Agent Guidance
 
-Keep this file short. Only add rules that prevent repeat regressions.
-
+Keep this file short. Add only concrete rules that prevent repeat regressions.
 
 ## Engineering Standards
 
 - Treat this as a public repo. Never commit personal identifiers, real transcript snippets, or user-specific examples.
-- Do not add user-facing copy inline. Put renderer strings in `app/electron/frontend/src/strings/en.ts`, Electron shell strings in `app/electron/strings/en.js`, backend API copy in `app/api/strings/en.py`, and prompt text in `app/stt/prompts.py`.
-- Do not let files grow without bounds. If a module mixes routing, orchestration, and pure logic or grows past roughly 300-500 lines, split it by responsibility before adding more behavior.
-- Keep boundaries clean:
-  - routes: HTTP/WebSocket validation and transport only
-  - services: orchestration and stateful business logic
-  - STT modules: decoding, aggregation, cleanup, refinement, prompts
-  - utilities: pure helpers with focused tests
+- Do not add user-facing copy inline. Renderer copy -> `app/electron/frontend/src/strings/en.ts`; Electron shell copy -> `app/electron/strings/en.js`; backend API copy -> `app/api/strings/en.py`; prompt text -> `app/stt/prompts.py`.
+- Keep boundaries clean: routes handle transport/validation only, services own orchestration, STT modules own decoding/aggregation/cleanup/refinement/prompts, utilities stay pure.
+- Split mixed-responsibility modules before they exceed roughly 300-500 lines.
 
 ## Never Reintroduce These Bugs
 
-- Always route transcript/websocket/SSE payloads through a single JSON-safe encoder. Numpy scalars/arrays, dataclasses, `datetime`, and `Path` must never be sent raw.
-- Do not append live transcript text for the same session/segment. Draft and final transcript updates must replace by `session_id + segment_index` (or equivalent stable key).
-- Do not share live transcript state between Dictation and Sessions. Keep separate scoped slices and render only the active mode's data.
-- Do not emit duplicate hotkey transcript events for the same draft/final update. One live draft lane and one final lane only.
-- Do not let microphone/system model selection drift. Active capture source must resolve the matching ASR model:
-  - microphone -> `microphone_asr_model_id`
-  - system -> `system_asr_model_id`
-  - fallback only if the source-specific model is unset
-- Do not show fake progress. Downloads may show percent only when total size is known. Model preload/model warmup must use truthful state labels, not fake `0%` progress.
-- Do not hard-fail model downloads on optional Hugging Face artifacts. Missing vocabulary-style files must be skipped gracefully.
-- Do not make refiner runtime mandatory. If `llama-cpp-python` is unavailable, degrade once, log clearly once, and return original text safely.
-- Do not treat normal SSE/WebSocket client disconnects as application errors. Handle `CancelledError` and clean closes as expected behavior.
-- Do not log everything at DEBUG just because debug mode is enabled. `debugMode` controls extra diagnostics; `logLevel` controls verbosity.
-- Do not leave verbose backend or Electron dev logging on by default. Default to INFO/WARNING noise levels unless `TRANSCRIPTA_LOG_LEVEL=DEBUG` is explicitly set.
-- Do not trust legacy class names or stale UI labels as truth. Use resolved runtime fields (`capture_source`, resolved device kind, resolved model id, runtime model name).
-- Do not let hotkey final text sources drift. For microphone dictation, `aggregated_clean_text` is the canonical deterministic final transcript, `paste_text` is the only text Electron should inject/copy, and coach/refiner output must layer on top of that instead of rebuilding from raw segments elsewhere.
-- Do not hardcode a separate tray/quick-settings palette. Shared app themes must come from the common theme-token source so the main window, quick settings, and floating surfaces stay visually aligned.
-- Do not ship fake floating-window activity. Waveforms must come from real live audio amplitude (RMS/peak from PCM), silence must render flat, and the floating timer must be owned by a local monotonic clock instead of transcript events.
-- Do not let floating-window transcript UX regress. The transcript surface must stay scrollable, auto-scroll only while pinned to bottom, and Cancel/Finish must respect discard vs configured finish behavior without reopening stale result state.
-- Do not split transcription behavior settings across unrelated sections. Language, presets, finish action, refinement intensity/profile, and cleanup instructions belong under Transcription; Models is only for download/cache/runtime controls.
-- Do not let finish-time cleanup profiles corrupt technical text. Protect decimals, percentages, version-like strings, hotkeys, uppercase tokens, and code/log tokens with placeholders before runtime cleanup and restore them exactly afterward.
-- Do not reintroduce `Style` as a top-level workflow page. Writing tone is configured inside Settings; top-level navigation is for workflows (`Home`, `Microphone`, `System Audio`, `Dictionary`, `Snippets`, `Settings`).
-- Do not let transcript cleanup and writing tone overlap in UI copy. Cleanup/refinement controls govern transcript fidelity and finalization; writing tone is optional post-cleanup wording only.
-- Do not default normal microphone dictation to code/log cleanup behavior. Spoken-English defaults must stay faithful-first (`clean_dictation`-style cleanup) unless the user explicitly switches profiles.
-- Do not leave Settings wiring half-removed. If `App.tsx` passes model/settings callbacks into `SettingsPanel`, the corresponding functions must exist and use the current Electron/backend contract.
-- What went wrong: frontend settings defaults and validation drifted away from the backend settings registry.
-- Why it happened: handwritten renderer schema layers duplicated ownership that already existed in `app/config/settings.py` and generated settings outputs.
-- Detect earlier: whenever a setting is added, renamed, or re-categorized, compare the backend registry, generated frontend settings output, and renderer consumers in the same change.
-- Prevention rule: do not maintain parallel handwritten frontend settings defaults or validation rules unless the divergence is explicitly justified; `app/config/settings.py` remains the leading registry and generated settings outputs must be updated in the same change.
-- Do not shadow imported Electron window/service helpers with local booleans or config flags. Keep decision flags and callable helpers named distinctly, especially around floating window and coach result flows.
-- Do not maintain a hand-written frontend settings schema/default source in parallel with `app/config/settings.py` and `app/config/generate_ts.py` outputs. What went wrong: settings ownership drifted across backend registry, generated TS metadata, and `app/electron/frontend/src/lib/settingsSchema.ts`; why: renderer validation/defaults were maintained separately from the declared registry; detect earlier: compare added or renamed settings against `config/generated/settings.ts` and renderer consumers before merging; prevention rule: backend registry stays authoritative and any frontend schema layer must be generated from it or proved necessary with sync coverage.
+- Always route transcript/WebSocket/SSE payloads through a single JSON-safe encoder; never emit raw numpy/dataclass/datetime/Path objects.
+- Draft/final transcript updates must replace by stable segment key (`session_id + segment_index` or equivalent), never append duplicate live text.
+- Keep Dictation and Sessions live transcript state isolated; do not render shared cross-mode state.
+- Keep source-specific model routing strict: microphone -> `microphone_asr_model_id`, system -> `system_asr_model_id`, fallback only when source-specific value is unset.
+- Do not show fake download/preload progress; percent is valid only when total size is known.
+- Treat normal SSE/WebSocket disconnects (`CancelledError`, clean closes) as expected behavior, not app errors.
+- Do not make refiner runtime mandatory; if optional dependencies are missing, degrade once and return original text safely.
+- Preserve hotkey final-text contract: `aggregated_clean_text` is canonical final transcript and `paste_text` is the only Electron injection/copy source.
+- Keep floating waveform driven by real amplitude data and floating timer driven by local monotonic clock.
+- Do not split transcription behavior settings across unrelated sections; transcription fidelity/finalization controls live under Transcription, Models only controls runtime/download/cache.
+- Do not maintain parallel handwritten frontend settings schema/defaults in parallel with `app/config/settings.py` + generated settings outputs.
+- Do not shadow imported Electron helper functions with local boolean flags of similar names.
+
+## Verified Prevention Entries
+
+### Settings ownership drift
+- What went wrong: frontend settings defaults/validation drifted away from backend settings registry.
+- Why it happened: renderer schema/defaults were maintained separately from `app/config/settings.py` and generated outputs.
+- Detect earlier: for every setting add/rename/re-category, compare backend registry, generated frontend settings, and renderer consumers in the same change.
+- Prevention rule: backend registry is authoritative; frontend settings schema/defaults must be generated from it or explicitly justified with sync coverage.
+
+### Typecheck wrapper false green
+- What went wrong: repo-root `typecheck` passed via fallback even when package-level validation contract was missing.
+- Why it happened: wrapper script allowed echo/fallback behavior instead of enforcing a real frontend typecheck command.
+- Detect earlier: run the package-level typecheck command directly once when adding/changing root validation wrappers.
+- Prevention rule: never ship required validation wrappers that silently downgrade to fallback behavior.
+
+### Electron module move import break
+- What went wrong: moving model download manager broke internal relative imports after directory change.
+- Why it happened: compatibility shim path was updated, but module-internal `require()` paths were not validated.
+- Detect earlier: after Node/Electron module moves, require both canonical and shim paths, then run colocated unit tests.
+- Prevention rule: update internal relative imports in the same move commit and verify both canonical + shim load paths.
+
+### Electron packaging allowlist mismatch
+- What went wrong: moving preload scripts risked broken packaged builds because `app/electron/package.json` allowlist still matched old paths.
+- Why it happened: runtime path migration and packaging globs were changed in separate steps.
+- Detect earlier: after Electron file moves, diff moved canonical paths against `build.files` globs.
+- Prevention rule: whenever Electron main/preload paths move, update packaging globs in the same change.
+
+### Doc path drift after runtime refactors
+- What went wrong: architecture docs still referenced legacy Electron entry/preload paths after canonical file moves.
+- Why it happened: runtime refactor landed before docs source-of-truth references were reconciled.
+- Detect earlier: run a stale-path grep in `docs/` for moved canonical paths before merging structural batches.
+- Prevention rule: every runtime path move must include same-batch docs inventory/source-of-truth updates for renamed entrypoints and preloads.
 
 ## Required Rules For New Work
 
-- If a control is visible in the UI, it must change real behavior. Remove or hide placebo controls.
-- When fixing a bug, add or update at least one focused regression test.
-- For any non-trivial feature or workflow change, add the smallest sensible test mix:
-  - unit test for local logic
-  - integration test for wiring/contracts
-  - regression test for the bug or failure mode
-  - E2E coverage if the user-visible flow changed materially
-  - property-style/invariant test when ordering, serialization, dedupe, or aggregation logic is involved
-- When changing event schemas, update both backend and frontend consumers in the same change.
-- When changing config/text/constants on the Python side, update the generated frontend exports or regenerate them in the same change.
-- Keep exactly one active SSE/WebSocket subscription per workflow/route. New listeners must have stable deps and guaranteed cleanup.
-- Do not introduce repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, or `/api/models/catalog`. Load once, cache, and resubscribe only when needed.
-- Prefer one canonical source of truth for shared constants/settings. Compatibility shims are acceptable; duplicate live definitions are not.
+- If a UI control is visible, it must change real behavior; remove or hide placebo controls.
+- For bug fixes, add or update at least one focused regression test.
+- For non-trivial workflow changes, add the smallest sensible mix: unit + integration/wiring + regression, and E2E only when user-visible flow changed materially.
+- When changing event schemas, update backend and frontend consumers in the same change.
+- When changing Python config/text/constants, regenerate or update frontend generated exports in the same change.
+- Keep one active SSE/WebSocket subscription per workflow/route with stable dependency cleanup.
+- Avoid repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, `/api/models/catalog`; load once, cache, and resubscribe only when needed.
 - Keep microphone and system audio as mutually exclusive active capture modes.
-- What went wrong: pnpm run typecheck at the repo root reported success-by-fallback because the frontend package had no real typecheck script.
-- Why it happened: the root wrapper assumed a package-level validation contract that did not exist.
-- Detect earlier: whenever adding or relying on a root validation command, run the package-level command directly once and confirm it fails on real type errors.
-- Prevention rule: do not add wrapper validation scripts that silently downgrade to echo/fallback behavior for required checks; renderer TypeScript validation must resolve to a real package command.
-- What went wrong: moving pp/electron/main/model-download-manager.js into services/ initially broke its own internal relative import to shared/state.
-- Why it happened: the external import path was shimmed, but the module's internal equire() paths were not validated after the directory move.
-- Detect earlier: after any Node/Electron module move, require both the new canonical path and the old shim path once, then run the colocated unit test from the new location.
-- Prevention rule: when moving Electron/Node modules across directories, update internal relative imports in the same change and prove both canonical and shim imports still load.
-- What went wrong: moving Electron preload scripts into main/preload/ would have left packaged builds incomplete because pp/electron/package.json still whitelisted only the old root preload files.
-- Why it happened: the runtime move updated source paths and shims, but the Electron builder file allowlist was not updated in the same batch.
-- Detect earlier: after any Electron file move, compare the moved paths against pp/electron/package.json uild.files and verify every new canonical directory is included.
-- Prevention rule: whenever Electron main/preload files move, update pp/electron/package.json packaging globs in the same change so packaged apps include the canonical files, not just legacy shims.
-
-
 
 ## Regression Checklist
 
-- Floating waveform is driven by real amplitude data, not fake animation.
+- Floating waveform uses real amplitude data (no fake animation).
 - Floating timer starts immediately, increments correctly, and resets on cancel/finish.
-- Floating transcript scrolls correctly, auto-scrolls only while pinned to the bottom, and pauses when the user scrolls up.
-- Cancel discards transcript and closes without paste/copy. Finish uses the configured finish behavior.
-- Floating header remains draggable, while transcript/buttons stay `no-drag`.
-- Transcription presets actually update the active profile/runtime behavior.
-- Code/Logs mode preserves numbers, percentages, versions, hotkeys, uppercase tokens, and command-like strings.
-- Models owns runtime/download/cache controls only. Transcription owns language, presets, finish mode, and refinement behavior.
-
-## Feature Placement
-
-- Strings:
-  - renderer copy -> `app/electron/frontend/src/strings/en.ts`
-  - Electron shell copy -> `app/electron/strings/en.js`
-  - backend API messages -> `app/api/strings/en.py`
-- Prompts:
-  - add new prompt templates or refiner instructions in `app/stt/prompts.py`
-- Routes / services:
-  - new HTTP/WebSocket handlers go in `app/api/routes/`
-  - orchestration belongs in service modules, not routers
-  - pure STT behavior belongs in `app/stt/`
-- Tests:
-  - pure logic -> unit test
-  - wiring/contracts -> integration or smoke test
-  - user-visible regression -> add the smallest focused regression for the affected flow
-  - renderer copy rule -> run `python tools/check_renderer_strings.py`
+- Floating transcript auto-scrolls only while pinned to bottom and pauses when user scrolls up.
+- Cancel discards transcript with no paste/copy; Finish follows configured finish behavior.
+- Transcription presets change active runtime profile behavior.
+- Code/log cleanup mode preserves numbers, percentages, versions, hotkeys, uppercase tokens, and command-like strings.
+- Models section owns runtime/download/cache controls only.
 
 ## Before Merging
 
-- Run the smallest relevant backend/frontend tests for the touched area.
-- If you changed hotkey/session flows, verify both transcript correctness and model routing in logs.
-- If you changed downloads, verify resume/retry behavior and monotonic progress.
-
-
-
-- What went wrong: moving Electron preload scripts into `main/preload/` would have left packaged builds incomplete because `app/electron/package.json` still whitelisted only the old root preload files.
-- Why it happened: the runtime move updated source paths and shims, but the Electron builder file allowlist was not updated in the same batch.
-- Detect earlier: after any Electron file move, compare the moved paths against `app/electron/package.json` `build.files` and verify every new canonical directory is included.
-- Prevention rule: whenever Electron main/preload files move, update `app/electron/package.json` packaging globs in the same change so packaged apps include the canonical files, not just legacy shims.
+- Run smallest relevant backend/frontend tests for touched areas.
+- For hotkey/session changes, verify transcript correctness and model routing in logs.
+- For download changes, verify resume/retry behavior and monotonic progress.
