@@ -8,9 +8,9 @@ source_of_truth:
   - requirements.txt
 ---
 
-# Transcripta Deployment Guide
+# OpenWispr Deployment Guide
 
-Production-grade deployment instructions for the Transcripta Windows 11 desktop transcription application.
+Production-grade deployment instructions for the OpenWispr Windows 11 desktop transcription application.
 
 ## Prerequisites
 
@@ -207,7 +207,7 @@ Create a `.env` file in the project root. All settings use `TRANSCRIPTA_` prefix
 
 ```powershell
 # Core application settings
-TRANSCRIPTA_APP_NAME=Transcripta
+TRANSCRIPTA_APP_NAME=OpenWispr
 TRANSCRIPTA_HOST=127.0.0.1
 TRANSCRIPTA_PORT=8765
 TRANSCRIPTA_LOG_LEVEL=INFO
@@ -379,8 +379,8 @@ npm run dist
 ```
 
 Outputs:
-- `app/electron/dist/Transcripta-<version>.exe` (portable)
-- `app/electron/dist/Transcripta Setup-<version>.exe` (installer)
+- `app/electron/dist/OpenWispr-<version>.exe` (portable)
+- `app/electron/dist/OpenWispr Setup-<version>.exe` (installer)
 
 ### Root-Level Build Commands
 
@@ -432,7 +432,7 @@ The root `package.json` controls packaging:
 {
   "build": {
     "appId": "com.transcripta.desktop",
-    "productName": "Transcripta",
+    "productName": "OpenWispr",
     "directories": {
       "output": "release"
     },
@@ -509,7 +509,7 @@ TRANSCRIPTA_COMPUTE_TYPE=int8
 python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu')"
 
 # Set custom download root
-$env:TRANSCRIPTA_DOWNLOAD_ROOT="C:\Transcripta\Models"
+$env:TRANSCRIPTA_DOWNLOAD_ROOT="C:\OpenWispr\Models"
 
 # Check HuggingFace connectivity
 python -c "import requests; r = requests.get('https://huggingface.co'); print(f'HuggingFace status: {r.status_code}')"
@@ -655,15 +655,15 @@ npm run pack
 
 ```
 release/
-├── Transcripta-<version>-setup.exe     # NSIS installer
-├── Transcripta-<version>-portable.exe  # Portable executable
+├── OpenWispr-<version>-setup.exe     # NSIS installer
+├── OpenWispr-<version>-portable.exe  # Portable executable
 └── win-unpacked/                       # Unpacked directory (npm run pack)
 ```
 
 Or from `app/electron/dist/`:
 ```
 app/electron/dist/
-├── Transcripta-<version>.exe           # Portable
-├── Transcripta Setup-<version>.exe     # Installer
+├── OpenWispr-<version>.exe           # Portable
+├── OpenWispr Setup-<version>.exe     # Installer
 └── win-unpacked/                       # Unpacked files
 ```

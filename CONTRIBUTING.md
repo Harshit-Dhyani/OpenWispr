@@ -1,6 +1,6 @@
-# Contributing to Transcripta
+# Contributing to OpenWispr
 
-Thank you for your interest in contributing to Transcripta. This document provides guidelines for setting up the development environment, coding standards, and the contribution process.
+Thank you for your interest in contributing to OpenWispr. This document provides guidelines for setting up the development environment, coding standards, and the contribution process.
 
 ## Table of Contents
 
@@ -71,7 +71,7 @@ Brief description of changes
 
 ```powershell
 git clone <repository-url>
-cd Transcripta
+cd OpenWispr
 ```
 
 ### 2. Set Up Python Environment
@@ -115,7 +115,7 @@ cd app/electron/frontend && npm run typecheck
 ## Project Structure
 
 ```
-Transcripta/
+OpenWispr/
 ├── app/
 │   ├── api/           # FastAPI endpoints, WebSocket, SSE
 │   ├── audio/         # Audio capture, VAD, backends
@@ -396,7 +396,7 @@ When reporting bugs, please include:
 
 **Logs:**
 - Relevant excerpts from logs (sanitize any personal info)
-- Located in `%APPDATA%/Transcripta/logs/` (Windows)
+- Located in `%APPDATA%/OpenWispr/logs/` (Windows)
 
 ## License
 
@@ -405,3 +405,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 ---
 
 For questions or clarifications, open a discussion in the GitHub Discussions tab.
+

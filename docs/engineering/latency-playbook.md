@@ -10,7 +10,7 @@ source_of_truth:
   - AGENTS.md
 ---
 
-# Transcripta Latency Playbook
+# OpenWispr Latency Playbook
 
 **Purpose:** "What to do when lag happens" - Diagnostic and remediation guide  
 **Owner:** Backend + Performance Team
@@ -208,14 +208,14 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
 ### 3.3 Environment Variables
 
 ```powershell
-# Windows PowerShell - Set before starting Transcripta
+# Windows PowerShell - Set before starting OpenWispr
 $env:TRANSCRIPTA_DEFAULT_MODEL="tiny"
 $env:TRANSCRIPTA_DEVICE="cpu"
 $env:TRANSCRIPTA_DEFAULT_LANGUAGE="en"
 $env:TRANSCRIPTA_LOG_LEVEL="INFO"  # Reduce log noise
 
 # Then launch
-.\Transcripta.exe
+.\OpenWispr.exe
 ```
 
 ---
@@ -239,7 +239,7 @@ Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
 
 # Or force model reload via environment
 $env:TRANSCRIPTA_FORCE_MODEL_RELOAD="1"
-# Restart Transcripta
+# Restart OpenWispr
 ```
 
 ### 4.2 "First word is fast, then it lags"
@@ -335,7 +335,7 @@ If latency issues persist after applying fixes:
    ```
 
 2. **Check logs:**
-   - Windows: `%APPDATA%\Transcripta\logs\`
+   - Windows: `%APPDATA%\OpenWispr\logs\`
    - Look for: `latency`, `queue`, `inference`, `rtf`
 
 3. **Create issue with:**

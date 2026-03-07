@@ -14,7 +14,7 @@ source_of_truth:
 
 ## Overview
 
-The model runtime system manages the complete lifecycle of AI models in Transcripta:
+The model runtime system manages the complete lifecycle of AI models in OpenWispr:
 
 1. **Model Catalog** - Canonical source of model definitions
 2. **Installation State** - Verification of locally installed models

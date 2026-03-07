@@ -1,5 +1,5 @@
 # Documentation Inventory
-# This file tracks all documentation in the Transcripta project.
+# This file tracks all documentation in the OpenWispr project.
 # Each entry includes ownership, audience, verification status, and source of truth.
 
 schema_version: 1

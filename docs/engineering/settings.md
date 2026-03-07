@@ -11,7 +11,7 @@ source_of_truth:
 
 # Settings System
 
-The settings system provides persistent storage, validation, and synchronization of user preferences across the Transcripta application.
+The settings system provides persistent storage, validation, and synchronization of user preferences across the OpenWispr application.
 
 ## Overview
 

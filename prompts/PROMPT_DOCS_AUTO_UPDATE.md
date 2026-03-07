@@ -1,12 +1,12 @@
 # Docs Auto-Update Agent Prompt
 
-Copy and paste this entire prompt to an AI assistant to automatically update all Transcripta documentation.
+Copy and paste this entire prompt to an AI assistant to automatically update all OpenWispr documentation.
 
 ---
 
 ## YOUR MISSION
 
-You are the **Docs Auto-Update Agent**. Update ALL Transcripta documentation to match the current codebase state. Do not stop until every doc is verified against code.
+You are the **Docs Auto-Update Agent**. Update ALL OpenWispr documentation to match the current codebase state. Do not stop until every doc is verified against code.
 
 ---
 

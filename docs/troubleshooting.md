@@ -8,7 +8,7 @@ source_of_truth:
   - AGENTS.md
 ---
 
-# Transcripta Troubleshooting Guide
+# OpenWispr Troubleshooting Guide
 
 Quick reference for diagnosing and resolving issues using the Symptom → Cause → Fix → Verify format.
 
@@ -192,7 +192,7 @@ icacls sessions/ /grant "$env:USERNAME:(OI)(CI)F" /T
 Get-PSDrive C | Select-Object Free
 
 # 4. Change export path if needed
-$env:TRANSCRIPTA_EXPORT_ROOT="D:\Transcripta\Sessions"
+$env:TRANSCRIPTA_EXPORT_ROOT="D:\OpenWispr\Sessions"
 ```
 
 **Verify:**
@@ -388,7 +388,7 @@ From `app/core/error_handler.py`:
 | Error Category | Trigger | User Message |
 |----------------|---------|--------------|
 | `AUDIO_DEVICE_DISCONNECTED` | Headset/speaker unplugged | "Your audio device was disconnected. Switching to default device." |
-| `AUDIO_PERMISSION_DENIED` | Windows privacy settings | "Transcripta needs microphone access to transcribe audio." |
+| `AUDIO_PERMISSION_DENIED` | Windows privacy settings | "OpenWispr needs microphone access to transcribe audio." |
 | `AUDIO_BACKEND_FAILURE` | WASAPI/driver failure | "The audio backend encountered an error." |
 | `AUDIO_CAPTURE_ERROR` | Format/channel mismatch | Check audio device properties |
 
@@ -580,7 +580,7 @@ echo "TRANSCRIPTA_COMPUTE_TYPE=int8" >> .env
 ### Emergency Session Export
 
 ```powershell
-$exportDir = "$env:USERPROFILE\Desktop\Transcripta-Emergency-$(Get-Date -Format 'yyyyMMdd')"
+$exportDir = "$env:USERPROFILE\Desktop\OpenWispr-Emergency-$(Get-Date -Format 'yyyyMMdd')"
 New-Item -ItemType Directory -Path $exportDir -Force
 
 Get-ChildItem sessions | ForEach-Object {

@@ -9,9 +9,9 @@ source_of_truth:
   - app/core/modes.py
 ---
 
-# Transcripta Configuration Reference
+# OpenWispr Configuration Reference
 
-Complete reference for all Transcripta configuration options, including environment variables, settings file structure, mode-specific defaults, and validation bounds.
+Complete reference for all OpenWispr configuration options, including environment variables, settings file structure, mode-specific defaults, and validation bounds.
 
 ## Table of Contents
 
@@ -401,7 +401,7 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
 
 ## Mode-Specific Defaults
 
-Transcripta supports two transcription modes with optimized defaults:
+OpenWispr supports two transcription modes with optimized defaults:
 
 ### Wispr Mode (Hotkey Dictation)
 

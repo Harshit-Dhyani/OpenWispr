@@ -12,7 +12,7 @@ source_of_truth:
 
 ## Overview
 
-Transcripta uses a multi-layered testing strategy covering Python backend tests (unit, integration, regression) and TypeScript/React frontend tests.
+OpenWispr uses a multi-layered testing strategy covering Python backend tests (unit, integration, regression) and TypeScript/React frontend tests.
 
 ## Test Structure
 

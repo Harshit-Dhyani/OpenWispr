@@ -11,7 +11,7 @@ source_of_truth:
 
 # Events and Streaming
 
-Transcripta uses multiple real-time streaming mechanisms for communication between the Python backend and Electron frontend: Server-Sent Events (SSE) for unidirectional server-to-client streaming, and WebSockets for bidirectional communication.
+OpenWispr uses multiple real-time streaming mechanisms for communication between the Python backend and Electron frontend: Server-Sent Events (SSE) for unidirectional server-to-client streaming, and WebSockets for bidirectional communication.
 
 ## Streaming Architecture
 

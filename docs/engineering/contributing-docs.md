@@ -9,7 +9,7 @@ source_of_truth:
 
 # Contributing to Documentation
 
-Guide for adding and updating documentation in the Transcripta project.
+Guide for adding and updating documentation in the OpenWispr project.
 
 ## How to Update Docs
 

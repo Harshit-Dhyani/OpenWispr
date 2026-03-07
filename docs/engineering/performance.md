@@ -7,7 +7,7 @@ source_of_truth:
   - app/stt/streaming_engine.py
 ---
 
-# Transcripta Performance Documentation
+# OpenWispr Performance Documentation
 
 **Scope:** Real-time transcription performance tuning  
 **Owner:** Backend + Performance Team

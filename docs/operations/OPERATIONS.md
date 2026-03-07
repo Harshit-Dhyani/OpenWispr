@@ -10,9 +10,9 @@ source_of_truth:
   - app/api/streaming_metrics.py
 ---
 
-# Transcripta Operations Guide
+# OpenWispr Operations Guide
 
-Production operations guide for running and maintaining the Transcripta desktop transcription application on Windows 11.
+Production operations guide for running and maintaining the OpenWispr desktop transcription application on Windows 11.
 
 ## Table of Contents
 
@@ -50,10 +50,10 @@ After packaging with electron-builder:
 
 ```powershell
 # Start the packaged application
-.\dist\Transcripta.exe
+.\dist\OpenWispr.exe
 
 # Or install and run via shortcut
-# Located at: %LOCALAPPDATA%\Programs\Transcripta\Transcripta.exe
+# Located at: %LOCALAPPDATA%\Programs\OpenWispr\OpenWispr.exe
 ```
 
 ### Environment Variables
@@ -101,7 +101,7 @@ Get-Process python | Where-Object {$_.CommandLine -like "*api_main*"} | Select-O
 Stop-Process -Id <PID> -Force
 
 # Or kill all related processes
-Get-Process | Where-Object {$_.ProcessName -in @("python","electron","Transcripta")} | Stop-Process -Force
+Get-Process | Where-Object {$_.ProcessName -in @("python","electron","OpenWispr")} | Stop-Process -Force
 ```
 
 ---
@@ -445,7 +445,7 @@ Settings are stored in `user_settings.json`:
 
 | Location | Description |
 |----------|-------------|
-| `%APPDATA%/Transcripta/settings.json` | Windows app data directory |
+| `%APPDATA%/OpenWispr/settings.json` | Windows app data directory |
 | `user_settings.json` | Application root directory (fallback) |
 
 ### Session Storage Paths
@@ -467,7 +467,7 @@ Session data structure (`app/storage/session_store.py`):
 ```powershell
 # backup-transcripta.ps1
 $source = "$PWD\sessions"
-$backupRoot = "$env:USERPROFILE\Backups\Transcripta"
+$backupRoot = "$env:USERPROFILE\Backups\OpenWispr"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backupDir = "$backupRoot\$timestamp"
 
@@ -490,7 +490,7 @@ Write-Host "Backup completed: $backupDir"
 # backup-sessions.ps1 - Production-grade backup
 $date = Get-Date -Format "yyyyMMdd"
 $source = "$PWD\sessions"
-$dest = "D:\Backups\Transcripta\$date"
+$dest = "D:\Backups\OpenWispr\$date"
 
 if (!(Test-Path $dest)) {
     New-Item -ItemType Directory -Path $dest -Force
@@ -499,7 +499,7 @@ if (!(Test-Path $dest)) {
 robocopy $source $dest /MIR /R:3 /W:5 /LOG:$dest\backup.log
 
 # Keep only last 30 days
-Get-ChildItem "D:\Backups\Transcripta" | 
+Get-ChildItem "D:\Backups\OpenWispr" | 
     Where-Object {$_.LastWriteTime -lt (Get-Date).AddDays(-30)} | 
     Remove-Item -Recurse -Force
 ```
@@ -702,11 +702,11 @@ Recovery strategies from `app/core/recovery_strategies.py`:
 ### Application Freeze
 
 ```powershell
-# Kill all Transcripta processes
-Get-Process | Where-Object { $_.ProcessName -match "python|electron|Transcripta" } | Stop-Process -Force
+# Kill all OpenWispr processes
+Get-Process | Where-Object { $_.ProcessName -match "python|electron|OpenWispr" } | Stop-Process -Force
 
 # Verify cleanup
-Get-Process | Where-Object { $_.ProcessName -match "python|electron|Transcripta" }
+Get-Process | Where-Object { $_.ProcessName -match "python|electron|OpenWispr" }
 ```
 
 ### Session Recovery After Crash
@@ -750,7 +750,7 @@ Start-Service audiosrv
 
 ```powershell
 # Export all session data for emergency backup
-$exportDir = "$env:USERPROFILE\Desktop\Transcripta-Emergency-Export-$(Get-Date -Format 'yyyyMMdd')"
+$exportDir = "$env:USERPROFILE\Desktop\OpenWispr-Emergency-Export-$(Get-Date -Format 'yyyyMMdd')"
 New-Item -ItemType Directory -Path $exportDir -Force
 
 Get-ChildItem sessions | ForEach-Object {
@@ -775,7 +775,7 @@ Write-Host "Emergency export complete: $exportDir.zip"
 
 ```powershell
 # 1. Kill all processes
-Get-Process | Where-Object {$_.ProcessName -in @("python","electron","Transcripta")} | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process | Where-Object {$_.ProcessName -in @("python","electron","OpenWispr")} | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # 2. Check disk space
 Get-Volume | Where-Object {$_.DriveLetter -eq 'C'} | Select-Object DriveLetter, SizeRemaining, Size

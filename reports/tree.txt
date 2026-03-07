@@ -1,20 +1,35 @@
 # Transcripta Tree
 
-Generated: 2026-03-04T10:47:06.731Z
-Files: 386
+Generated: 2026-03-07T00:22:14.050Z
+Files: 414
 
 .
+├── .codex
+│   └── environments
+│       └── environment.toml
 ├── .github
 │   └── workflows
 │       └── docs.yml
+├── .transcripta
+│   └── history.db
 ├── app
 │   ├── api
 │   │   ├── routes
 │   │   │   ├── __init__.py
+│   │   │   ├── dictionary.py
+│   │   │   ├── history.py
 │   │   │   ├── models.py
 │   │   │   ├── session.py
 │   │   │   ├── settings.py
+│   │   │   ├── snippets.py
+│   │   │   ├── style.py
 │   │   │   └── system.py
+│   │   ├── services
+│   │   │   ├── __init__.py
+│   │   │   ├── dictionary_service.py
+│   │   │   ├── snippet_service.py
+│   │   │   ├── style_service.py
+│   │   │   └── transcript_history_service.py
 │   │   ├── strings
 │   │   │   └── en.py
 │   │   ├── __init__.py
@@ -90,17 +105,30 @@ Files: 386
 │   │   │   │   └── workflows
 │   │   │   │       └── tests.yml
 │   │   │   ├── src
+│   │   │   │   ├── assets
+│   │   │   │   │   └── openwispr-logo.svg
 │   │   │   │   ├── components
 │   │   │   │   │   ├── __tests__
 │   │   │   │   │   │   ├── ActivityFeed.test.tsx
+│   │   │   │   │   │   ├── ActivityFeedLayout.test.tsx
 │   │   │   │   │   │   ├── App.test.tsx
 │   │   │   │   │   │   ├── FloatingWindow.test.tsx
 │   │   │   │   │   │   ├── MainContentCoach.test.tsx
 │   │   │   │   │   │   ├── SettingsPanel.test.tsx
-│   │   │   │   │   │   └── Sidebar.test.tsx
+│   │   │   │   │   │   ├── Sidebar.test.tsx
+│   │   │   │   │   │   └── themeContrastStyles.test.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   │   └── HomePage.test.tsx
+│   │   │   │   │   │   ├── DictionaryPage.tsx
+│   │   │   │   │   │   ├── FeaturePageShell.tsx
+│   │   │   │   │   │   ├── HomePage.tsx
+│   │   │   │   │   │   ├── SnippetsPage.tsx
+│   │   │   │   │   │   └── StylePage.tsx
 │   │   │   │   │   ├── settings
 │   │   │   │   │   │   ├── __tests__
 │   │   │   │   │   │   │   ├── HotkeyRecorder.test.tsx
+│   │   │   │   │   │   │   ├── HotkeySection.test.tsx
 │   │   │   │   │   │   │   └── SettingCard.test.tsx
 │   │   │   │   │   │   ├── controls
 │   │   │   │   │   │   │   ├── index.ts
@@ -112,10 +140,14 @@ Files: 386
 │   │   │   │   │   │   │   ├── AdvancedSection.tsx
 │   │   │   │   │   │   │   ├── AudioSection.tsx
 │   │   │   │   │   │   │   ├── CoachSection.tsx
+│   │   │   │   │   │   │   ├── DictionarySection.tsx
 │   │   │   │   │   │   │   ├── GeneralSection.tsx
+│   │   │   │   │   │   │   ├── HistorySection.tsx
 │   │   │   │   │   │   │   ├── HotkeySection.tsx
 │   │   │   │   │   │   │   ├── index.ts
 │   │   │   │   │   │   │   ├── ModelSection.tsx
+│   │   │   │   │   │   │   ├── SnippetsSection.tsx
+│   │   │   │   │   │   │   ├── StyleSection.tsx
 │   │   │   │   │   │   │   └── TranscriptionSection.tsx
 │   │   │   │   │   │   ├── categories.ts
 │   │   │   │   │   │   ├── HardwareProfileDisplay.tsx
@@ -225,13 +257,19 @@ Files: 386
 │   │   ├── main
 │   │   │   ├── ipc
 │   │   │   │   ├── handlers.js
-│   │   │   │   └── hotkeyHandlers.js
+│   │   │   │   ├── handlers.test.js
+│   │   │   │   ├── hotkeyHandlers.js
+│   │   │   │   ├── hotkeyStopPolicy.js
+│   │   │   │   └── hotkeyStopPolicy.test.js
 │   │   │   ├── services
 │   │   │   │   ├── backendSpawn.js
+│   │   │   │   ├── holdModeHotkeys.js
+│   │   │   │   ├── holdModeHotkeys.test.js
 │   │   │   │   └── textInjector.js
 │   │   │   ├── shared
 │   │   │   │   ├── generated
 │   │   │   │   │   └── appMeta.js
+│   │   │   │   ├── iconPaths.js
 │   │   │   │   └── state.js
 │   │   │   ├── utils
 │   │   │   │   └── api.js
@@ -251,6 +289,7 @@ Files: 386
 │   │   │   ├── model-download-manager.js
 │   │   │   ├── model-download-manager.test.js
 │   │   │   ├── preload-floating.js
+│   │   │   ├── preload-floating.test.js
 │   │   │   ├── preload-quick-settings.js
 │   │   │   └── preload.js
 │   │   ├── scripts
@@ -273,6 +312,8 @@ Files: 386
 │   ├── storage
 │   │   ├── __init__.py
 │   │   ├── document_store.py
+│   │   ├── history_db.py
+│   │   ├── migrations.py
 │   │   ├── session_store.py
 │   │   └── session_writer.py
 │   ├── stt
@@ -303,11 +344,9 @@ Files: 386
 │   ├── api
 │   │   └── endpoints.md
 │   ├── architecture
-│   │   ├── MODEL_SYSTEM.md
-│   │   └── OPTIMIZATION_ROADMAP.md
-│   ├── audits
-│   │   ├── performance-audit.md
-│   │   └── security-audit.md
+│   │   └── MODEL_SYSTEM.md
+│   ├── branding
+│   │   └── brand-assets.md
 │   ├── debug
 │   │   └── floating-window-regression.md
 │   ├── deployment
@@ -335,8 +374,6 @@ Files: 386
 │   │   └── features.md
 │   ├── _inventory.yml
 │   ├── _style.md
-│   ├── config-reference.md
-│   ├── features.md
 │   ├── pnpm-lock.yaml
 │   ├── README.md
 │   └── troubleshooting.md
@@ -353,12 +390,12 @@ Files: 386
 │   │   ├── 2026-03-02-security-audit.md
 │   │   └── 2026-03-04-optimization-roadmap.md
 │   ├── changes-since-last-commit.md
-│   ├── docs-refresh-2026-03-04.md
 │   ├── docs-update-2026-03-04.md
 │   └── tree.txt
 ├── scripts
 │   ├── build.py
 │   ├── dev.cjs
+│   ├── generate_brand_assets.py
 │   ├── generate-changes-since-last-commit.cjs
 │   ├── generate-tree.cjs
 │   ├── run-backend-dev.cjs
@@ -368,6 +405,8 @@ Files: 386
 │       ├── agents
 │       │   └── openai.yaml
 │       └── SKILL.md
+├── test-results
+│   └── junit.xml
 ├── tests
 │   ├── integration
 │   │   ├── __init__.py
@@ -410,6 +449,7 @@ Files: 386
 │   ├── test_fixes.py
 │   ├── test_flow_control.py
 │   ├── test_formula_extraction_contract.py
+│   ├── test_generate_brand_assets.py
 │   ├── test_gpu_fallback.py
 │   ├── test_hotkey_service_lifecycle.py
 │   ├── test_hotkey_session.py
@@ -455,14 +495,10 @@ Files: 386
 │   └── runner.py
 ├── .env.example
 ├── .gitignore
-├── agent_engine.md
 ├── AGENTS.md
-├── CHANGELOG.md
-├── coach_cache.json
 ├── CONTRIBUTING.md
 ├── LICENSE
 ├── package.json
-├── pnpm-lock.yaml
 ├── pyproject.toml
 ├── README.md
 └── requirements.txt

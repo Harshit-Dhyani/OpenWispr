@@ -1,4 +1,4 @@
-# Transcripta
+# OpenWispr
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
@@ -8,7 +8,7 @@
 
 > **Last Updated:** March 5, 2026
 
-Transcripta is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
+OpenWispr is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
 
 ## Key Features
 
@@ -163,7 +163,7 @@ Transcripta is a production-grade desktop application for real-time speech-to-te
 ```powershell
 # Clone repository
 git clone <repo-url>
-cd Transcripta
+cd OpenWispr
 
 # Create virtual environment
 python -m venv .venv
@@ -253,7 +253,7 @@ $env:TRANSCRIPTA_LOG_LEVEL='DEBUG'  # DEBUG, INFO, WARN, ERROR
 
 User settings stored in:
 ```
-%APPDATA%\Transcripta\settings.json
+%APPDATA%\OpenWispr\settings.json
 ```
 
 Or project root:
@@ -265,7 +265,7 @@ user_settings.json
 
 Downloaded models stored in:
 ```
-%APPDATA%\Transcripta\models\
+%APPDATA%\OpenWispr\models\
 ├── asr\
 │   ├── faster-whisper-tiny\
 │   ├── faster-whisper-small\
@@ -410,7 +410,7 @@ app/
 ### Project Structure
 
 ```
-Transcripta/
+OpenWispr/
 ├── app/
 │   ├── api/           # REST API, WebSocket, settings sync
 │   ├── audio/         # Audio capture, processing, backends
@@ -440,4 +440,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-**Transcripta** - Local-first transcription for Windows 11
+**OpenWispr** - Local-first transcription for Windows 11
+

@@ -10,9 +10,9 @@ source_of_truth:
   - app/stt/fast_engine.py
 ---
 
-# Transcripta Features Documentation
+# OpenWispr Features Documentation
 
-Comprehensive documentation of Transcripta's features, capabilities, and implementation details.
+Comprehensive documentation of OpenWispr's features, capabilities, and implementation details.
 
 ---
 
@@ -35,7 +35,7 @@ Comprehensive documentation of Transcripta's features, capabilities, and impleme
 
 ## Transcription Modes
 
-Transcripta provides two distinct transcription modes optimized for different use cases.
+OpenWispr provides two distinct transcription modes optimized for different use cases.
 
 ### 1. Hotkey Mode (Wispr)
 
@@ -183,7 +183,7 @@ Speech-to-Text processing using optimized Whisper inference.
 
 ### faster-whisper Backend
 
-Transcripta uses `faster-whisper` (CTranslate2) for efficient inference.
+OpenWispr uses `faster-whisper` (CTranslate2) for efficient inference.
 
 **Key Features:**
 
@@ -247,7 +247,7 @@ Automatic quality assessment and filtering:
 
 ## Models
 
-Transcripta supports 6 Whisper model sizes with automatic optimization.
+OpenWispr supports 6 Whisper model sizes with automatic optimization.
 
 ### Model Catalog (app/core/model_catalog.py)
 
@@ -550,4 +550,4 @@ session/
 
 ---
 
-*Documentation generated from Transcripta source code. Last updated: March 2026.*
+*Documentation generated from OpenWispr source code. Last updated: March 2026.*

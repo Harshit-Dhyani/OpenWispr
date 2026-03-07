@@ -10,7 +10,7 @@ source_of_truth:
 
 # System Architecture
 
-Transcripta uses a multi-process Electron architecture with a Python FastAPI backend for transcription services.
+OpenWispr uses a multi-process Electron architecture with a Python FastAPI backend for transcription services.
 
 ## Process Model
 

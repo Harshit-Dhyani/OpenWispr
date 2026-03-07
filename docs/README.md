@@ -7,9 +7,9 @@ source_of_truth:
   - README.md
 ---
 
-# Transcripta Documentation Hub
+# OpenWispr Documentation Hub
 
-> Complete documentation for the Transcripta desktop transcription application.  
+> Complete documentation for the OpenWispr desktop transcription application.  
 > **Last Updated:** March 5, 2026  
 > **Version:** 1.0.0
 
@@ -22,7 +22,7 @@ Choose your path based on your role:
 ### New Users
 📖 [Main README](../README.md) → 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
-**Start here if you're new to Transcripta.** Learn what the app does, install it, and resolve common issues.
+**Start here if you're new to OpenWispr.** Learn what the app does, install it, and resolve common issues.
 
 ### Developers
 🏗️ [Architecture Overview](./engineering/architecture-overview.md) → 🔌 [API Reference](./api/endpoints.md) → 🤝 [Contributing Guidelines](../CONTRIBUTING.md)
@@ -32,7 +32,7 @@ Choose your path based on your role:
 ### Operators
 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → ⚙️ [Operations Guide](./operations/OPERATIONS.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
-**For system administrators.** Deploy, monitor, and maintain Transcripta in production.
+**For system administrators.** Deploy, monitor, and maintain OpenWispr in production.
 
 ---
 
@@ -149,4 +149,4 @@ Choose your path based on your role:
 
 ---
 
-*This documentation hub is maintained by the Transcripta team.*
+*This documentation hub is maintained by the OpenWispr team.*

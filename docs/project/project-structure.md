@@ -10,12 +10,12 @@ source_of_truth:
 
 # Project Structure
 
-This document outlines the organized project structure for Transcripta.
+This document outlines the organized project structure for OpenWispr.
 
 ## Directory Layout
 
 ```
-Transcripta/
+OpenWispr/
 ├── app/                          # Python backend and Electron desktop app
 │   ├── api/                      # FastAPI endpoints, WebSocket, SSE, services
 │   │   ├── server.py             # Main API server entry

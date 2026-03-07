@@ -8,7 +8,7 @@ source_of_truth:
   - app/core/logging_utils.py
 ---
 
-# Transcripta Security Documentation
+# OpenWispr Security Documentation
 
 **Scope:** Local-first desktop application (Electron + FastAPI backend)  
 **Owner:** Security + Backend Team
@@ -59,7 +59,7 @@ source_of_truth:
 
 ### 2.1 Permission Model
 
-Transcripta requires audio capture permissions for:
+OpenWispr requires audio capture permissions for:
 - Microphone input (dictation mode)
 - System audio loopback (system transcription)
 
@@ -193,7 +193,7 @@ ASR models (Whisper) are loaded via `faster-whisper` which:
 
 ### 5.1 No External Secrets
 
-Transcripta is a fully local application with no cloud services requiring:
+OpenWispr is a fully local application with no cloud services requiring:
 - No API keys stored
 - No authentication tokens
 - No remote credentials
