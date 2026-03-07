@@ -93,7 +93,7 @@ from app.api.websocket_server import (
     ConnectionConfig,
     get_websocket_manager,
 )
-from app.api.settings_sync import (
+from app.api.transport.settings_sync import (
     SettingsSynchronizer,
     SyncConfig,
     SyncDirection,
@@ -3132,3 +3132,4 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
