@@ -3,7 +3,7 @@
 # Each entry includes ownership, audience, verification status, and source of truth.
 
 schema_version: 1
-last_updated: 2026-03-04
+last_updated: 2026-03-07
 
 docs:
   - path: README.md
@@ -30,6 +30,17 @@ docs:
     critical: true
 
 ## Project Documentation
+
+  - path: project/folder-ownership.md
+    title: Folder Ownership
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+      - docs/
+    critical: false
 
   - path: project/project-structure.md
     title: Project Structure
@@ -120,6 +131,19 @@ docs:
       - app/stt/fast_engine.py
     critical: true
 
+## Branding
+
+  - path: branding/brand-assets.md
+    title: Brand Asset Pipeline
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - scripts/generate_brand_assets.py
+      - package.json
+    critical: false
+
 ## Engineering Documentation
 
   - path: engineering/contributing-docs.md
@@ -140,7 +164,7 @@ docs:
     last_verified: 2026-03-04
     review_cadence: monthly
     source_of_truth:
-      - app/electron/main/preload.js
+      - app/electron/main/preload/main.js
       - app/api/websocket_server.py
       - app/api/server.py
       - app/electron/main/ipc/handlers.js
@@ -154,7 +178,6 @@ docs:
     review_cadence: quarterly
     source_of_truth:
       - app/electron/main/index.js
-      - app/electron/main/main.js
       - app/electron/main/shared/state.js
     critical: true
 
@@ -180,7 +203,7 @@ docs:
       - app/core/model_catalog.py
       - app/api/model_service.py
       - app/stt/model_pool.py
-      - app/electron/main/model-download-manager.js
+      - app/electron/main/services/modelDownloadManager.js
       - app/core/system_profiler.py
     critical: true
 
@@ -204,7 +227,7 @@ docs:
     review_cadence: quarterly
     source_of_truth:
       - app/api/server.py
-      - app/electron/main/preload.js
+      - app/electron/main/preload/main.js
       - app/core/logging_utils.py
     critical: false
 
@@ -291,4 +314,46 @@ docs:
     source_of_truth:
       - app/electron/main/windows/floatingWindow.js
       - app/electron/main/ipc/hotkeyHandlers.js
+    critical: false
+
+  - path: engineering/folder-ownership.md
+    title: Folder Ownership
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+      - docs/
+    critical: false
+
+  - path: engineering/restructure-audit.md
+    title: Restructure Audit
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+    critical: false
+
+  - path: engineering/restructure-discovery.md
+    title: Restructure Discovery
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+    critical: false
+
+  - path: engineering/settings-source-of-truth.md
+    title: Settings Source of Truth
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-07
+    review_cadence: quarterly
+    source_of_truth:
+      - app/config/settings.py
+      - app/config/text.py
     critical: false

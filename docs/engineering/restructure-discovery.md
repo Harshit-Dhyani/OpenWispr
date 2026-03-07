@@ -1,3 +1,14 @@
+---
+title: Restructure Discovery
+owner: docs/ux
+audience: developers
+last_verified: 2026-03-07
+review_cadence: quarterly
+source_of_truth:
+  - app/
+critical: false
+---
+
 # Restructure Discovery
 
 This document is the verified starting point for the OpenWispr cleanup program. It is intentionally limited to architecture mapping, ownership, risk boundaries, and safe first moves.
@@ -10,11 +21,11 @@ This document is the verified starting point for the OpenWispr cleanup program. 
 - Python API entry: `app/api_main.py`
 - Backend app module: `app/api/server.py`
 - Electron package entry: `app/electron/main/index.js`
-- Electron bootstrap: `app/electron/main/main.js`
+- Electron bootstrap: `app/electron/main/index.js`
 - Electron preloads:
-  - `app/electron/main/preload.js`
-  - `app/electron/main/preload-floating.js`
-  - `app/electron/main/preload-quick-settings.js`
+  - `app/electron/main/preload/main.js`
+  - `app/electron/main/preload/floating.js`
+  - `app/electron/main/preload/quickSettings.js`
 
 ### Layer map
 

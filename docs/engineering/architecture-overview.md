@@ -4,7 +4,6 @@ audience: developers
 last_verified: 2026-03-04
 source_of_truth:
   - app/electron/main/index.js
-  - app/electron/main/main.js
   - app/electron/main/shared/state.js
 ---
 
