@@ -145,7 +145,7 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel {...defaultProps} />);
 
     fireEvent.click(screen.getByText('Advanced'));
-    expect(screen.getByText('Transcripta')).toBeInTheDocument();
+    expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     expect(screen.queryByText('Electron')).not.toBeInTheDocument();
   });
 
@@ -156,8 +156,9 @@ describe('SettingsPanel', () => {
 
     expect(
       screen.getByText(
-        /Mute app audio during transcription|Mute App Audio During Dictation|Mute Transcripta renderer audio while microphone dictation is active/i,
+        /Mute app audio during transcription|Mute App Audio During Dictation|Mute OpenWispr renderer audio while microphone dictation is active/i,
       ),
     ).toBeInTheDocument();
   });
 });
+

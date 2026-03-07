@@ -61,3 +61,17 @@ def test_live_postprocess_stays_lightweight() -> None:
     result = postprocess_live_text(text, mode="dictation")
 
     assert result == "set threshold to zero point two three"
+
+
+def test_clean_dictation_profile_adds_light_punctuation_without_changing_numbers() -> None:
+    text = "deploy version two point one today"
+    result = postprocess_final_text(text, mode="dictation", profile="clean_dictation")
+
+    assert result == "Deploy version 2.1 today."
+
+
+def test_code_logs_profile_preserves_literal_style_without_sentence_punctuation() -> None:
+    text = "version two point one release candidate"
+    result = postprocess_final_text(text, mode="dictation", profile="code_logs")
+
+    assert result == "version 2.1 release candidate"

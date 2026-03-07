@@ -46,13 +46,16 @@ describe('MainContent coach panel', () => {
       />,
     );
 
-    expect(screen.getByText('Polished Output')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /show inspector/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coach/i }));
+
+    expect(screen.getByText('Coach Result')).toBeInTheDocument();
     expect(screen.getAllByText('I want to improve my English writing.').length).toBeGreaterThan(0);
     expect(screen.getByText('Capitalize the pronoun "I".')).toBeInTheDocument();
     expect(screen.getByText('Original')).toBeInTheDocument();
   });
 
-  it('does not pretend fallback transcript output is a generated coach result', () => {
+  it('renders fallback transcript output as fallback instead of a generated coach result', () => {
     render(
       <MainContent
         scope="dictation"
@@ -64,13 +67,19 @@ describe('MainContent coach panel', () => {
         })}
         coachStatus="fallback"
         coachResult={null}
+        coachDisplaySource="fallback"
         originalText="hello there this is the final transcript"
         pasteText="hello there this is the final transcript"
       />,
     );
 
-    expect(screen.getByText('Transcript Ready')).toBeInTheDocument();
-    expect(screen.queryByText('Polished Output')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /show inspector/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coach/i }));
+
+    expect(screen.getByText('Fallback Output')).toBeInTheDocument();
+    expect(screen.getByText('fallback')).toBeInTheDocument();
+    expect(screen.getByText(/deterministic fallback output/i)).toBeInTheDocument();
+    expect(screen.queryByText('Coach Failed')).not.toBeInTheDocument();
     expect(screen.queryByText('Tips')).not.toBeInTheDocument();
     expect(screen.getAllByText('hello there this is the final transcript').length).toBeGreaterThanOrEqual(2);
   });
@@ -92,6 +101,7 @@ describe('MainContent coach panel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /show inspector/i }));
     fireEvent.click(screen.getByRole('button', { name: /combined/i }));
 
     expect(screen.getByText('Combined Dictation')).toBeInTheDocument();
@@ -132,6 +142,9 @@ describe('MainContent coach panel', () => {
         pasteText="hello there"
       />,
     );
+
+    fireEvent.click(screen.getByRole('button', { name: /show inspector/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coach/i }));
 
     expect(screen.getByText('Edit Diff')).toBeInTheDocument();
     expect(screen.getByText('Replace')).toBeInTheDocument();

@@ -1,4 +1,4 @@
-"""E2E test configuration for Transcripta application.
+"""E2E test configuration for OpenWispr application.
 
 This module provides:
 - Automated Electron app launch and management
@@ -318,7 +318,7 @@ class ElectronAppController:
         elif system == "darwin":
             electron_paths = [
                 ELECTRON_DIR / "node_modules" / ".bin" / "electron",
-                "/Applications/Transcripta.app/Contents/MacOS/Transcripta",
+                "/Applications/OpenWispr.app/Contents/MacOS/OpenWispr",
             ]
         else:  # Linux
             electron_paths = [
@@ -915,4 +915,4 @@ def pytest_collection_modifyitems(config, items):
 
 def pytest_html_report_title(report):
     """Set HTML report title."""
-    report.title = "Transcripta E2E Test Report"
+    report.title = "OpenWispr E2E Test Report"

@@ -60,7 +60,7 @@ const createMockHotkeyApi = (overrides = {}) => ({
 describe('HotkeySettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(window, 'transcriptaDesktop', {
+    Object.defineProperty(window, 'openwisprDesktop', {
       writable: true,
       value: {
         hotkey: createMockHotkeyApi(),
@@ -107,7 +107,7 @@ describe('HotkeySettings', () => {
         session: { ...mockHotkeyState.session, is_recording: true },
       };
 
-      Object.defineProperty(window, 'transcriptaDesktop', {
+      Object.defineProperty(window, 'openwisprDesktop', {
         writable: true,
         value: {
           hotkey: createMockHotkeyApi({
@@ -334,7 +334,7 @@ describe('HotkeySettings', () => {
 
     it('calls register API when clicking register button', async () => {
       const registerMock = vi.fn().mockResolvedValue({ success: true });
-      Object.defineProperty(window, 'transcriptaDesktop', {
+      Object.defineProperty(window, 'openwisprDesktop', {
         writable: true,
         value: {
           hotkey: createMockHotkeyApi({
@@ -397,7 +397,7 @@ describe('HotkeySettings', () => {
 
   describe('Error Handling', () => {
     it('displays error when API fails', async () => {
-      Object.defineProperty(window, 'transcriptaDesktop', {
+      Object.defineProperty(window, 'openwisprDesktop', {
         writable: true,
         value: {
           hotkey: createMockHotkeyApi({
@@ -439,7 +439,7 @@ describe('HotkeySettings', () => {
 
     it('refreshes state when clicking refresh button', async () => {
       const getStateMock = vi.fn().mockResolvedValue(mockHotkeyState);
-      Object.defineProperty(window, 'transcriptaDesktop', {
+      Object.defineProperty(window, 'openwisprDesktop', {
         writable: true,
         value: {
           hotkey: createMockHotkeyApi({
@@ -466,7 +466,7 @@ describe('HotkeySettings', () => {
 describe('HotkeySettings Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(window, 'transcriptaDesktop', {
+    Object.defineProperty(window, 'openwisprDesktop', {
       writable: true,
       value: {
         hotkey: createMockHotkeyApi(),

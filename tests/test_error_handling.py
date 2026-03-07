@@ -1194,7 +1194,7 @@ class TestEdgeCases:
         strategy = DiskFullRecoveryStrategy()
 
         # Create temp directory with files
-        temp_dir = tmp_path / ".transcripta" / "temp"
+        temp_dir = tmp_path / ".openwispr" / "temp"
         temp_dir.mkdir(parents=True)
         (temp_dir / "temp_file.bin").write_bytes(b"x" * 1024 * 1024 * 20)  # 20MB
 

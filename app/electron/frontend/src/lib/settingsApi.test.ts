@@ -202,7 +202,7 @@ describe('settingsApi', () => {
 
       expect(result.settings).toEqual(mockSettings);
       expect(result.version).toBe('1.0.0');
-      expect(result.source).toBe('Transcripta');
+      expect(result.source).toBe('OpenWispr');
       expect(result.exportedAt).toBeDefined();
     });
   });
@@ -219,7 +219,7 @@ describe('settingsApi', () => {
         settings: mockSettings,
         exportedAt: new Date().toISOString(),
         version: '1.0.0',
-        source: 'Transcripta',
+        source: 'OpenWispr',
       });
 
       const blob = new Blob([fileContent], { type: 'application/json' });
@@ -417,3 +417,4 @@ describe('settingsApi', () => {
     });
   });
 });
+

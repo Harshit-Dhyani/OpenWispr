@@ -16,7 +16,7 @@ describe('useHotkey', () => {
     vi.clearAllMocks();
 
     // Setup mock hotkey API
-    window.transcriptaDesktop.hotkey = mockHotkeyApi;
+    window.openwisprDesktop.hotkey = mockHotkeyApi;
 
     // Default mock implementations
     mockHotkeyApi.getState.mockResolvedValue(createMockHotkeyState());
@@ -135,7 +135,7 @@ describe('useHotkey', () => {
   });
 
   it('shows floating window', async () => {
-    window.transcriptaDesktop.floatingWindow = {
+    window.openwisprDesktop.floatingWindow = {
       show: vi.fn().mockResolvedValue(undefined),
       hide: vi.fn().mockResolvedValue(undefined),
     };
@@ -150,11 +150,11 @@ describe('useHotkey', () => {
       await result.current.showFloatingWindow();
     });
 
-    expect(window.transcriptaDesktop.floatingWindow.show).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.show).toHaveBeenCalled();
   });
 
   it('hides floating window', async () => {
-    window.transcriptaDesktop.floatingWindow = {
+    window.openwisprDesktop.floatingWindow = {
       show: vi.fn().mockResolvedValue(undefined),
       hide: vi.fn().mockResolvedValue(undefined),
     };
@@ -169,7 +169,7 @@ describe('useHotkey', () => {
       await result.current.hideFloatingWindow();
     });
 
-    expect(window.transcriptaDesktop.floatingWindow.hide).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.hide).toHaveBeenCalled();
   });
 
   it('triggers onActivated callback when hotkey activates', async () => {
@@ -348,7 +348,7 @@ describe('useHotkey', () => {
   });
 
   it('handles test hotkey flow', async () => {
-    window.transcriptaDesktop.floatingWindow = {
+    window.openwisprDesktop.floatingWindow = {
       show: vi.fn().mockResolvedValue(undefined),
       hide: vi.fn().mockResolvedValue(undefined),
     };
@@ -368,14 +368,14 @@ describe('useHotkey', () => {
     });
 
     expect(mockHotkeyApi.toggle).toHaveBeenCalledWith(true);
-    expect(window.transcriptaDesktop.floatingWindow.show).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.show).toHaveBeenCalled();
 
     // Fast-forward timers to trigger hide
     act(() => {
       vi.advanceTimersByTime(3000);
     });
 
-    expect(window.transcriptaDesktop.floatingWindow.hide).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.hide).toHaveBeenCalled();
 
     vi.useRealTimers();
   });
@@ -399,8 +399,8 @@ describe('useHotkey', () => {
 
   it('handles missing hotkey API gracefully', async () => {
     // Remove hotkey API temporarily
-    const originalHotkey = window.transcriptaDesktop.hotkey;
-    window.transcriptaDesktop.hotkey = undefined as unknown as typeof window.transcriptaDesktop.hotkey;
+    const originalHotkey = window.openwisprDesktop.hotkey;
+    window.openwisprDesktop.hotkey = undefined as unknown as typeof window.openwisprDesktop.hotkey;
 
     const { result } = renderHook(() => useHotkey());
 
@@ -408,6 +408,6 @@ describe('useHotkey', () => {
     expect(result.current.isLoading).toBe(true);
 
     // Restore
-    window.transcriptaDesktop.hotkey = originalHotkey;
+    window.openwisprDesktop.hotkey = originalHotkey;
   });
 });

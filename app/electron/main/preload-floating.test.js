@@ -55,7 +55,7 @@ test("preload-floating reads strings from sync IPC", () => {
   });
 
   assert.equal(channel, "floating:get-strings");
-  assert.deepEqual(exposed.transcriptaFloating.strings, floating);
+  assert.deepEqual(exposed.openwisprFloating.strings, floating);
 });
 
 test("preload-floating falls back when IPC string resolution fails", () => {
@@ -70,7 +70,7 @@ test("preload-floating falls back when IPC string resolution fails", () => {
     });
 
     assert.equal(
-      exposed.transcriptaFloating.strings.waitingForSpeech,
+      exposed.openwisprFloating.strings.waitingForSpeech,
       "Waiting for speech...",
     );
   } finally {

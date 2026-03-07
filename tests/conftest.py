@@ -1,4 +1,4 @@
-"""Comprehensive pytest configuration for Transcripta backend testing.
+"""Comprehensive pytest configuration for OpenWispr backend testing.
 
 This module provides fixtures for:
 - Audio pipeline testing

@@ -37,7 +37,7 @@ describe('App', () => {
     });
 
     // Mock Electron API
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       switch (true) {
         case path === '/api/settings':
           return Promise.resolve(createMockSettings());
@@ -59,18 +59,28 @@ describe('App', () => {
             refinement_mode: 'off',
             recommendations: ['small'],
           });
+        case path === '/api/style/profiles':
+          return Promise.resolve({
+            profiles: [],
+            assignments: {
+              personal: null,
+              work: null,
+              email: null,
+              other: null,
+            },
+          });
         default:
           return Promise.resolve({});
       }
     });
 
-    window.transcriptaDesktop.hotkey.getState.mockResolvedValue({
+    window.openwisprDesktop.hotkey.getState.mockResolvedValue({
       config: { enabled: false, key_combination: 'Ctrl+Shift+Space' },
     });
 
-    window.transcriptaDesktop.models.onDownloadEvent.mockReturnValue(vi.fn());
-    window.transcriptaDesktop.onBackendExit.mockReturnValue(vi.fn());
-    window.transcriptaDesktop.onOpenSettings.mockReturnValue(vi.fn());
+    window.openwisprDesktop.models.onDownloadEvent.mockReturnValue(vi.fn());
+    window.openwisprDesktop.onBackendExit.mockReturnValue(vi.fn());
+    window.openwisprDesktop.onOpenSettings.mockReturnValue(vi.fn());
   });
 
   afterEach(() => {
@@ -82,9 +92,10 @@ describe('App', () => {
       render(<App />);
     });
 
-    expect(screen.getByText('Transcripta')).toBeInTheDocument();
+    expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     expect(screen.getByText('Microphone')).toBeInTheDocument();
     expect(screen.getByText('System Audio')).toBeInTheDocument();
+    expect(screen.queryByText('Style')).not.toBeInTheDocument();
   });
 
   it('displays loading state initially', async () => {
@@ -101,7 +112,7 @@ describe('App', () => {
       general: { defaultSessionTitle: 'Test Session' },
     });
 
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/settings') {
         return Promise.resolve(mockSettings);
       }
@@ -113,7 +124,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith('/api/settings', undefined);
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith('/api/settings', undefined);
     });
   });
 
@@ -123,13 +134,13 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith('/api/devices', undefined);
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith('/api/devices', undefined);
     });
   });
 
   it('handles backend exit gracefully', async () => {
     let backendExitHandler: (() => void) | null = null;
-    window.transcriptaDesktop.onBackendExit.mockImplementation((handler: () => void) => {
+    window.openwisprDesktop.onBackendExit.mockImplementation((handler: () => void) => {
       backendExitHandler = handler;
       return vi.fn();
     });
@@ -157,7 +168,7 @@ describe('App', () => {
 
     // Wait for app to load
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Find and click settings button
@@ -171,8 +182,27 @@ describe('App', () => {
     });
   });
 
+    it('keeps writing tone controls inside settings only', async () => {
+    await act(async () => {
+      render(<App />);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Style')).not.toBeInTheDocument();
+    });
+
+    act(() => {
+      fireEvent.click(screen.getByTitle(/open settings/i));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+      expect(screen.getByText('Writing Tone')).toBeInTheDocument();
+      expect(screen.queryByText(/open style editor/i)).not.toBeInTheDocument();
+    });
+  });
   it('handles session start', async () => {
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       switch (true) {
         case path === '/api/session/start':
           return Promise.resolve({ success: true });
@@ -197,7 +227,7 @@ describe('App', () => {
       general: { theme: 'dark' },
     });
 
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/settings') {
         return Promise.resolve(mockSettings);
       }
@@ -249,7 +279,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.hotkey.updateConfig).toHaveBeenCalledWith(
+      expect(window.openwisprDesktop.hotkey.updateConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           enabled: expect.any(Boolean),
           key_combination: expect.any(String),
@@ -264,7 +294,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     const refreshButton = screen.getByTitle(/refresh devices/i);
@@ -273,12 +303,12 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith('/api/devices', undefined);
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith('/api/devices', undefined);
     });
   });
 
   it('handles model preloading', async () => {
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/models/preload') {
         return Promise.resolve({ success: true });
       }
@@ -290,7 +320,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
   });
 
@@ -313,13 +343,13 @@ describe('App', () => {
         } | null | undefined) => void)
       | undefined;
 
-    window.transcriptaDesktop.hotkey.onStateChange.mockImplementation((handler) => {
+    window.openwisprDesktop.hotkey.onStateChange.mockImplementation((handler) => {
       hotkeyStateListener = handler;
       return vi.fn();
     });
 
-    window.transcriptaDesktop.hotkey.start.mockResolvedValue({ success: true });
-    window.transcriptaDesktop.hotkey.stop.mockResolvedValue({ success: true });
+    window.openwisprDesktop.hotkey.start.mockResolvedValue({ success: true });
+    window.openwisprDesktop.hotkey.stop.mockResolvedValue({ success: true });
 
     await act(async () => {
       render(<App />);
@@ -336,7 +366,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.hotkey.start).toHaveBeenCalledTimes(1);
+      expect(window.openwisprDesktop.hotkey.start).toHaveBeenCalledTimes(1);
     });
 
     act(() => {
@@ -363,7 +393,7 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.hotkey.stop).toHaveBeenCalledTimes(1);
+      expect(window.openwisprDesktop.hotkey.stop).toHaveBeenCalledTimes(1);
     });
 
     act(() => {
@@ -390,31 +420,31 @@ describe('App', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.hotkey.start).toHaveBeenCalledTimes(2);
+      expect(window.openwisprDesktop.hotkey.start).toHaveBeenCalledTimes(2);
     });
   });
 
   it('handles PDF attachment', async () => {
-    window.transcriptaDesktop.choosePdf.mockResolvedValue('/path/to/file.pdf');
+    window.openwisprDesktop.choosePdf.mockResolvedValue('/path/to/file.pdf');
 
     await act(async () => {
       render(<App />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
   });
 
   it('handles directory selection', async () => {
-    window.transcriptaDesktop.chooseDirectory.mockResolvedValue('/new/export/path');
+    window.openwisprDesktop.chooseDirectory.mockResolvedValue('/new/export/path');
 
     await act(async () => {
       render(<App />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
   });
 
@@ -429,7 +459,7 @@ describe('App', () => {
   });
 
   it('stays stable when backend health reports an error', async () => {
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       switch (true) {
         case path === '/api/settings':
           return Promise.resolve(createMockSettings());
@@ -452,6 +482,16 @@ describe('App', () => {
             selected_asr_model_id: 'small',
             refinement_mode: 'off',
             recommendations: ['small'],
+          });
+        case path === '/api/style/profiles':
+          return Promise.resolve({
+            profiles: [],
+            assignments: {
+              personal: null,
+              work: null,
+              email: null,
+              other: null,
+            },
           });
         default:
           return Promise.resolve({});
@@ -486,3 +526,7 @@ describe('App', () => {
     });
   });
 });
+
+
+
+

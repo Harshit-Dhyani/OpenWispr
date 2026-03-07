@@ -15,7 +15,7 @@ describe('useHotkey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    Object.defineProperty(window, 'transcriptaDesktop', {
+    Object.defineProperty(window, 'openwisprDesktop', {
       writable: true,
       value: {
         hotkey: mockHotkeyApi,
@@ -133,7 +133,7 @@ describe('useHotkey', () => {
       await result.current.showFloatingWindow();
     });
 
-    expect(window.transcriptaDesktop.floatingWindow.show).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.show).toHaveBeenCalled();
   });
 
   it('hides floating window when hideFloatingWindow is called', async () => {
@@ -149,7 +149,7 @@ describe('useHotkey', () => {
       await result.current.hideFloatingWindow();
     });
 
-    expect(window.transcriptaDesktop.floatingWindow.hide).toHaveBeenCalled();
+    expect(window.openwisprDesktop.floatingWindow.hide).toHaveBeenCalled();
   });
 
   it('handles errors gracefully', async () => {

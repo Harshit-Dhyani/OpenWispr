@@ -58,7 +58,7 @@ describe('Sidebar', () => {
     
     expect(screen.getByText('Session Setup')).toBeInTheDocument();
     expect(screen.getByText('Local Transcription')).toBeInTheDocument();
-    expect(screen.getByText('Transcripta')).toBeInTheDocument();
+    expect(screen.getByText('OpenWispr')).toBeInTheDocument();
   });
 
   it('displays ready status when backend is ready', () => {
@@ -218,3 +218,4 @@ describe('Sidebar', () => {
     expect(screen.getByText('Test warning')).toBeInTheDocument();
   });
 });
+

@@ -5,7 +5,9 @@ from pathlib import Path, PureWindowsPath
 
 
 def test_windows_style_session_paths_round_trip_cleanly(tmp_path: Path):
-    session_path = PureWindowsPath(r"C:\Users\tester\AppData\Local\Transcripta\sessions\demo-001.json")
+    session_path = PureWindowsPath(
+        r"C:\Users\tester\AppData\Local\OpenWispr\sessions\demo-001.json"
+    )
     assert session_path.drive == "C:"
     assert session_path.parts[-2:] == ("sessions", "demo-001.json")
 
@@ -18,7 +20,7 @@ def test_windows_style_session_paths_round_trip_cleanly(tmp_path: Path):
 
 
 def test_local_temp_workspace_is_writable_for_offline_runs(tmp_path: Path):
-    artifact = tmp_path / "transcripta-local" / "run.log"
+    artifact = tmp_path / "openwispr-local" / "run.log"
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text("ok", encoding="utf-8")
 

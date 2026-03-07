@@ -67,8 +67,8 @@ export type MockFloatingAPI = {
 
 declare global {
   interface Window {
-    transcriptaDesktop: MockElectronAPI;
-    transcriptaFloating: MockFloatingAPI;
+    openwisprDesktop: MockElectronAPI;
+    openwisprFloating: MockFloatingAPI;
   }
 }
 
@@ -141,12 +141,12 @@ function createMockFloatingAPI(): MockFloatingAPI {
 }
 
 // Setup mock implementations on window
-Object.defineProperty(window, 'transcriptaDesktop', {
+Object.defineProperty(window, 'openwisprDesktop', {
   writable: true,
   value: createMockElectronAPI(),
 });
 
-Object.defineProperty(window, 'transcriptaFloating', {
+Object.defineProperty(window, 'openwisprFloating', {
   writable: true,
   value: createMockFloatingAPI(),
 });
@@ -456,11 +456,11 @@ export function resetAllMocks() {
 
   // Reset Electron API mocks
   const electronApi = createMockElectronAPI();
-  Object.assign(window.transcriptaDesktop, electronApi);
+  Object.assign(window.openwisprDesktop, electronApi);
 
   // Reset Floating API mocks
   const floatingApi = createMockFloatingAPI();
-  Object.assign(window.transcriptaFloating, floatingApi);
+  Object.assign(window.openwisprFloating, floatingApi);
 
   // Clear storage
   localStorageMock.getItem.mockReturnValue(null);
@@ -475,7 +475,7 @@ export function mockElectronResponse(
   response: unknown,
   shouldReject = false
 ) {
-  const api = window.transcriptaDesktop;
+  const api = window.openwisprDesktop;
 
   if (method === 'fetchJson') {
     api.fetchJson.mockImplementation(() =>

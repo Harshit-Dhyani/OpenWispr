@@ -200,7 +200,7 @@ class TestHotkeySessionConfig:
         """Test default output directory creation."""
         config = HotkeySessionConfig()
         assert config.output_dir is not None
-        assert ".transcripta" in str(config.output_dir)
+        assert ".openwispr" in str(config.output_dir)
         assert "hotkey_sessions" in str(config.output_dir)
 
 

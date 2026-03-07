@@ -1,6 +1,6 @@
 # Frontend Testing Suite
 
-Comprehensive testing suite for the Transcripta Electron frontend application.
+Comprehensive testing suite for the OpenWispr Electron frontend application.
 
 ## Test Structure
 

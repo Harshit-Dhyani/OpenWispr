@@ -35,7 +35,7 @@ describe('Settings Integration Flow', () => {
       disconnect: mockDisconnect,
     });
 
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       switch (true) {
         case path === '/api/settings':
           return Promise.resolve(createMockSettings());
@@ -58,7 +58,7 @@ describe('Settings Integration Flow', () => {
       }
     });
 
-    window.transcriptaDesktop.hotkey.getState.mockResolvedValue({
+    window.openwisprDesktop.hotkey.getState.mockResolvedValue({
       config: { enabled: false },
     });
   });
@@ -70,7 +70,7 @@ describe('Settings Integration Flow', () => {
   it('completes full settings change and save flow', async () => {
     // Setup save handler
     let savedSettings: SettingsState | null = null;
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string, options?: RequestInit) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string, options?: RequestInit) => {
       if (path === '/api/settings' && options?.method === 'POST') {
         savedSettings = JSON.parse(options.body as string) as SettingsState;
         return Promise.resolve({ success: true });
@@ -84,7 +84,7 @@ describe('Settings Integration Flow', () => {
 
     // Wait for app to load
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Open settings
@@ -125,7 +125,7 @@ describe('Settings Integration Flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Open settings
@@ -153,14 +153,14 @@ describe('Settings Integration Flow', () => {
   it('validates settings before saving', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    window.transcriptaDesktop.fetchJson.mockRejectedValue(new Error('Validation failed'));
+    window.openwisprDesktop.fetchJson.mockRejectedValue(new Error('Validation failed'));
 
     await act(async () => {
       render(<App />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Save should fail gracefully
@@ -178,11 +178,11 @@ describe('Settings Integration Flow', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.hotkey.updateConfig).toHaveBeenCalled();
+      expect(window.openwisprDesktop.hotkey.updateConfig).toHaveBeenCalled();
     });
 
     // Should include all hotkey configuration
-    expect(window.transcriptaDesktop.hotkey.updateConfig).toHaveBeenCalledWith(
+    expect(window.openwisprDesktop.hotkey.updateConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         enabled: expect.any(Boolean),
         key_combination: expect.any(String),
@@ -193,7 +193,7 @@ describe('Settings Integration Flow', () => {
   });
 
   it('handles settings reset', async () => {
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/settings/reset') {
         return Promise.resolve({ success: true });
       }
@@ -205,7 +205,7 @@ describe('Settings Integration Flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Open settings
@@ -229,7 +229,7 @@ describe('Settings Integration Flow', () => {
       });
 
       await waitFor(() => {
-        expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith(
+        expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith(
           '/api/settings/reset',
           expect.objectContaining({ method: 'POST' })
         );
@@ -239,7 +239,7 @@ describe('Settings Integration Flow', () => {
 
   it('handles multiple rapid setting changes', async () => {
     const saveCalls: unknown[] = [];
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string, options?: RequestInit) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string, options?: RequestInit) => {
       if (path === '/api/settings' && options?.method === 'POST') {
         saveCalls.push(JSON.parse(options.body as string));
       }
@@ -251,7 +251,7 @@ describe('Settings Integration Flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Rapid theme changes should be debounced
@@ -280,7 +280,7 @@ describe('Transcription Flow Integration', () => {
       disconnect: mockDisconnect,
     });
 
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       switch (true) {
         case path === '/api/settings':
           return Promise.resolve(createMockSettings());
@@ -307,7 +307,7 @@ describe('Transcription Flow Integration', () => {
       }
     });
 
-    window.transcriptaDesktop.hotkey.getState.mockResolvedValue({
+    window.openwisprDesktop.hotkey.getState.mockResolvedValue({
       config: { enabled: false },
     });
   });
@@ -318,7 +318,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Click start button
@@ -328,7 +328,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith(
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith(
         '/api/session/start',
         expect.objectContaining({ method: 'POST' })
       );
@@ -337,7 +337,7 @@ describe('Transcription Flow Integration', () => {
 
   it('stops transcription session', async () => {
     // Start with running session
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/session') {
         return Promise.resolve(createMockSnapshot({
           session: { status: 'running' },
@@ -351,7 +351,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Click stop button
@@ -361,7 +361,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith(
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith(
         '/api/session/stop',
         expect.objectContaining({ method: 'POST' })
       );
@@ -435,7 +435,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Switch capture mode
@@ -444,11 +444,11 @@ describe('Transcription Flow Integration', () => {
       fireEvent.click(micButton);
     });
 
-    expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalled();
+    expect(window.openwisprDesktop.fetchJson).toHaveBeenCalled();
   });
 
   it('handles model preloading', async () => {
-    window.transcriptaDesktop.fetchJson.mockImplementation((path: string) => {
+    window.openwisprDesktop.fetchJson.mockImplementation((path: string) => {
       if (path === '/api/models/preload') {
         return Promise.resolve({ success: true });
       }
@@ -460,7 +460,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Transcripta')).toBeInTheDocument();
+      expect(screen.getByText('OpenWispr')).toBeInTheDocument();
     });
 
     // Click preload button
@@ -470,7 +470,7 @@ describe('Transcription Flow Integration', () => {
     });
 
     await waitFor(() => {
-      expect(window.transcriptaDesktop.fetchJson).toHaveBeenCalledWith(
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith(
         '/api/models/preload',
         expect.objectContaining({ method: 'POST' })
       );
@@ -504,3 +504,4 @@ describe('Transcription Flow Integration', () => {
     });
   });
 });
+

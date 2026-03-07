@@ -1,8 +1,8 @@
-# Backend Testing Suite for Transcripta
+# Backend Testing Suite for OpenWispr
 
 ## Overview
 
-This testing suite provides comprehensive coverage for the Transcripta Python backend.
+This testing suite provides comprehensive coverage for the OpenWispr Python backend.
 
 **Last Updated:** 2026-03-04
 

@@ -3,15 +3,15 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { FloatingWindow } from '../FloatingWindow';
 import type { HotkeyStopResponse } from '../../types/api';
 
-type RecordingHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onRecordingState']>[0];
-type TranscriptHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onTranscription']>[0];
-type AudioHandler = Parameters<NonNullable<Window['transcriptaFloating']>['onAudioVisualizer']>[0];
-type CoachResultHandler = NonNullable<Window['transcriptaFloating']>['onCoachResult'] extends (
+type RecordingHandler = Parameters<NonNullable<Window['openwisprFloating']>['onRecordingState']>[0];
+type TranscriptHandler = Parameters<NonNullable<Window['openwisprFloating']>['onTranscription']>[0];
+type AudioHandler = Parameters<NonNullable<Window['openwisprFloating']>['onAudioVisualizer']>[0];
+type CoachResultHandler = NonNullable<Window['openwisprFloating']>['onCoachResult'] extends (
   callback: infer T,
 ) => () => void
   ? T
   : never;
-type CoachResultClearHandler = NonNullable<Window['transcriptaFloating']>['onCoachResultClear'] extends (
+type CoachResultClearHandler = NonNullable<Window['openwisprFloating']>['onCoachResultClear'] extends (
   callback: infer T,
 ) => () => void
   ? T
@@ -40,7 +40,7 @@ function installFloatingMock(): FloatingMockContext {
     dismissResult: vi.fn(),
   };
 
-  Object.defineProperty(window, 'transcriptaFloating', {
+  Object.defineProperty(window, 'openwisprFloating', {
     writable: true,
     value: {
       onRecordingState: vi.fn((handler: RecordingHandler) => {
@@ -181,7 +181,7 @@ describe('FloatingWindow', () => {
   });
 
   it('hydrates from cached preload events', () => {
-    Object.defineProperty(window, 'transcriptaFloating', {
+    Object.defineProperty(window, 'openwisprFloating', {
       writable: true,
       value: {
         onRecordingState: vi.fn((handler: RecordingHandler) => {
@@ -431,4 +431,41 @@ describe('FloatingWindow', () => {
 
     expect(screen.getByText('Waiting for speech...')).toBeInTheDocument();
   });
+  it('keeps the floating result visible when an idle recording-state arrives after coach-result', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    const payload: HotkeyStopResponse = {
+      session_id: 'session-8',
+      final_transcription: 'faithful final',
+      paste_text: 'faithful final',
+      coach_result: null,
+      coach_status: 'failed',
+      coach_error: 'coach_timeout',
+      duration_ms: 1200,
+      segment_count: 2,
+    };
+
+    act(() => {
+      ctx.coachResultHandler?.(payload);
+    });
+
+    expect(screen.getByText('faithful final')).toBeInTheDocument();
+    expect(screen.getAllByText('Transcript ready').length).toBeGreaterThan(0);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: false,
+        processing: false,
+        finished: false,
+        sessionId: null,
+        mode: 'dictation',
+        error: null,
+      });
+    });
+
+    expect(screen.getByText('faithful final')).toBeInTheDocument();
+    expect(screen.getAllByText('Transcript ready').length).toBeGreaterThan(0);
+  });
 });
+
