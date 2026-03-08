@@ -69,6 +69,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: after Windows launcher changes, run full `npm run dev`, not just `node scripts/dev.cjs`, and verify backend plus Electron both start without `ENOENT ... C:\Windows\package.json`.
 - Prevention rule: repo launchers must call canonical child entry scripts directly with explicit `cwd`; do not nest dev startup through package-manager subcommands when a stable script path already exists.
 
+### Icon asset transparent-margin regression
+- What went wrong: the Windows taskbar icon looked much smaller than other desktop apps even though the source logo itself was high resolution.
+- Why it happened: the brand asset generator preserved transparent margins from the source art and used a thumbnail-style resize path that never upscaled trimmed artwork, so the visible mark only occupied about 70-83% of the icon canvas.
+- Detect earlier: after changing branding assets, measure the non-transparent bounds of generated `build/icon.ico` and `build/icons/*` outputs and compare the visible-area ratio against the source intent.
+- Prevention rule: packaging icons must trim transparent outer margins before resizing, use explicit scale-and-resize logic that can upscale to the target canvas, and render with a defined icon padding ratio instead of inheriting arbitrary empty space from the source canvas.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

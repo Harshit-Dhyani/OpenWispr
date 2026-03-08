@@ -18,6 +18,8 @@ ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 ICNS_SIZES = (16, 32, 64, 128, 256, 512, 1024)
 RASTER_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 VECTOR_EXTENSIONS = {'.svg'}
+ICON_PADDING_RATIO = 0.08
+ICON_SOURCE_WITH_BG = REPO_ROOT / 'build' / 'logo with bg.png'
 
 
 DEFAULT_SOURCE_CANDIDATES = (
@@ -79,30 +81,50 @@ def render_svg_to_image(source: Path) -> Image.Image:
     return Image.open(BytesIO(png_bytes)).convert('RGBA')
 
 
-def write_png(image: Image.Image, destination: Path, size: int) -> None:
-    ensure_parent(destination)
-    resized = image.copy()
-    resized.thumbnail((size, size), Image.Resampling.LANCZOS)
+def trim_to_alpha_bounds(image: Image.Image) -> Image.Image:
+    alpha_bbox = image.getchannel('A').getbbox()
+    if alpha_bbox is None:
+        return image.copy()
+    return image.crop(alpha_bbox)
+
+
+def resolve_icon_source_image(source: Path, fallback_image: Image.Image) -> Image.Image:
+    if ICON_SOURCE_WITH_BG.exists() and ICON_SOURCE_WITH_BG.resolve() != source.resolve():
+        return load_source_image(ICON_SOURCE_WITH_BG)
+    return trim_to_alpha_bounds(fallback_image)
+
+
+def fit_to_square(image: Image.Image, size: int, padding_ratio: float = 0.0) -> Image.Image:
+    padding_ratio = max(0.0, min(0.49, padding_ratio))
+    target_size = max(1, round(size * (1 - (padding_ratio * 2))))
+    width, height = image.size
+    scale = min(target_size / width, target_size / height)
+    resized = image.resize(
+        (max(1, round(width * scale)), max(1, round(height * scale))),
+        Image.Resampling.LANCZOS,
+    )
     canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     x = (size - resized.width) // 2
     y = (size - resized.height) // 2
     canvas.paste(resized, (x, y), resized)
-    canvas.save(destination, format='PNG')
+    return canvas
 
 
-def write_ico(image: Image.Image, destination: Path, sizes: Iterable[int]) -> None:
+def write_png(image: Image.Image, destination: Path, size: int, padding_ratio: float = 0.0) -> None:
     ensure_parent(destination)
-    base = image.copy()
+    fit_to_square(image, size, padding_ratio).save(destination, format='PNG')
+
+
+def write_ico(image: Image.Image, destination: Path, sizes: Iterable[int], padding_ratio: float) -> None:
+    ensure_parent(destination)
+    sizes = tuple(sizes)
+    base = fit_to_square(image, max(sizes), padding_ratio)
     base.save(destination, format='ICO', sizes=[(size, size) for size in sizes])
 
 
-def write_icns(image: Image.Image, destination: Path, size: int) -> None:
+def write_icns(image: Image.Image, destination: Path, size: int, padding_ratio: float) -> None:
     ensure_parent(destination)
-    square = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    resized = image.copy()
-    resized.thumbnail((size, size), Image.Resampling.LANCZOS)
-    square.paste(resized, ((size - resized.width) // 2, (size - resized.height) // 2), resized)
-    square.save(destination, format='ICNS')
+    fit_to_square(image, size, padding_ratio).save(destination, format='ICNS')
 
 
 def copy_source_assets(source: Path) -> None:
@@ -120,6 +142,7 @@ def generate_brand_assets(source: Path) -> list[Path]:
         raise FileNotFoundError(f'Source logo not found: {source}')
 
     image = load_source_image(source)
+    icon_image = resolve_icon_source_image(source, image)
     copy_source_assets(source)
 
     generated: list[Path] = []
@@ -136,15 +159,15 @@ def generate_brand_assets(source: Path) -> list[Path]:
 
     for size in PNG_SIZES:
         icon_path = LINUX_ICON_DIR / f'{size}x{size}.png'
-        write_png(image, icon_path, size)
+        write_png(icon_image, icon_path, size, ICON_PADDING_RATIO)
         generated.append(icon_path)
 
     ico_path = BUILD_DIR / 'icon.ico'
-    write_ico(image, ico_path, ICO_SIZES)
+    write_ico(icon_image, ico_path, ICO_SIZES, ICON_PADDING_RATIO)
     generated.append(ico_path)
 
     icns_path = BUILD_DIR / 'icon.icns'
-    write_icns(image, icns_path, max(ICNS_SIZES))
+    write_icns(icon_image, icns_path, max(ICNS_SIZES), ICON_PADDING_RATIO)
     generated.append(icns_path)
 
     build_png = BUILD_DIR / 'logo.png'
