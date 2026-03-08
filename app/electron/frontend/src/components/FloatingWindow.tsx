@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { HotkeyStopResponse } from '../types/api';
 
-type FloatingPhase = 'idle' | 'listening' | 'transcribing' | 'finalizing' | 'done' | 'error';
+type FloatingPhase = 'idle' | 'preparing' | 'listening' | 'transcribing' | 'finalizing' | 'done' | 'error';
 type FloatingStyle = CSSProperties & { WebkitAppRegion?: 'drag' | 'no-drag' };
 
 type FloatingStrings = NonNullable<Window['openwisprFloating']>['strings'];
@@ -28,6 +28,14 @@ interface TranscriptPayload {
   sessionId?: string | null;
   segmentIndex?: number | null;
   mode?: string;
+}
+
+interface ModelPreparationPayload {
+  active: boolean;
+  stage?: 'idle' | 'loading' | 'ready' | 'error';
+  message?: string;
+  modelName?: string | null;
+  sessionId?: string | null;
 }
 
 type CoachResultPayload = HotkeyStopResponse;
@@ -85,6 +93,7 @@ export function FloatingWindow() {
     const fallback = {
       status: {
         idle: 'Ready',
+        preparing: 'Preparing',
         listening: 'Listening',
         transcribing: 'Transcribing',
         processing: 'Finishing',
@@ -103,6 +112,10 @@ export function FloatingWindow() {
         sessionParagraphHint: 'Live partials stay temporary until stop.',
         genericError: 'Something went wrong.',
       },
+      modelPrep: {
+        title: 'Preparing speech model',
+        hint: 'The first run can take longer while the model loads into memory.',
+      },
     };
 
     return {
@@ -120,6 +133,10 @@ export function FloatingWindow() {
         ...fallback.resultMeta,
         ...(floatingApi?.strings?.resultMeta ?? {}),
       },
+      modelPrep: {
+        ...fallback.modelPrep,
+        ...(floatingApi?.strings?.modelPrep ?? {}),
+      },
     };
   }, [floatingApi]);
 
@@ -132,6 +149,13 @@ export function FloatingWindow() {
   const [audioLevels, setAudioLevels] = useState<number[]>([...EMPTY_LEVELS]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const [modelPreparation, setModelPreparation] = useState<ModelPreparationPayload>({
+    active: false,
+    stage: 'idle',
+    message: '',
+    modelName: null,
+    sessionId: null,
+  });
 
   const phaseRef = useRef<FloatingPhase>('idle');
   const activeSessionIdRef = useRef<string | null>(null);
@@ -260,6 +284,20 @@ export function FloatingWindow() {
     clearSession();
   }, [clearSession, resetTranscriptState, traceEvent]);
 
+  const handleModelPreparation = useCallback(
+    (payload: ModelPreparationPayload) => {
+      traceEvent('model-preparation', payload);
+      setModelPreparation({
+        active: Boolean(payload?.active),
+        stage: payload?.stage || 'loading',
+        message: payload?.message || '',
+        modelName: payload?.modelName ?? null,
+        sessionId: payload?.sessionId ?? null,
+      });
+    },
+    [traceEvent],
+  );
+
   const scrollTranscriptToBottom = useCallback(() => {
     const container = transcriptScrollRef.current;
     if (!container) {
@@ -320,6 +358,7 @@ export function FloatingWindow() {
       }
 
       if (state.finished) {
+        setModelPreparation((current) => ({ ...current, active: false, stage: 'ready', message: '' }));
         phaseRef.current = 'done';
         setPhase('done');
         stopTimer(false);
@@ -361,6 +400,7 @@ export function FloatingWindow() {
       const nextPartial = payload.partialText ?? (payload.isPartial ? nextText : '');
 
       if (payload.isPartial) {
+        setModelPreparation((current) => ({ ...current, active: false, stage: 'ready', message: '' }));
         setPartialText(nextPartial);
         if (nextCommitted) {
           setCommittedText(nextCommitted);
@@ -380,6 +420,7 @@ export function FloatingWindow() {
       } else if (nextText) {
         setCommittedText(nextText);
       }
+      setModelPreparation((current) => ({ ...current, active: false, stage: 'ready', message: '' }));
       setPartialText('');
 
       const resolvedFinal =
@@ -425,6 +466,7 @@ export function FloatingWindow() {
     const cleanupAudio = floatingApi.onAudioVisualizer(handleAudioVisualizer);
     const cleanupCoachResult = floatingApi.onCoachResult?.(handleCoachResult);
     const cleanupCoachResultClear = floatingApi.onCoachResultClear?.(handleCoachResultClear);
+    const cleanupModelPreparation = floatingApi.onModelPreparation?.(handleModelPreparation);
 
     return () => {
       cleanupRecording?.();
@@ -432,6 +474,7 @@ export function FloatingWindow() {
       cleanupAudio?.();
       cleanupCoachResult?.();
       cleanupCoachResultClear?.();
+      cleanupModelPreparation?.();
       stopTimer(true);
     };
   }, [
@@ -439,14 +482,28 @@ export function FloatingWindow() {
     handleAudioVisualizer,
     handleCoachResult,
     handleCoachResultClear,
+    handleModelPreparation,
     handleRecordingState,
     handleTranscription,
     stopTimer,
   ]);
 
+  const showModelPreparationPanel =
+    modelPreparation.active &&
+    (phase === 'listening' || phase === 'transcribing') &&
+    !committedText &&
+    !partialText &&
+    !finalText;
+
+  const effectivePhase = showModelPreparationPanel ? 'preparing' : phase;
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const isActive = phase === 'listening' || phase === 'transcribing' || phase === 'finalizing';
+      const isActive =
+        effectivePhase === 'preparing' ||
+        effectivePhase === 'listening' ||
+        effectivePhase === 'transcribing' ||
+        effectivePhase === 'finalizing';
       if (event.key === 'Escape') {
         event.preventDefault();
         if (isActive) {
@@ -456,7 +513,7 @@ export function FloatingWindow() {
         }
       }
 
-      if (event.key === 'Enter' && (phase === 'listening' || phase === 'transcribing')) {
+      if (event.key === 'Enter' && (effectivePhase === 'listening' || effectivePhase === 'transcribing')) {
         event.preventDefault();
         window.openwisprFloating?.finishRecording?.();
       }
@@ -464,10 +521,12 @@ export function FloatingWindow() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [phase]);
+  }, [effectivePhase]);
 
   const statusText = useMemo(() => {
-    switch (phase) {
+    switch (effectivePhase) {
+      case 'preparing':
+        return strings?.status?.preparing || 'Preparing';
       case 'listening':
         return strings?.status?.listening || 'Listening';
       case 'transcribing':
@@ -481,10 +540,12 @@ export function FloatingWindow() {
       default:
         return strings?.status?.idle || 'Ready';
     }
-  }, [phase, strings]);
+  }, [effectivePhase, strings]);
 
   const statusColor = useMemo(() => {
-    switch (phase) {
+    switch (effectivePhase) {
+      case 'preparing':
+        return '#38bdf8';
       case 'listening':
         return '#ef4444';
       case 'transcribing':
@@ -509,14 +570,20 @@ export function FloatingWindow() {
 
   const waitingLabel = strings?.waitingForSpeech || 'Waiting for speech...';
   const resultMetaLabel =
-    phase === 'done'
+    effectivePhase === 'done'
       ? strings?.resultMeta?.transcriptReady || 'Transcript ready'
+      : showModelPreparationPanel
+        ? strings?.modelPrep?.hint || 'The first run can take longer while the model loads into memory.'
       : mode === 'session_paragraph'
         ? strings?.resultMeta?.sessionParagraphHint || 'Live partials stay temporary until stop.'
         : strings?.resultMeta?.livePartialHint || 'Live transcript updates during recording.';
 
-  const showActiveControls = phase === 'listening' || phase === 'transcribing' || phase === 'finalizing';
-  const showClose = phase === 'done' || phase === 'error';
+  const showActiveControls =
+    effectivePhase === 'preparing' ||
+    effectivePhase === 'listening' ||
+    effectivePhase === 'transcribing' ||
+    effectivePhase === 'finalizing';
+  const showClose = effectivePhase === 'done' || effectivePhase === 'error';
 
   return (
     <div
@@ -525,13 +592,23 @@ export function FloatingWindow() {
         height: '100%',
         minHeight: 0,
         maxHeight: '100%',
-        background: 'linear-gradient(145deg, rgba(20, 25, 35, 0.98) 0%, rgba(15, 20, 28, 0.99) 100%)',
+        background: effectivePhase === 'preparing'
+          ? 'linear-gradient(145deg, rgba(10, 20, 30, 0.98) 0%, rgba(14, 28, 44, 0.99) 100%)'
+          : 'linear-gradient(145deg, rgba(20, 25, 35, 0.98) 0%, rgba(15, 20, 28, 0.99) 100%)',
         borderRadius: 16,
-        border: `1px solid ${phase === 'transcribing' ? 'rgba(74, 246, 38, 0.2)' : 'rgba(255, 255, 255, 0.08)'}`,
+        border: `1px solid ${
+          effectivePhase === 'preparing'
+            ? 'rgba(56, 189, 248, 0.28)'
+            : effectivePhase === 'transcribing'
+              ? 'rgba(74, 246, 38, 0.2)'
+              : 'rgba(255, 255, 255, 0.08)'
+        }`,
         boxShadow:
-          phase === 'transcribing'
-            ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 24px rgba(74, 246, 38, 0.12)'
-            : '0 20px 60px rgba(0, 0, 0, 0.5)',
+          effectivePhase === 'preparing'
+            ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 28px rgba(56, 189, 248, 0.18)'
+            : effectivePhase === 'transcribing'
+              ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 24px rgba(74, 246, 38, 0.12)'
+              : '0 20px 60px rgba(0, 0, 0, 0.5)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -557,7 +634,10 @@ export function FloatingWindow() {
               height: 10,
               borderRadius: '50%',
               backgroundColor: statusColor,
-              boxShadow: phase === 'listening' || phase === 'transcribing' ? `0 0 12px ${statusColor}` : 'none',
+              boxShadow:
+                effectivePhase === 'preparing' || effectivePhase === 'listening' || effectivePhase === 'transcribing'
+                  ? `0 0 12px ${statusColor}`
+                  : 'none',
               flexShrink: 0,
             }}
           />
@@ -589,36 +669,94 @@ export function FloatingWindow() {
           WebkitAppRegion: 'no-drag',
         } as FloatingStyle}
       >
-        <div
-          aria-label="Audio waveform"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            height: 52,
-          }}
-        >
-          {audioLevels.map((level, index) => {
-            const height = Math.max(4, Math.round(6 + Math.pow(level, 0.72) * 42));
-            return (
+        {showModelPreparationPanel ? (
+          <div
+            data-testid="floating-model-preparation"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              padding: '4px 0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(240, 249, 255, 0.96)' }}>
+                  {strings?.modelPrep?.title || 'Preparing speech model'}
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(186, 230, 253, 0.78)', marginTop: 2 }}>
+                  {modelPreparation.message || 'Loading transcription runtime...'}
+                </div>
+              </div>
               <div
-                key={index}
-                className="floating-waveform-bar"
                 style={{
-                  width: 5,
-                  height,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  color: 'rgba(125, 211, 252, 0.92)',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                }}
+              >
+                {modelPreparation.stage || 'loading'}
+              </div>
+            </div>
+            <div
+              aria-label="Model loading progress"
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                height: 10,
+                borderRadius: 999,
+                background: 'rgba(125, 211, 252, 0.12)',
+                border: '1px solid rgba(125, 211, 252, 0.18)',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '42%',
                   borderRadius: 999,
-                  background:
-                    level > 0.025
-                      ? 'linear-gradient(to top, #4af626, rgba(74, 246, 38, 0.55))'
-                      : 'linear-gradient(to top, rgba(139, 155, 180, 0.45), rgba(139, 155, 180, 0.18))',
-                  boxShadow: level > 0.025 ? '0 0 8px rgba(74, 246, 38, 0.26)' : 'none',
-                  transition: 'height 70ms ease-out',
+                  background: 'linear-gradient(90deg, rgba(56, 189, 248, 0.2) 0%, rgba(125, 211, 252, 0.95) 50%, rgba(34, 197, 94, 0.25) 100%)',
+                  boxShadow: '0 0 18px rgba(56, 189, 248, 0.28)',
+                  animation: 'floating-model-progress 1.35s ease-in-out infinite',
                 }}
               />
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            aria-label="Audio waveform"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              height: 52,
+            }}
+          >
+            {audioLevels.map((level, index) => {
+              const height = Math.max(4, Math.round(6 + Math.pow(level, 0.72) * 42));
+              return (
+                <div
+                  key={index}
+                  className="floating-waveform-bar"
+                  style={{
+                    width: 5,
+                    height,
+                    borderRadius: 999,
+                    background:
+                      level > 0.025
+                        ? 'linear-gradient(to top, #4af626, rgba(74, 246, 38, 0.55))'
+                        : 'linear-gradient(to top, rgba(139, 155, 180, 0.45), rgba(139, 155, 180, 0.18))',
+                    boxShadow: level > 0.025 ? '0 0 8px rgba(74, 246, 38, 0.26)' : 'none',
+                    transition: 'height 70ms ease-out',
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div
@@ -636,7 +774,7 @@ export function FloatingWindow() {
           gap: 10,
         } as FloatingStyle}
       >
-        {phase === 'error' ? (
+        {effectivePhase === 'error' ? (
           <div
             style={{
               border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -696,6 +834,8 @@ export function FloatingWindow() {
               </div>
             ) : null}
           </>
+        ) : showModelPreparationPanel ? (
+          <div style={{ flex: 1 }} />
         ) : (
           <div
             style={{
@@ -746,8 +886,8 @@ export function FloatingWindow() {
               <button
                 type="button"
                 onClick={() => window.openwisprFloating?.finishRecording?.()}
-                disabled={phase === 'finalizing'}
-                style={buttonStyle('primary', phase === 'finalizing')}
+                disabled={effectivePhase === 'preparing' || effectivePhase === 'finalizing'}
+                style={buttonStyle('primary', effectivePhase === 'preparing' || effectivePhase === 'finalizing')}
               >
                 {strings?.actions?.finish || 'Finish'}
               </button>
@@ -765,6 +905,13 @@ export function FloatingWindow() {
           ) : null}
         </div>
       </div>
+      <style>{`
+        @keyframes floating-model-progress {
+          0% { transform: translateX(-70%); opacity: 0.72; }
+          55% { transform: translateX(90%); opacity: 1; }
+          100% { transform: translateX(190%); opacity: 0.72; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -81,6 +81,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: after a model download completes, compare the downloader target path with `/api/models/catalog` install paths in the same session.
 - Prevention rule: backend model install-state, runtime loading, and Electron download management must share one canonical models root, and default paths must match the Electron user-data contract on desktop builds.
 
+### Floating warmup duplicate-state rendering
+- What went wrong: the floating hotkey warmup state rendered the same model-loading message in both the prep panel and the transcript body.
+- Why it happened: the new warmup panel was added without suppressing the empty transcript placeholder for the same state.
+- Detect earlier: when adding a new floating phase, verify each phase has one primary status surface and run the floating-window test against the rendered DOM.
+- Prevention rule: floating warmup/loading states must have a single authoritative message surface; when a dedicated status panel is visible, transcript placeholders must stay empty unless they add distinct information.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

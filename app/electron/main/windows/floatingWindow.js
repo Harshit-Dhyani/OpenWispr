@@ -32,6 +32,13 @@ let pendingTranscriptionPayload = {
   segmentIndex: null,
   mode: "dictation",
 };
+let pendingModelPreparationPayload = {
+  active: false,
+  stage: "idle",
+  message: "",
+  modelName: null,
+  sessionId: null,
+};
 
 function getFloatingWindowStatePath() {
   return path.join(app.getPath("userData"), "floating-window-state.json");
@@ -155,6 +162,7 @@ function createFloatingWindow() {
     }
     state.floatingWindow?.webContents.send("recording-state", pendingRecordingState);
     state.floatingWindow?.webContents.send("transcription-update", pendingTranscriptionPayload);
+    state.floatingWindow?.webContents.send("model-preparation", pendingModelPreparationPayload);
     state.floatingWindow?.webContents.send(
       "audio-visualizer",
       pendingVisualizerPayload || {
@@ -227,6 +235,13 @@ function resetFloatingWindow() {
     segmentIndex: null,
     mode: pendingTranscriptionPayload.mode || "dictation",
   };
+  pendingModelPreparationPayload = {
+    active: false,
+    stage: "idle",
+    message: "",
+    modelName: null,
+    sessionId: null,
+  };
   if (visualizerFlushTimer) {
     clearTimeout(visualizerFlushTimer);
     visualizerFlushTimer = null;
@@ -239,6 +254,7 @@ function resetFloatingWindow() {
     partialText: "",
     isPartial: false,
   });
+  updateFloatingModelPreparation(pendingModelPreparationPayload);
 }
 
 function updateFloatingTranscription(text, options = {}) {
@@ -275,6 +291,23 @@ function updateFloatingRecordingState(payload) {
       console.log("[floating] send recording-state", pendingRecordingState);
     }
     state.floatingWindow.webContents.send("recording-state", pendingRecordingState);
+  }
+}
+
+function updateFloatingModelPreparation(payload) {
+  pendingModelPreparationPayload = {
+    ...pendingModelPreparationPayload,
+    ...payload,
+  };
+  if (
+    floatingWindowReady &&
+    state.floatingWindow &&
+    !state.floatingWindow.isDestroyed()
+  ) {
+    if (state.isDebugLoggingEnabled()) {
+      console.log("[floating] send model-preparation", pendingModelPreparationPayload);
+    }
+    state.floatingWindow.webContents.send("model-preparation", pendingModelPreparationPayload);
   }
 }
 
@@ -375,6 +408,7 @@ module.exports = {
   resetFloatingWindow,
   updateFloatingTranscription,
   updateFloatingRecordingState,
+  updateFloatingModelPreparation,
   updateFloatingAudioLevel,
   showFloatingCoachResult,
   clearFloatingCoachResult,

@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const FALLBACK_FLOATING_STRINGS = {
   status: {
     idle: "Ready",
+    preparing: "Preparing",
     listening: "Listening",
     transcribing: "Transcribing",
     processing: "Finishing",
@@ -24,6 +25,10 @@ const FALLBACK_FLOATING_STRINGS = {
     livePartialHint: "Live transcript updates during recording.",
     sessionParagraphHint: "Live partials stay temporary until stop.",
     genericError: "Something went wrong.",
+  },
+  modelPrep: {
+    title: "Preparing speech model",
+    hint: "The first run can take longer while the model loads into memory.",
   },
 };
 
@@ -63,6 +68,13 @@ let latestAudioVisualizer = {
   peak: 0,
 };
 let latestCoachResult = null;
+let latestModelPreparation = {
+  active: false,
+  stage: "idle",
+  message: "",
+  modelName: null,
+  sessionId: null,
+};
 
 ipcRenderer.on("recording-state", (_event, state) => {
   latestRecordingState = state || latestRecordingState;
@@ -85,6 +97,11 @@ ipcRenderer.on("coach-result", (_event, data) => {
 ipcRenderer.on("coach-result-clear", () => {
   latestCoachResult = null;
   logFloatingEvent("coach-result-clear");
+});
+
+ipcRenderer.on("model-preparation", (_event, data) => {
+  latestModelPreparation = data || latestModelPreparation;
+  logFloatingEvent("model-preparation", latestModelPreparation);
 });
 
 contextBridge.exposeInMainWorld("openwisprFloating", {
@@ -132,6 +149,13 @@ contextBridge.exposeInMainWorld("openwisprFloating", {
     const handler = () => callback();
     ipcRenderer.on("coach-result-clear", handler);
     return () => ipcRenderer.removeListener("coach-result-clear", handler);
+  },
+
+  onModelPreparation: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on("model-preparation", handler);
+    callback(latestModelPreparation);
+    return () => ipcRenderer.removeListener("model-preparation", handler);
   },
 
   // Platform info

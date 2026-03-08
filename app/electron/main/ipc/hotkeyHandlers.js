@@ -8,6 +8,7 @@ const {
   hideFloatingWindow,
   resetFloatingWindow,
   updateFloatingRecordingState,
+  updateFloatingModelPreparation,
   updateFloatingAudioLevel,
   updateFloatingTranscription,
   showFloatingCoachResult,
@@ -579,6 +580,21 @@ async function connectHotkeyWebSocket(sessionId) {
           return;
         }
 
+        if (message.type === "hotkey_loading") {
+          if (!isExpectedHotkeySession(payload.session_id)) {
+            return;
+          }
+          const stage = payload.stage || "loading";
+          updateFloatingModelPreparation({
+            active: stage !== "ready" && stage !== "error",
+            stage,
+            message: payload.message || "",
+            modelName: payload.model_name || null,
+            sessionId: payload.session_id ?? state.activeHotkeySessionId,
+          });
+          return;
+        }
+
         if (message.type === "hotkey_partial" || message.type === "hotkey_draft_partial") {
           if (
             !isExpectedHotkeySession(payload.session_id) ||
@@ -591,6 +607,12 @@ async function connectHotkeyWebSocket(sessionId) {
           emitStateChange();
           emitHotkeyTranscriptEvent("hotkey_draft_partial", payload);
           if (text) {
+            updateFloatingModelPreparation({
+              active: false,
+              stage: "ready",
+              message: "",
+              sessionId: payload.session_id ?? state.activeHotkeySessionId,
+            });
             updateFloatingTranscription(text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
               mode: payload.transcription_mode || resolveTranscriptionMode(),
@@ -634,6 +656,12 @@ async function connectHotkeyWebSocket(sessionId) {
             payload.text ||
             "";
           if (text) {
+            updateFloatingModelPreparation({
+              active: false,
+              stage: "ready",
+              message: "",
+              sessionId: payload.session_id ?? state.activeHotkeySessionId,
+            });
             updateFloatingTranscription(liveBufferText || text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
               mode: payload.transcription_mode || resolveTranscriptionMode(),
@@ -654,6 +682,12 @@ async function connectHotkeyWebSocket(sessionId) {
           const text = payload.text || payload.final_text || "";
           if (text) {
             state.hotkeyLatestPasteCandidate = text;
+            updateFloatingModelPreparation({
+              active: false,
+              stage: "ready",
+              message: "",
+              sessionId: payload.session_id ?? state.activeHotkeySessionId,
+            });
             updateFloatingTranscription(text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
               mode: payload.mode || resolveTranscriptionMode(),

@@ -448,6 +448,26 @@ class HotkeyTranscriptionService:
                             session, text, start, end
                         )
                     )
+                if hasattr(session.transcriber, "add_status_callback"):
+                    def _publish_hotkey_loading_status(message: str) -> None:
+                        lowered = (message or "").lower()
+                        if "loaded" in lowered:
+                            stage = "ready"
+                        elif "error" in lowered or "failed" in lowered:
+                            stage = "error"
+                        else:
+                            stage = "loading"
+                        self._publish_event(
+                            "hotkey_loading",
+                            {
+                                "session_id": session.session_id,
+                                "message": message,
+                                "stage": stage,
+                                "model_name": model_name,
+                            },
+                        )
+
+                    session.transcriber.add_status_callback(_publish_hotkey_loading_status)
 
                 # Start the transcriber
                 session.transcriber.start()
@@ -3132,6 +3152,7 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
+
 
 
 

@@ -110,6 +110,15 @@ declare global {
       onHotkeyEvent: (callback: (event: { type: 'start' | 'stop' }) => void) => () => void;
       onCoachResult?: (callback: (payload: import('./types/api').HotkeyStopResponse | null) => void) => () => void;
       onCoachResultClear?: (callback: () => void) => () => void;
+      onModelPreparation?: (
+        callback: (payload: {
+          active: boolean;
+          stage?: 'idle' | 'loading' | 'ready' | 'error';
+          message?: string;
+          modelName?: string | null;
+          sessionId?: string | null;
+        }) => void
+      ) => () => void;
       cancelRecording?: () => void;
       finishRecording?: () => void;
       finishAndPaste?: () => void;
@@ -121,6 +130,7 @@ declare global {
         waitingForSpeech?: string;
         actions?: Record<string, string>;
         resultMeta?: Record<string, string>;
+        modelPrep?: Record<string, string>;
       };
     };
   }

@@ -10,6 +10,7 @@ const ELECTRON_STRINGS = {
   floating: {
     status: {
       idle: "Ready",
+      preparing: "Preparing",
       listening: "Listening",
       transcribing: "Transcribing",
       processing: "Finishing",
@@ -31,6 +32,10 @@ const ELECTRON_STRINGS = {
       livePartialHint: "Live transcript updates during recording.",
       sessionParagraphHint: "Live partials stay temporary until stop.",
       genericError: "Something went wrong.",
+    },
+    modelPrep: {
+      title: "Preparing speech model",
+      hint: "The first run can take longer while the model loads into memory.",
     },
   },
 };

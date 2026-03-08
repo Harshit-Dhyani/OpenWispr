@@ -6,6 +6,11 @@ import type { HotkeyStopResponse } from '../../types/api';
 type RecordingHandler = Parameters<NonNullable<Window['openwisprFloating']>['onRecordingState']>[0];
 type TranscriptHandler = Parameters<NonNullable<Window['openwisprFloating']>['onTranscription']>[0];
 type AudioHandler = Parameters<NonNullable<Window['openwisprFloating']>['onAudioVisualizer']>[0];
+type ModelPreparationHandler = NonNullable<Window['openwisprFloating']>['onModelPreparation'] extends (
+  callback: infer T,
+) => () => void
+  ? T
+  : never;
 type CoachResultHandler = NonNullable<Window['openwisprFloating']>['onCoachResult'] extends (
   callback: infer T,
 ) => () => void
@@ -21,6 +26,7 @@ interface FloatingMockContext {
   recordingHandler: RecordingHandler | null;
   transcriptHandler: TranscriptHandler | null;
   audioHandler: AudioHandler | null;
+  modelPreparationHandler: ModelPreparationHandler | null;
   coachResultHandler: CoachResultHandler | null;
   coachResultClearHandler: CoachResultClearHandler | null;
   cancelRecording: ReturnType<typeof vi.fn>;
@@ -33,6 +39,7 @@ function installFloatingMock(): FloatingMockContext {
     recordingHandler: null,
     transcriptHandler: null,
     audioHandler: null,
+    modelPreparationHandler: null,
     coachResultHandler: null,
     coachResultClearHandler: null,
     cancelRecording: vi.fn(),
@@ -59,6 +66,10 @@ function installFloatingMock(): FloatingMockContext {
         context.coachResultHandler = handler;
         return vi.fn();
       }),
+      onModelPreparation: vi.fn((handler: ModelPreparationHandler) => {
+        context.modelPreparationHandler = handler;
+        return vi.fn();
+      }),
       onCoachResultClear: vi.fn((handler: CoachResultClearHandler) => {
         context.coachResultClearHandler = handler;
         return vi.fn();
@@ -71,6 +82,7 @@ function installFloatingMock(): FloatingMockContext {
       strings: {
         status: {
           idle: 'Ready',
+          preparing: 'Preparing',
           listening: 'Listening',
           transcribing: 'Transcribing',
           processing: 'Finishing',
@@ -88,6 +100,10 @@ function installFloatingMock(): FloatingMockContext {
           livePartialHint: 'Live transcript updates during recording.',
           sessionParagraphHint: 'Live partials stay temporary until stop.',
           genericError: 'Something went wrong.',
+        },
+        modelPrep: {
+          title: 'Preparing speech model',
+          hint: 'The first run can take longer while the model loads into memory.',
         },
       },
       debugEnabled: true,
@@ -117,6 +133,35 @@ describe('FloatingWindow', () => {
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('00:00')).toBeInTheDocument();
     expect(screen.getByText('Waiting for speech...')).toBeInTheDocument();
+  });
+
+  it('shows a loading bar while the hotkey model is preparing', () => {
+    const ctx = installFloatingMock();
+    render(<FloatingWindow />);
+
+    act(() => {
+      ctx.recordingHandler?.({
+        isRecording: true,
+        processing: false,
+        finished: false,
+        sessionId: 'session-warmup',
+        mode: 'dictation',
+      });
+      ctx.modelPreparationHandler?.({
+        active: true,
+        stage: 'loading',
+        message: 'Loading whisper-turbo model...',
+        modelName: 'whisper-turbo',
+        sessionId: 'session-warmup',
+      });
+    });
+
+    expect(screen.getByText('Preparing')).toBeInTheDocument();
+    expect(screen.getByTestId('floating-model-preparation')).toBeInTheDocument();
+    expect(screen.getByText('Preparing speech model')).toBeInTheDocument();
+    expect(screen.getByText('Loading whisper-turbo model...')).toBeInTheDocument();
+    expect(screen.getByLabelText('Model loading progress')).toBeInTheDocument();
+    expect(screen.getByText('Finish')).toBeDisabled();
   });
 
   it('transitions through listening, transcribing, finalizing, and done', () => {
