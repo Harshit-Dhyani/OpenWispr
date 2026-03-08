@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +38,27 @@ __all__ = [
     "LIVE_MODE_PROFILES",
     "resolve_live_profile",
     "create_default_mode_configs",
+    "default_download_root",
+    "is_legacy_download_root",
 ]
+
+
+def default_download_root() -> Path:
+    if sys.platform == "win32":
+        base = Path(os.getenv("APPDATA") or (Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.getenv("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return base / AppConstants.APP_NAME / "models"
+
+
+def is_legacy_download_root(value: Any) -> bool:
+    if value is None:
+        return False
+    normalized = str(value).strip().replace("\\", "/").rstrip("/")
+    return normalized in {"models", "./models"}
+
 
 
 class ModeConfig(BaseModel):
@@ -319,13 +341,22 @@ class AppSettings(BaseSettings):
     beam_size: int = ModelConstants.DEFAULT_BEAM_SIZE
     best_of: int = ModelConstants.DEFAULT_BEST_OF
     temperature: float = ModelConstants.DEFAULT_TEMPERATURE
-    download_root: Path = Field(default_factory=lambda: Path.cwd() / "models")
+    download_root: Path = Field(default_factory=default_download_root)
     max_queue_items: int = AudioConstants.MAX_QUEUE_ITEMS
     output_refresh_seconds: float = PerformanceConstants.OUTPUT_REFRESH_SECONDS
     capture_device_id: str | None = None
 
     # Mode-specific settings container (new)
     mode_settings: SettingsContainer = Field(default_factory=SettingsContainer)
+
+    @field_validator("download_root", mode="before")
+    @classmethod
+    def upgrade_legacy_download_root(cls, value: Any) -> Any:
+        if is_legacy_download_root(value):
+            resolved = default_download_root()
+            logger.info("Upgrading legacy download_root %r to %s", value, resolved)
+            return resolved
+        return value
 
     def get_active_mode_config(self) -> ModeConfig:
         """Get configuration for the currently active mode."""
@@ -412,4 +443,3 @@ def create_default_mode_configs() -> SettingsContainer:
         ),
         active_mode=TranscriptionMode.SYSTEM,
     )
-

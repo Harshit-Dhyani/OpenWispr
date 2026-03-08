@@ -75,6 +75,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: after changing branding assets, measure the non-transparent bounds of generated `build/icon.ico` and `build/icons/*` outputs and compare the visible-area ratio against the source intent.
 - Prevention rule: packaging icons must trim transparent outer margins before resizing, use explicit scale-and-resize logic that can upscale to the target canvas, and render with a defined icon padding ratio instead of inheriting arbitrary empty space from the source canvas.
 
+### Model install root drift
+- What went wrong: the Models UI could show `completed` downloads while still marking the same model as `Not Installed`.
+- Why it happened: Electron wrote model files under the roaming app-data models directory, but backend install-state checks defaulted to a separate repo-local `./models` path.
+- Detect earlier: after a model download completes, compare the downloader target path with `/api/models/catalog` install paths in the same session.
+- Prevention rule: backend model install-state, runtime loading, and Electron download management must share one canonical models root, and default paths must match the Electron user-data contract on desktop builds.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.
