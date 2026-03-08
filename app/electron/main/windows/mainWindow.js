@@ -77,10 +77,11 @@ function createMainWindow() {
   }
 
   state.mainWindow.on("close", (event) => {
-    if (process.platform === "darwin") {
-      event.preventDefault();
-      state.mainWindow.hide();
+    if (state.isQuitting) {
+      return;
     }
+    event.preventDefault();
+    state.mainWindow.hide();
   });
 
   state.mainWindow.on("closed", () => {
@@ -89,7 +90,24 @@ function createMainWindow() {
 }
 
 function showMainWindowAndFocus(openSettings = false) {
-  if (!state.mainWindow) {
+  if (!state.mainWindow || state.mainWindow.isDestroyed()) {
+    createMainWindow();
+    if (!state.mainWindow || state.mainWindow.isDestroyed()) {
+      return;
+    }
+    state.mainWindow.once("ready-to-show", () => {
+      if (!state.mainWindow || state.mainWindow.isDestroyed()) {
+        return;
+      }
+      if (state.mainWindow.isMinimized()) {
+        state.mainWindow.restore();
+      }
+      state.mainWindow.show();
+      state.mainWindow.focus();
+      if (openSettings) {
+        state.mainWindow.webContents.send("open-settings");
+      }
+    });
     return;
   }
   if (state.mainWindow.isMinimized()) {

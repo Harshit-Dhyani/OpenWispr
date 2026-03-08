@@ -87,6 +87,18 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: when adding a new floating phase, verify each phase has one primary status surface and run the floating-window test against the rendered DOM.
 - Prevention rule: floating warmup/loading states must have a single authoritative message surface; when a dedicated status panel is visible, transcript placeholders must stay empty unless they add distinct information.
 
+### Tray reopen dead window
+- What went wrong: tray click and tray show flows could target a destroyed main window, leaving the app apparently stuck in the tray.
+- Why it happened: tray handlers assumed `state.mainWindow` existed and was still usable after close/minimize lifecycle changes.
+- Detect earlier: after changing main-window close semantics, exercise tray click, tray show, and reopen-from-hidden flows against both hidden and destroyed window states.
+- Prevention rule: tray entrypoints must recreate the main window when the reference is missing or destroyed; never early-return on a stale window handle.
+
+### Explicit floating finish action drift
+- What went wrong: clicking floating `Finish` could inherit the default stop mode and behave like `Finish & Paste`.
+- Why it happened: the explicit floating action reused config-derived pending-action fallback logic instead of locking its own intent.
+- Detect earlier: for each floating action, assert the pending action seen by the stop path in a focused IPC test.
+- Prevention rule: explicit floating actions must set an explicit pending action and never inherit another finish mode from defaults.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

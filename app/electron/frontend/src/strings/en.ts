@@ -280,6 +280,12 @@ export const RENDERER_STRINGS = {
         { value: 'local_only', label: 'Local only' },
         { value: 'allow_llm', label: 'Allow local LLM' },
       ],
+      localOnlyWarningTitle: 'Coach is in fallback-only mode',
+      localOnlyWarningDescription:
+        'Switch Privacy Mode to Allow local LLM if you want polished coach output instead of the faithful transcript.',
+      runtimeDisabledWarningTitle: 'Coach runtime is disabled',
+      runtimeDisabledWarningDescription:
+        'Enable the Refiner runtime and install a local coach model if you want the coach stage to produce polished output.',
       detailLevelTitle: 'Coach Detail Level',
       detailLevelDescription: 'Choose how much feedback appears in the Coach panel and floating summary.',
       detailLevelOptions: [

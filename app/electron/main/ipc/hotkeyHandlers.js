@@ -1088,6 +1088,7 @@ async function stopRecording(options = {}) {
     pendingAction,
     keepResultVisible: options.keepFloatingResultVisible ?? false,
   });
+  state.floatingWindowSuppressResult = !shouldKeepFloatingVisible;
   if (shouldKeepFloatingVisible) {
     updateFloatingRecordingState({
       isRecording: false,

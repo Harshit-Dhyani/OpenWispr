@@ -1,5 +1,5 @@
 // Tray icon and menu management
-const { Tray, Menu, shell, dialog } = require("electron");
+const { Tray, Menu, shell, dialog, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const state = require("../shared/state");
@@ -73,11 +73,11 @@ async function createTray() {
   createTrayIcons();
 
   if (!state.tray) {
-    const icon = state.isRecording ? state.trayIconRecording : state.trayIconIdle;
-    const { app } = require("electron");
+    const icon = state.isRecording ? state.trayIconRecording : state.trayIconIdle;
     state.tray = new Tray(icon || createCircleIcon(16, state.isRecording ? "#ef4444" : "#10b981"));
     state.tray.on("click", () => {
-      if (!state.mainWindow) {
+      if (!state.mainWindow || state.mainWindow.isDestroyed()) {
+        showMainWindowAndFocus(false);
         return;
       }
       if (state.mainWindow.isVisible()) {
@@ -312,8 +312,7 @@ async function createTray() {
     { type: "separator" },
     {
       label: "Quit",
-      click: () => {
-        const { app } = require("electron");
+      click: () => {
         app.quit();
       },
     },

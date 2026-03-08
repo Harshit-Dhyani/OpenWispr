@@ -77,6 +77,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  state.isQuitting = true;
   unregisterHotkey();
   stopBackend();
   if (state.webSocketReconnectTimeout) {

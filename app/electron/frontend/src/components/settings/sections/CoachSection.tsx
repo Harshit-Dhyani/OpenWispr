@@ -42,6 +42,11 @@ export function CoachSection({
       ) ?? settings.coach.coach_prompt_templates[0],
     [settings.coach.coach_prompt_templates, settings.coach.coach_template_id_mic],
   );
+  const showLocalOnlyWarning = settings.coach.coach_enabled && settings.coach.privacy_mode === 'local_only';
+  const showRuntimeDisabledWarning =
+    settings.coach.coach_enabled &&
+    settings.coach.privacy_mode === 'allow_llm' &&
+    !settings.refiner.runtime_enabled;
 
   useEffect(() => {
     let cancelled = false;
@@ -156,6 +161,20 @@ export function CoachSection({
           />
         </SettingCard>
       </div>
+      {showLocalOnlyWarning ? (
+        <div className="border-2 border-theme-warning bg-theme-warning/10 p-4">
+          <h4 className="text-sm font-bold text-theme-warning">{text.localOnlyWarningTitle}</h4>
+          <p className="mt-1 text-xs text-stone-500">{text.localOnlyWarningDescription}</p>
+        </div>
+      ) : null}
+
+      {showRuntimeDisabledWarning ? (
+        <div className="border-2 border-theme-warning bg-theme-warning/10 p-4">
+          <h4 className="text-sm font-bold text-theme-warning">{text.runtimeDisabledWarningTitle}</h4>
+          <p className="mt-1 text-xs text-stone-500">{text.runtimeDisabledWarningDescription}</p>
+        </div>
+      ) : null}
+
 
       <div className="border-2 border-lawn-border bg-lawn-panel p-4">
         <h4 className="mb-4 text-sm font-bold">{text.outputTitle}</h4>

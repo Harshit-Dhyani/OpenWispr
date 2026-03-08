@@ -57,7 +57,7 @@ function loadHandlersModule() {
         requestStartRecording: async () => ({}),
         requestStopRecording: async () => ({}),
         stopRecording: async (options = {}) => {
-          stopCalls.push(options);
+          stopCalls.push({ options, pendingAction: state.hotkeyPendingAction });
           return {};
         },
         closeHotkeyWebSocket: () => {},
@@ -114,12 +114,7 @@ function loadHandlersModule() {
     delete require.cache[HANDLERS_PATH];
   }
 
-  return {
-    registeredOn,
-    registeredHandle,
-    stopCalls,
-    state,
-  };
+  return { registeredOn, registeredHandle, stopCalls, state };
 }
 
 test("floating finish actions stop recording while keeping floating result visible", async () => {
@@ -130,9 +125,17 @@ test("floating finish actions stop recording while keeping floating result visib
 
   state.isRecording = true;
   await handler({}, { action: "finish" });
-  assert.deepEqual(stopCalls.at(-1), { keepFloatingResultVisible: true });
+  assert.deepEqual(stopCalls.at(-1), {
+    options: { keepFloatingResultVisible: true },
+    pendingAction: "finish",
+  });
+  assert.equal(state.hotkeyPendingAction, null);
 
   state.isRecording = true;
   await handler({}, { action: "finish-and-paste" });
-  assert.deepEqual(stopCalls.at(-1), { keepFloatingResultVisible: true });
+  assert.deepEqual(stopCalls.at(-1), {
+    options: { keepFloatingResultVisible: true },
+    pendingAction: "finish_and_paste",
+  });
+  assert.equal(state.hotkeyPendingAction, null);
 });

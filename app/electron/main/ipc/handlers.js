@@ -274,9 +274,7 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
     }
   } else if (action === "finish") {
     if (state.isRecording) {
-      state.hotkeyPendingAction =
-        state.hotkeyConfigState.finish_mode_default ||
-        (state.hotkeyConfigState.auto_inject ? "finish_and_paste" : "finish");
+      state.hotkeyPendingAction = "finish";
       try {
         await stopRecording({ keepFloatingResultVisible: true });
       } finally {

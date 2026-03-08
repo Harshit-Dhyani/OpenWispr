@@ -54,6 +54,7 @@ let hotkeyLatestPasteCandidate = "";
 let hotkeyPastedLiveCandidate = false;
 let floatingWindowSuppressResult = false;
 let hotkeyMutedAppAudio = false;
+let isQuitting = false;
 
 // Tray icons cache
 let trayIconIdle = null;
@@ -224,6 +225,8 @@ module.exports = {
   set floatingWindowSuppressResult(value) { floatingWindowSuppressResult = value; },
   get hotkeyMutedAppAudio() { return hotkeyMutedAppAudio; },
   set hotkeyMutedAppAudio(value) { hotkeyMutedAppAudio = value; },
+  get isQuitting() { return isQuitting; },
+  set isQuitting(value) { isQuitting = value; },
 
   // Tray icons
   get trayIconIdle() { return trayIconIdle; },
