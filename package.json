@@ -15,10 +15,10 @@
     "install:ui": "pnpm --dir app/electron install",
     "install:backend": "python -m pip install -e . || echo 'Backend optional'",
     "postinstall": "pnpm run install:all",
-    "dev": "node scripts/dev.cjs",
+    "dev": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json), 'scripts', 'dev.cjs')).runDev()\"",
     "dev:electron": "pnpm --dir app/electron run dev",
     "dev:frontend": "pnpm --dir app/electron/frontend run dev",
-    "dev:backend": "node scripts/run-backend-dev.cjs",
+    "dev:backend": "node -e \"require(require('path').join(require('path').dirname(process.env.npm_package_json), 'scripts', 'run-backend-dev.cjs'))\"",
     "build": "pnpm run build:clean && pnpm run build:frontend && pnpm run build:electron",
     "build:clean": "rimraf app/electron/renderer/dist app/electron/dist dist release",
     "build:frontend": "pnpm --dir app/electron/frontend run build",
@@ -286,3 +286,5 @@
     ]
   }
 }
+
+

@@ -61,7 +61,7 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - What went wrong: `npm run dev` failed before startup because the dev launcher spawned child scripts through `cmd.exe`, which treated an extended-length Windows current directory (`\\?\...`) as unsupported and then resolved `scripts/dev.cjs` from `C:\Windows`.
 - Why it happened: `scripts/dev.cjs` used `shell: true` instead of launching `pnpm` through a Node-resolved executable path.
 - Detect earlier: run `node scripts/dev.cjs` once on Windows after launcher changes and verify there is no `CMD.EXE ... UNC paths are not supported` banner.
-- Prevention rule: on Windows, do not use `shell: true` for repo launchers that inherit cwd; spawn package managers through a resolved executable/script path and sanitize extended-length cwd values first.
+- Prevention rule: on Windows, do not use `shell: true` for repo launchers that inherit cwd; spawn package managers through a resolved executable/script path, sanitize extended-length cwd values first, and avoid root npm scripts that reference `node scripts/...` by relative path when `npm_package_json` can provide the repo root.
 
 ## Required Rules For New Work
 
@@ -89,3 +89,4 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Run smallest relevant backend/frontend tests for touched areas.
 - For hotkey/session changes, verify transcript correctness and model routing in logs.
 - For download changes, verify resume/retry behavior and monotonic progress.
+
