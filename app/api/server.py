@@ -113,6 +113,7 @@ _sse_metrics: dict[str, int] = {
     "keepalives_sent": 0,
     "events_sent": 0,
 }
+SSE_EVENT_QUEUE_MAXSIZE = 100
 
 # WebSocket manager and settings synchronizer
 _ws_manager: WebSocketManager | None = None
@@ -146,6 +147,10 @@ _resolve_input_device_for_source = resolve_input_device_for_source
 
 def _make_json_safe(value: Any) -> Any:
     return make_json_safe(value)
+
+
+def _create_sse_event_queue() -> asyncio.Queue[tuple[str, dict[str, Any]]]:
+    return asyncio.Queue(maxsize=SSE_EVENT_QUEUE_MAXSIZE)
 
 
 # Hotkey-specific request/response models
@@ -2541,7 +2546,7 @@ async def hotkey_events(
     client_id = id(request)
     logger.debug("Hotkey SSE connect: client_id=%s", client_id)
 
-    queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue(maxsize=100)
+    queue = _create_sse_event_queue()
     loop = asyncio.get_running_loop()
 
     # Track last audio update for throttling
@@ -2643,7 +2648,7 @@ async def events(
         client_info,
     )
 
-    queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
+    queue = _create_sse_event_queue()
     loop = asyncio.get_running_loop()
     events_sent = 0
     keepalives_sent = 0

@@ -10,7 +10,9 @@ from app.ui.main_window import MainWindow
 
 def main() -> int:
     settings = AppSettings()
-    app = QApplication(sys.argv)
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
     app.setApplicationName(settings.app_name)
     window = MainWindow(settings=settings)
     window.show()

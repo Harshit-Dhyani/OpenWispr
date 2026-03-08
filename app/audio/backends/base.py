@@ -18,6 +18,10 @@ class BackendAttempt:
     error_type: str
     error: str
 
+    @property
+    def backend_name(self) -> str:
+        return self.backend
+
 
 @dataclass(slots=True)
 class AudioBackendError(RuntimeError):
@@ -27,13 +31,20 @@ class AudioBackendError(RuntimeError):
 
     def __post_init__(self) -> None:
         if not self.message:
-            details = "\n".join(
-                f"  - [{attempt.backend}] {attempt.device_name} @ {attempt.sample_rate}Hz, "
-                f"{attempt.channels}ch: {attempt.error_type}: {attempt.error}"
-                for attempt in self.attempts
-            )
+            details = self.describe_attempts()
             self.message = details or f"{self.backend} backend failed"
-        super().__init__(self.message)
+        RuntimeError.__init__(self, self.message)
+
+    @property
+    def backend_name(self) -> str:
+        return self.backend
+
+    def describe_attempts(self) -> str:
+        return "\n".join(
+            f"  - [{attempt.backend}] {attempt.device_name} @ {attempt.sample_rate}Hz, "
+            f"{attempt.channels}ch: {attempt.error_type}: {attempt.error}"
+            for attempt in self.attempts
+        )
 
 
 def sanitize_audio(samples: np.ndarray) -> np.ndarray:

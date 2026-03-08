@@ -56,6 +56,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: run a stale-path grep in `docs/` for moved canonical paths before merging structural batches.
 - Prevention rule: every runtime path move must include same-batch docs inventory/source-of-truth updates for renamed entrypoints and preloads.
 
+### SSE queue growth under slow consumers
+- What went wrong: `/api/events` used an unbounded asyncio queue, so a slow or stalled SSE client could accumulate backend events without limit.
+- Why it happened: hotkey SSE had a queue cap, but the main SSE path kept a separate queue implementation without the same bound.
+- Detect earlier: compare all SSE/WebSocket fanout queues for matching maxsize and drop policy whenever adding a new transport path.
+- Prevention rule: every long-lived streaming queue must declare an explicit bounded maxsize and a deliberate overflow policy in the same module.
+
 
 ### Windows dev launcher shell regression
 - What went wrong: `npm run dev` failed before startup because the dev launcher spawned child scripts through `cmd.exe`, which treated an extended-length Windows current directory (`\\?\...`) as unsupported and then resolved `scripts/dev.cjs` from `C:\Windows`.

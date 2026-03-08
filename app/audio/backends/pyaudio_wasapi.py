@@ -97,70 +97,85 @@ class PyAudioWasapiBackend(AudioBackend):
             ) from exc
 
         self._pa = pyaudio.PyAudio()
-        formats = [
-            (pyaudio.paFloat32, np.float32),
-            (pyaudio.paInt16, np.int16),
-        ]
+        try:
+            formats = [
+                (pyaudio.paFloat32, np.float32),
+                (pyaudio.paInt16, np.int16),
+            ]
 
-        device_infos = self._rank_device_infos(self._iter_device_infos())
-        fallback_rates = [48000, 44100, 16000]
-        last_exc: Exception | None = None
+            device_infos = self._rank_device_infos(self._iter_device_infos())
+            fallback_rates = [48000, 44100, 16000]
+            last_exc: Exception | None = None
 
-        for info in device_infos:
-            device_name = str(info.get("name", "Unknown"))
-            max_input_channels = int(info.get("maxInputChannels", 0) or 0)
-            if max_input_channels <= 0:
-                continue
-
-            default_rate = int(
-                float(info.get("defaultSampleRate", self.sample_rate) or self.sample_rate)
-            )
-            sample_rates_to_try = []
-            for rate in (self.sample_rate, default_rate, *fallback_rates):
-                if rate not in sample_rates_to_try:
-                    sample_rates_to_try.append(rate)
-
-            for channel_count in (self.channels, 2, 1, max_input_channels):
-                if channel_count <= 0 or channel_count > max_input_channels:
+            for info in device_infos:
+                device_name = str(info.get("name", "Unknown"))
+                max_input_channels = int(info.get("maxInputChannels", 0) or 0)
+                if max_input_channels <= 0:
                     continue
-                for rate in sample_rates_to_try:
-                    for stream_format, dtype in formats:
-                        try:
-                            self._stream = self._pa.open(
-                                format=stream_format,
-                                channels=channel_count,
-                                rate=rate,
-                                input=True,
-                                output=False,
-                                input_device_index=int(info["index"]),
-                                frames_per_buffer=self.block_size,
-                                start=True,
-                            )
-                            self._format = stream_format
-                            self._dtype = dtype
-                            self.resolved_name = device_name
-                            self.runtime_sample_rate = rate
-                            self.runtime_channels = channel_count
-                            self._running = True
-                            return
-                        except Exception as exc:
-                            last_exc = exc
-                            self.attempts.append(
-                                BackendAttempt(
-                                    backend=self.backend_name,
-                                    device_name=device_name,
-                                    sample_rate=rate,
-                                    channels=channel_count,
-                                    error_type=type(exc).__name__,
-                                    error=str(exc),
-                                )
-                            )
 
-        raise AudioBackendError(
-            backend=self.backend_name,
-            attempts=self.attempts,
-            message=f"No compatible PyAudio/WASAPI capture path could be opened for '{self.device_id}'.",
-        ) from last_exc
+                default_rate = int(
+                    float(info.get("defaultSampleRate", self.sample_rate) or self.sample_rate)
+                )
+                sample_rates_to_try = []
+                for rate in (self.sample_rate, default_rate, *fallback_rates):
+                    if rate not in sample_rates_to_try:
+                        sample_rates_to_try.append(rate)
+
+                for channel_count in (self.channels, 2, 1, max_input_channels):
+                    if channel_count <= 0 or channel_count > max_input_channels:
+                        continue
+                    for rate in sample_rates_to_try:
+                        for stream_format, dtype in formats:
+                            try:
+                                self._stream = self._pa.open(
+                                    format=stream_format,
+                                    channels=channel_count,
+                                    rate=rate,
+                                    input=True,
+                                    output=False,
+                                    input_device_index=int(info["index"]),
+                                    frames_per_buffer=self.block_size,
+                                    start=True,
+                                )
+                                self._format = stream_format
+                                self._dtype = dtype
+                                self.resolved_name = device_name
+                                self.runtime_sample_rate = rate
+                                self.runtime_channels = channel_count
+                                self._running = True
+                                return
+                            except Exception as exc:
+                                last_exc = exc
+                                self.attempts.append(
+                                    BackendAttempt(
+                                        backend=self.backend_name,
+                                        device_name=device_name,
+                                        sample_rate=rate,
+                                        channels=channel_count,
+                                        error_type=type(exc).__name__,
+                                        error=str(exc),
+                                    )
+                                )
+
+            raise AudioBackendError(
+                backend=self.backend_name,
+                attempts=self.attempts,
+                message=f"No compatible PyAudio/WASAPI capture path could be opened for '{self.device_id}'.",
+            ) from last_exc
+        except Exception:
+            if self._stream is not None:
+                try:
+                    self._stream.close()
+                except Exception:
+                    logger.debug("PyAudio stream cleanup failed", exc_info=True)
+                self._stream = None
+            if self._pa is not None:
+                try:
+                    self._pa.terminate()
+                except Exception:
+                    logger.debug("PyAudio instance cleanup failed", exc_info=True)
+                self._pa = None
+            raise
 
     def stop(self) -> None:
         if self._stream is not None:
