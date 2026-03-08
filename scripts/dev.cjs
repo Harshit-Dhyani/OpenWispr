@@ -8,6 +8,10 @@ function sanitizeCwd(cwd) {
   return typeof cwd === "string" && cwd.startsWith("\\\\?\\") ? cwd.slice(4) : cwd;
 }
 
+function resolveChildCwd() {
+  return sanitizeCwd(repoRoot);
+}
+
 function resolvePnpmLaunch(env = process.env, execPath = process.execPath) {
   if (env.npm_execpath) {
     return {
@@ -43,14 +47,14 @@ function prefixOutput(stream, prefix, chunk) {
 }
 
 function runDev() {
-  const sanitizedCwd = sanitizeCwd(process.cwd());
+  const childCwd = resolveChildCwd();
   const pnpmLaunch = resolvePnpmLaunch();
   const processes = [];
   let shuttingDown = false;
 
   function start(name, scriptName) {
     const child = spawn(pnpmLaunch.command, [...pnpmLaunch.args, "run", scriptName], {
-      cwd: sanitizedCwd || repoRoot,
+      cwd: childCwd,
       stdio: ["inherit", "pipe", "pipe"],
       windowsHide: false,
       env: process.env,
@@ -104,6 +108,8 @@ if (require.main === module) {
 
 module.exports = {
   prefixOutput,
+  repoRoot,
+  resolveChildCwd,
   resolvePnpmLaunch,
   runDev,
   sanitizeCwd,

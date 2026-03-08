@@ -4,11 +4,16 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { resolvePnpmLaunch, sanitizeCwd } = require("./dev.cjs");
+const { repoRoot, resolveChildCwd, resolvePnpmLaunch, sanitizeCwd } = require("./dev.cjs");
 
 test("sanitizeCwd strips Windows extended-length prefix", () => {
   assert.equal(sanitizeCwd("\\\\?\\D:\\repo\\openwispr"), "D:\\repo\\openwispr");
   assert.equal(sanitizeCwd("D:\\repo\\openwispr"), "D:\\repo\\openwispr");
+});
+
+test("resolveChildCwd is derived from repo root, not inherited process cwd", () => {
+  assert.equal(resolveChildCwd(), sanitizeCwd(repoRoot));
+  assert.ok(path.isAbsolute(resolveChildCwd()));
 });
 
 test("resolvePnpmLaunch prefers npm_execpath when provided", () => {
