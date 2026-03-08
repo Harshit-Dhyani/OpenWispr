@@ -56,6 +56,13 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: run a stale-path grep in `docs/` for moved canonical paths before merging structural batches.
 - Prevention rule: every runtime path move must include same-batch docs inventory/source-of-truth updates for renamed entrypoints and preloads.
 
+
+### Windows dev launcher shell regression
+- What went wrong: `npm run dev` failed before startup because the dev launcher spawned child scripts through `cmd.exe`, which treated an extended-length Windows current directory (`\\?\...`) as unsupported and then resolved `scripts/dev.cjs` from `C:\Windows`.
+- Why it happened: `scripts/dev.cjs` used `shell: true` instead of launching `pnpm` through a Node-resolved executable path.
+- Detect earlier: run `node scripts/dev.cjs` once on Windows after launcher changes and verify there is no `CMD.EXE ... UNC paths are not supported` banner.
+- Prevention rule: on Windows, do not use `shell: true` for repo launchers that inherit cwd; spawn package managers through a resolved executable/script path and sanitize extended-length cwd values first.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

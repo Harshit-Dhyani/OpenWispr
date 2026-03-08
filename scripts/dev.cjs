@@ -1,57 +1,110 @@
 const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
-const processes = [];
-let shuttingDown = false;
+const repoRoot = path.resolve(__dirname, "..");
 
-function start(name, command) {
-  const child = spawn(command, {
-    shell: true,
-    stdio: ["inherit", "pipe", "pipe"],
-    windowsHide: false,
-    env: process.env,
-  });
+function sanitizeCwd(cwd) {
+  return typeof cwd === "string" && cwd.startsWith("\\\\?\\") ? cwd.slice(4) : cwd;
+}
 
-  const prefix = `[${name}] `;
+function resolvePnpmLaunch(env = process.env, execPath = process.execPath) {
+  if (env.npm_execpath) {
+    return {
+      command: execPath,
+      args: [env.npm_execpath],
+    };
+  }
 
-  child.stdout.on("data", (chunk) => {
-    process.stdout.write(prefix + String(chunk).replace(/\n/g, `\n${prefix}`).replace(/\n\[[^\]]+\] $/, "\n"));
-  });
+  if (process.platform === "win32") {
+    const candidates = [
+      path.join(env.APPDATA || "", "npm", "node_modules", "pnpm", "bin", "pnpm.cjs"),
+      path.join(path.dirname(execPath), "node_modules", "pnpm", "bin", "pnpm.cjs"),
+    ];
 
-  child.stderr.on("data", (chunk) => {
-    process.stderr.write(prefix + String(chunk).replace(/\n/g, `\n${prefix}`).replace(/\n\[[^\]]+\] $/, "\n"));
-  });
+    for (const candidate of candidates) {
+      if (candidate && fs.existsSync(candidate)) {
+        return {
+          command: execPath,
+          args: [candidate],
+        };
+      }
+    }
+  }
 
-  child.on("exit", (code, signal) => {
+  return {
+    command: "pnpm",
+    args: [],
+  };
+}
+
+function prefixOutput(stream, prefix, chunk) {
+  stream.write(prefix + String(chunk).replace(/\n/g, `\n${prefix}`).replace(/\n\[[^\]]+\] $/, "\n"));
+}
+
+function runDev() {
+  const sanitizedCwd = sanitizeCwd(process.cwd());
+  const pnpmLaunch = resolvePnpmLaunch();
+  const processes = [];
+  let shuttingDown = false;
+
+  function start(name, scriptName) {
+    const child = spawn(pnpmLaunch.command, [...pnpmLaunch.args, "run", scriptName], {
+      cwd: sanitizedCwd || repoRoot,
+      stdio: ["inherit", "pipe", "pipe"],
+      windowsHide: false,
+      env: process.env,
+    });
+
+    const prefix = `[${name}] `;
+
+    child.stdout.on("data", (chunk) => prefixOutput(process.stdout, prefix, chunk));
+    child.stderr.on("data", (chunk) => prefixOutput(process.stderr, prefix, chunk));
+
+    child.on("exit", (code, signal) => {
+      if (shuttingDown) {
+        return;
+      }
+      shuttingDown = true;
+      const exitCode = typeof code === "number" ? code : signal ? 1 : 0;
+      for (const proc of processes) {
+        if (proc !== child && !proc.killed) {
+          proc.kill("SIGINT");
+        }
+      }
+      process.exit(exitCode);
+    });
+
+    processes.push(child);
+    return child;
+  }
+
+  function shutdown() {
     if (shuttingDown) {
       return;
     }
     shuttingDown = true;
-    const exitCode = typeof code === "number" ? code : signal ? 1 : 0;
-    for (const proc of processes) {
-      if (proc !== child && !proc.killed) {
-        proc.kill("SIGINT");
+    for (const child of processes) {
+      if (!child.killed) {
+        child.kill("SIGINT");
       }
     }
-    process.exit(exitCode);
-  });
+  }
 
-  processes.push(child);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  start("backend", "dev:backend");
+  start("electron", "dev:electron");
 }
 
-function shutdown() {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  for (const child of processes) {
-    if (!child.killed) {
-      child.kill("SIGINT");
-    }
-  }
+if (require.main === module) {
+  runDev();
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
-
-start("backend", "pnpm run dev:backend");
-start("electron", "pnpm run dev:electron");
+module.exports = {
+  prefixOutput,
+  resolvePnpmLaunch,
+  runDev,
+  sanitizeCwd,
+};
