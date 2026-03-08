@@ -18,8 +18,7 @@ ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 ICNS_SIZES = (16, 32, 64, 128, 256, 512, 1024)
 RASTER_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
 VECTOR_EXTENSIONS = {'.svg'}
-ICON_PADDING_RATIO = 0.08
-ICON_SOURCE_WITH_BG = REPO_ROOT / 'build' / 'logo with bg.png'
+ICON_PADDING_RATIO = 0.05
 
 
 DEFAULT_SOURCE_CANDIDATES = (
@@ -88,9 +87,7 @@ def trim_to_alpha_bounds(image: Image.Image) -> Image.Image:
     return image.crop(alpha_bbox)
 
 
-def resolve_icon_source_image(source: Path, fallback_image: Image.Image) -> Image.Image:
-    if ICON_SOURCE_WITH_BG.exists() and ICON_SOURCE_WITH_BG.resolve() != source.resolve():
-        return load_source_image(ICON_SOURCE_WITH_BG)
+def resolve_icon_source_image(_: Path, fallback_image: Image.Image) -> Image.Image:
     return trim_to_alpha_bounds(fallback_image)
 
 
