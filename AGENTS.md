@@ -63,6 +63,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: run `node scripts/dev.cjs` once on Windows after launcher changes and verify there is no `CMD.EXE ... UNC paths are not supported` banner.
 - Prevention rule: on Windows, do not use `shell: true` for repo launchers that inherit cwd; spawn package managers through a resolved executable/script path, sanitize extended-length cwd values first, and avoid root npm scripts that reference `node scripts/...` by relative path when `npm_package_json` can provide the repo root.
 
+### Nested dev runner package-root regression
+- What went wrong: `npm run dev` still failed after the root launcher fix because child backend/Electron dev processes were started through nested package-manager commands that could still resolve `package.json` from `C:\Windows`.
+- Why it happened: the root launcher delegated to `npm`/`pnpm run ...` instead of invoking the canonical backend and Electron dev entry scripts directly from known repo paths.
+- Detect earlier: after Windows launcher changes, run full `npm run dev`, not just `node scripts/dev.cjs`, and verify backend plus Electron both start without `ENOENT ... C:\Windows\package.json`.
+- Prevention rule: repo launchers must call canonical child entry scripts directly with explicit `cwd`; do not nest dev startup through package-manager subcommands when a stable script path already exists.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

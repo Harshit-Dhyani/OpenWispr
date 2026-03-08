@@ -1,8 +1,8 @@
 const { spawn } = require("child_process");
-const fs = require("fs");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
+const nodeExe = process.execPath;
 
 function sanitizeCwd(cwd) {
   return typeof cwd === "string" && cwd.startsWith("\\\\?\\") ? cwd.slice(4) : cwd;
@@ -12,33 +12,16 @@ function resolveChildCwd() {
   return sanitizeCwd(repoRoot);
 }
 
-function resolvePnpmLaunch(env = process.env, execPath = process.execPath) {
-  if (env.npm_execpath) {
-    return {
-      command: execPath,
-      args: [env.npm_execpath],
-    };
-  }
-
-  if (process.platform === "win32") {
-    const candidates = [
-      path.join(env.APPDATA || "", "npm", "node_modules", "pnpm", "bin", "pnpm.cjs"),
-      path.join(path.dirname(execPath), "node_modules", "pnpm", "bin", "pnpm.cjs"),
-    ];
-
-    for (const candidate of candidates) {
-      if (candidate && fs.existsSync(candidate)) {
-        return {
-          command: execPath,
-          args: [candidate],
-        };
-      }
-    }
-  }
-
+function resolveDevTargets() {
   return {
-    command: "pnpm",
-    args: [],
+    backend: {
+      command: nodeExe,
+      args: [path.join(repoRoot, "scripts", "run-backend-dev.cjs")],
+    },
+    electron: {
+      command: nodeExe,
+      args: [path.join(repoRoot, "app", "electron", "scripts", "dev.js")],
+    },
   };
 }
 
@@ -48,12 +31,12 @@ function prefixOutput(stream, prefix, chunk) {
 
 function runDev() {
   const childCwd = resolveChildCwd();
-  const pnpmLaunch = resolvePnpmLaunch();
+  const targets = resolveDevTargets();
   const processes = [];
   let shuttingDown = false;
 
-  function start(name, scriptName) {
-    const child = spawn(pnpmLaunch.command, [...pnpmLaunch.args, "run", scriptName], {
+  function start(name, target) {
+    const child = spawn(target.command, target.args, {
       cwd: childCwd,
       stdio: ["inherit", "pipe", "pipe"],
       windowsHide: false,
@@ -98,8 +81,8 @@ function runDev() {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  start("backend", "dev:backend");
-  start("electron", "dev:electron");
+  start("backend", targets.backend);
+  start("electron", targets.electron);
 }
 
 if (require.main === module) {
@@ -110,7 +93,7 @@ module.exports = {
   prefixOutput,
   repoRoot,
   resolveChildCwd,
-  resolvePnpmLaunch,
+  resolveDevTargets,
   runDev,
   sanitizeCwd,
 };
