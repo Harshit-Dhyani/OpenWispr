@@ -148,17 +148,16 @@ class StemNoteProcessor:
             )
 
         for segment in existing_segments:
-            if segment.start in contradictions:
-                for variable, timestamps in contradictions.items():
-                    if segment.start in timestamps:
-                        new_reason = f"contradictory-definition:{variable}"
-                        if new_reason not in segment.review_reasons:
-                            segment.review_reasons = sorted(
-                                set([*segment.review_reasons, new_reason])
-                            )
-                            segment.review_flag = True
-                            if segment not in needs_review:
-                                needs_review.append(segment)
+            for variable, timestamps in contradictions.items():
+                if segment.start in timestamps:
+                    new_reason = f"contradictory-definition:{variable}"
+                    if new_reason not in segment.review_reasons:
+                        segment.review_reasons = sorted(
+                            set([*segment.review_reasons, new_reason])
+                        )
+                        segment.review_flag = True
+                        if segment not in needs_review:
+                            needs_review.append(segment)
 
         return NotesBundle(
             notes_markdown=self._build_notes_markdown(all_segments, formulas, needs_review),
@@ -221,15 +220,17 @@ class StemNoteProcessor:
 
 
 def collect_variable_contradictions(formulas: list[FormulaFinding]) -> dict[str, set[float]]:
-    seen: dict[str, str] = {}
+    seen: dict[str, tuple[str, float]] = {}
     contradictions: dict[str, set[float]] = {}
     for formula in formulas:
         if "=" not in formula.expression:
             continue
         left, right = [part.strip() for part in formula.expression.split("=", 1)]
         existing = seen.get(left)
-        if existing and existing != right:
-            contradictions.setdefault(left, set()).add(formula.timestamp_start)
+        if existing and existing[0] != right:
+            contradiction_timestamps = contradictions.setdefault(left, set())
+            contradiction_timestamps.add(existing[1])
+            contradiction_timestamps.add(formula.timestamp_start)
         else:
-            seen[left] = right
+            seen[left] = (right, formula.timestamp_start)
     return contradictions

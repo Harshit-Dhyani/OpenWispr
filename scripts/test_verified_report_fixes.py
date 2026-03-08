@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 from app.audio.backends.base import AudioBackendError, BackendAttempt
 from app.audio.backends.pyaudio_wasapi import PyAudioWasapiBackend
+from app.core.models import FormulaFinding, TranscriptSegment
+from app.stem.postprocess import StemNoteProcessor
 
 
 if "faster_whisper" not in sys.modules:
@@ -92,6 +94,48 @@ class VerifiedReportFixesTest(unittest.TestCase):
         self.assertTrue(holder["instance"].terminated)
         self.assertIsNone(backend._pa)
         self.assertIsNone(backend._stream)
+
+    def test_incremental_stem_review_propagates_contradictions_to_existing_segments(self) -> None:
+        processor = StemNoteProcessor()
+        existing_segment = TranscriptSegment(
+            id="seg-1",
+            start=1.0,
+            end=2.0,
+            text="value = 1",
+            display_text="value = 1",
+            language="en",
+            confidence=0.9,
+        )
+        new_segment = TranscriptSegment(
+            id="seg-2",
+            start=3.0,
+            end=4.0,
+            text="value = 2",
+            display_text="value = 2",
+            language="en",
+            confidence=0.9,
+        )
+        existing_formula = FormulaFinding(
+            expression="value = 1",
+            timestamp_start=1.0,
+            timestamp_end=2.0,
+            context="value = 1",
+            confidence=0.9,
+            parseable=True,
+            review_flag=False,
+            reasons=[],
+        )
+
+        bundle = processor.build_incremental(
+            existing_segments=[existing_segment],
+            new_segments=[new_segment],
+            existing_formulas=[existing_formula],
+            existing_needs_review=[],
+        )
+
+        self.assertIn("contradictory-definition:value", existing_segment.review_reasons)
+        self.assertTrue(existing_segment.review_flag)
+        self.assertIn(existing_segment, bundle.needs_review)
 
     def test_main_reuses_existing_qapplication(self) -> None:
         existing_app = SimpleNamespace(setApplicationName=lambda _: None, exec=lambda: 7)

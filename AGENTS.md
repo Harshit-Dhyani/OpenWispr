@@ -62,6 +62,12 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: compare all SSE/WebSocket fanout queues for matching maxsize and drop policy whenever adding a new transport path.
 - Prevention rule: every long-lived streaming queue must declare an explicit bounded maxsize and a deliberate overflow policy in the same module.
 
+### Contradiction map key mismatch in incremental STEM review
+- What went wrong: incremental STEM note rebuilding checked segment timestamps against the contradiction map itself before checking the per-variable timestamp sets, so existing segments missed contradiction review flags.
+- Why it happened: the contradiction structure is keyed by variable name, but the incremental update path treated it like a timestamp-indexed map.
+- Detect earlier: whenever a helper returns `dict[str, set[float]]`, add one regression test that exercises both the dict keys and the nested timestamp membership path.
+- Prevention rule: when propagating contradiction or review state, compare timestamps only against the nested timestamp sets, never against the outer variable-keyed dict.
+
 
 ### Windows dev launcher shell regression
 - What went wrong: `npm run dev` failed before startup because the dev launcher spawned child scripts through `cmd.exe`, which treated an extended-length Windows current directory (`\\?\...`) as unsupported and then resolved `scripts/dev.cjs` from `C:\Windows`.
