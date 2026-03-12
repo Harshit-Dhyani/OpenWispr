@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const repoRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(__dirname, "..", "..");
 const pathSeparator = process.platform === "win32" ? ";" : ":";
 const pythonPath = repoRoot + (process.env.PYTHONPATH ? pathSeparator + process.env.PYTHONPATH : "");
 const venvPython =

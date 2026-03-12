@@ -1,7 +1,7 @@
 const { spawn } = require("child_process");
 const path = require("path");
 
-const repoRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(__dirname, "..", "..");
 const nodeExe = process.execPath;
 
 function sanitizeCwd(cwd) {
@@ -16,7 +16,7 @@ function resolveDevTargets() {
   return {
     backend: {
       command: nodeExe,
-      args: [path.join(repoRoot, "scripts", "run-backend-dev.cjs")],
+      args: [path.join(repoRoot, "scripts", "dev", "run-backend-dev.cjs")],
     },
     electron: {
       command: nodeExe,

@@ -15,10 +15,10 @@
     "install:ui": "pnpm --dir app/electron install",
     "install:backend": "python -m pip install -e . || echo 'Backend optional'",
     "postinstall": "pnpm run install:all",
-    "dev": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'dev.cjs')).runDev()\"",
+    "dev": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'dev', 'dev.cjs')).runDev()\"",
     "dev:electron": "pnpm --dir app/electron run dev",
     "dev:frontend": "pnpm --dir app/electron/frontend run dev",
-    "dev:backend": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'run-backend-dev.cjs'))\"",
+    "dev:backend": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'dev', 'run-backend-dev.cjs'))\"",
     "build": "pnpm run build:clean && pnpm run build:frontend && pnpm run build:electron",
     "build:clean": "rimraf app/electron/renderer/dist app/electron/dist dist release",
     "build:frontend": "pnpm --dir app/electron/frontend run build",
@@ -39,8 +39,9 @@
     "check:renderer-strings": "python tools/check_renderer_strings.py",
     "lint:fix": "pnpm run lint:frontend -- --fix && pnpm run lint:electron -- --fix",
     "typecheck": "pnpm --dir app/electron/frontend run typecheck || echo 'No typecheck script'",
-    "tree:generate": "node scripts/generate-tree.cjs",
-    "changes:since-last-commit": "node scripts/generate-changes-since-last-commit.cjs",
+    "code:export": "node scripts/export/export-code-for-chatgpt.cjs",
+    "tree:generate": "node scripts/generate/generate-tree.cjs",
+    "changes:since-last-commit": "node scripts/generate/generate-changes-since-last-commit.cjs",
     "pack": "pnpm --dir app/electron run pack",
     "pack:all": "pnpm run build:production && pnpm run dist:all",
     "dist": "pnpm run build:production && pnpm run dist:current",
@@ -50,7 +51,7 @@
     "dist:mac": "pnpm --dir app/electron run dist -- --mac",
     "dist:linux": "pnpm --dir app/electron run dist -- --linux",
     "dist:portable": "pnpm run build:production && pnpm --dir app/electron run dist -- --win portable",
-    "scripts:build": "python scripts/build.py",
+    "scripts:build": "python scripts/build/build.py",
     "scripts:package": "python scripts/package.py",
     "scripts:release": "python scripts/release.py",
     "version": "node scripts/version.js",
@@ -66,8 +67,8 @@
     "clean:cache": "rimraf .cache .parcel-cache .turbo",
     "clean:all": "pnpm run clean && pnpm run clean:cache",
     "postversion": "pnpm run changelog && git push && git push --tags",
-    "brand:icons": "python scripts/generate_brand_assets.py",
-    "brand:icons:default": "python scripts/generate_brand_assets.py"
+    "brand:icons": "python scripts/generate/generate_brand_assets.py",
+    "brand:icons:default": "python scripts/generate/generate_brand_assets.py"
   },
   "build": {
     "appId": "com.openwispr.desktop",
@@ -286,6 +287,7 @@
     ]
   }
 }
+
 
 
 
