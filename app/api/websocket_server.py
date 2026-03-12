@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import ipaddress
 import json
 import logging
+import os
 import time
 import zlib
 from collections import deque
@@ -30,6 +32,16 @@ from starlette.websockets import WebSocketState
 from app.api.json_utils import make_json_safe
 
 logger = logging.getLogger(__name__)
+
+
+def _client_ip_is_local(client_ip: str) -> bool:
+    try:
+        address = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return client_ip in {"localhost"}
+
+    return address.is_loopback
+
 
 
 class MessageType(str, Enum):
@@ -166,7 +178,7 @@ class WebSocketConnection:
         self._disconnect_handlers: list[Callable] = []
 
         # Connection state
-        self._authenticated = not config.auth_required
+        self._authenticated = False
         self._closed = False
         self._heartbeat_task: asyncio.Task | None = None
         self._last_pong = time.time()
@@ -190,11 +202,18 @@ class WebSocketConnection:
     async def authenticate(self, token: str | None = None) -> bool:
         """Authenticate the connection."""
         if not self.config.auth_required:
-            self._authenticated = True
-            return True
+            if _client_ip_is_local(self.client_ip):
+                self._authenticated = True
+                return True
 
-        # Simple token validation (extend for JWT, etc.)
-        if token == "valid_token":  # Replace with actual validation
+            logger.warning(
+                "Rejected unauthenticated non-local WebSocket client",
+                extra={"connection_id": self.connection_id, "client_ip": self.client_ip},
+            )
+            return False
+
+        expected_token = os.getenv("OPENWISPR_WS_TOKEN")
+        if expected_token and token == expected_token:
             self._authenticated = True
             return True
 

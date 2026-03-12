@@ -1,6 +1,6 @@
 # OpenWispr Agent Guidance
 
-Keep this file short. Add only concrete rules that prevent repeat regressions.
+Keep this file short enough to stay enforceable. Add only concrete rules that prevent repeat regressions, reduce architecture drift, and make changes safer.
 
 ## Engineering Standards
 
@@ -8,6 +8,19 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Do not add user-facing copy inline. Renderer copy -> `app/electron/frontend/src/strings/en.ts`; Electron shell copy -> `app/electron/strings/en.js`; backend API copy -> `app/api/strings/en.py`; prompt text -> `app/stt/prompts.py`.
 - Keep boundaries clean: routes handle transport/validation only, services own orchestration, STT modules own decoding/aggregation/cleanup/refinement/prompts, utilities stay pure.
 - Split mixed-responsibility modules before they exceed roughly 300-500 lines.
+- Discovery first: inspect existing wiring, contracts, and tests before editing.
+- Prefer minimal diffs; do not mix bug fixes with broad cleanup unless the cleanup is required for the fix.
+- Do not rename/move modules and change behavior in the same batch unless unavoidable.
+- Treat file paths and ownership assumptions as hints until verified in the current repo.
+
+## Core Project Guardrails
+
+- Do not create a second source of truth for settings, model metadata, generated config, UI strings, event payloads, or docs ownership.
+- If docs, code, generated outputs, and tests disagree, reconcile them in the same change or explicitly mark the drift.
+- Do not document target architecture as current reality; label current, transitional, and target states explicitly.
+- One concept should have one primary owner. Parallel implementations, schemas, or docs must be temporary, explicit, and justified.
+- If a UI control is visible, it must change real behavior; remove or hide placebo controls.
+- Any change crossing backend/Electron/frontend boundaries must verify all producers and consumers in the same batch.
 
 ## Never Reintroduce These Bugs
 
@@ -23,6 +36,75 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Do not split transcription behavior settings across unrelated sections; transcription fidelity/finalization controls live under Transcription, Models only controls runtime/download/cache.
 - Do not maintain parallel handwritten frontend settings schema/defaults in parallel with `app/config/settings.py` + generated settings outputs.
 - Do not shadow imported Electron helper functions with local boolean flags of similar names.
+
+## Change Safety Rules
+
+- Verify existing contracts before editing: route payloads, preload APIs, WebSocket/SSE message shapes, generated config outputs, settings registry, and model catalogs.
+- Every non-trivial fix must preserve or intentionally update the contract, state the risk, and include verification.
+- Do not move files without checking imports, package/build allowlists, docs references, generated outputs, and tests in the same change.
+- Do not leave compatibility shims half-updated; when a canonical path changes, verify both canonical and shim paths if both remain supported.
+- Avoid broad “while I’m here” edits in risky areas such as hotkey flow, floating window, settings persistence, model loading, SSE/WebSocket paths, and download management.
+- When a change introduces a new long-lived background task, queue, cache, retry loop, or poller, bound it and document the overflow/cleanup policy in code.
+
+## Source of Truth Rules
+
+- Backend settings registry in `app/config/settings.py` is authoritative unless explicitly superseded in the same batch.
+- Frontend settings schema/defaults must be generated from or aligned with backend settings metadata; no silent handwritten drift.
+- `app/core/model_catalog.py` is the canonical model catalog unless a same-batch migration explicitly changes that ownership.
+- Renderer copy belongs only in `app/electron/frontend/src/strings/en.ts`.
+- Electron shell copy belongs only in `app/electron/strings/en.js`.
+- Backend API copy belongs only in `app/api/strings/en.py`.
+- Prompt text belongs only in `app/stt/prompts.py` unless a prompt-specific owner is explicitly introduced.
+- Generated files under `app/electron/frontend/src/config/generated/` are outputs, not handwritten sources.
+- Audit reports in `reports/` are not source of truth for runtime behavior; verify claims against current code before repeating them.
+
+## Security Baseline Rules
+
+- Never trust renderer/client input; validate at the transport boundary.
+- Never expose privileged Electron or OS capabilities beyond the narrow preload contract.
+- Prefer allowlists over broad passthrough behavior for IPC, file access, downloads, model actions, and shell/subprocess paths.
+- Do not introduce unbounded queues, unbounded retries, or unbounded file growth without explicit limits.
+- Do not log secrets, raw transcript content, raw document contents, or machine-specific sensitive paths unless redacted and explicitly required for debug mode.
+- Any new network, file-system, subprocess, shell, or download code must include failure handling and abuse-case thinking in the same change.
+- Do not treat local-only assumptions as a reason to skip validation or boundary checks.
+
+## Performance Guardrails
+
+- Do not add polling where push, caching, memoization, or existing subscriptions are sufficient.
+- Avoid repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, `/api/models/catalog`; load once, cache, and resubscribe only when needed.
+- Bound every long-lived queue, cache, retry loop, audio buffer, and background stream.
+- Do not duplicate computation across backend, Electron, and renderer when one layer can own it cleanly.
+- Measure before and after for hot paths: startup, hotkey start/stop, floating updates, model download, settings sync, and session streaming.
+- Do not raise default memory or latency cost without a clear user-visible benefit and explicit verification.
+- Streaming queues and fanout paths must have explicit maxsize and deliberate overflow policy.
+
+## Testing Contract Rules
+
+- For bug fixes, add or update at least one focused regression test.
+- For non-trivial workflow changes, add the smallest sensible mix: unit + integration/wiring + regression, and E2E only when user-visible flow changed materially.
+- Contract change: update backend and frontend consumers plus direct contract tests in the same change.
+- Refactor: prove behavior parity with at least one focused wiring/integration test.
+- Do not remove failing tests to make a change pass unless the test is demonstrably wrong and replaced with a correct one.
+- Run the smallest relevant backend/frontend tests for touched areas before merging.
+- Root validation wrappers must call real package-level validation commands; never silently downgrade to echo/fallback behavior.
+
+## Architecture Drift Rules
+
+- Do not leave new code in transitional locations if a target owner already exists.
+- If a module remains in a non-ideal location for compatibility, mark it as transitional and keep the shim explicit.
+- Routes handle transport only; move orchestration out instead of letting route files accumulate business logic.
+- Keep one active source of truth per concept; duplicates must be justified or scheduled for consolidation.
+- When moving modules, update imports, packaging allowlists, docs inventory/source-of-truth references, and tests in the same batch.
+- Do not merge microphone dictation and system-audio session logic unless the shared abstraction is concrete and verified.
+
+## Docs and Reports Hygiene Rules
+
+- README is public-facing; do not dump internal audits, migration notes, or deep implementation contracts into it.
+- Internal engineering docs must be labeled clearly as current-state, audit, transitional, or target-state documents.
+- Do not create duplicate docs for the same concept without a clearly different responsibility.
+- If a report or doc is superseded, mark it explicitly instead of leaving competing truths in the repo.
+- Do not claim performance, coverage, reliability, or security status numbers unless verified in the current repo state.
+- Every runtime path move must include same-batch docs inventory/source-of-truth updates for renamed entrypoints, moved files, and changed ownership.
 
 ## Verified Prevention Entries
 
@@ -68,7 +150,6 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: whenever a helper returns `dict[str, set[float]]`, add one regression test that exercises both the dict keys and the nested timestamp membership path.
 - Prevention rule: when propagating contradiction or review state, compare timestamps only against the nested timestamp sets, never against the outer variable-keyed dict.
 
-
 ### Windows dev launcher shell regression
 - What went wrong: `npm run dev` failed before startup because the dev launcher spawned child scripts through `cmd.exe`, which treated an extended-length Windows current directory (`\\?\...`) as unsupported and then resolved `scripts/dev.cjs` from `C:\Windows`.
 - Why it happened: `scripts/dev.cjs` used `shell: true` instead of launching `pnpm` through a Node-resolved executable path.
@@ -111,6 +192,24 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Detect earlier: for each floating action, assert the pending action seen by the stop path in a focused IPC test.
 - Prevention rule: explicit floating actions must set an explicit pending action and never inherit another finish mode from defaults.
 
+### Tray quick-settings live-state drift
+- What went wrong: tray quick-setting changes could persist to disk without refreshing renderer-visible settings or reapplying the active Electron hotkey config.
+- Why it happened: only one tray toggle path emitted `settings-updated` and called `applyHotkeyConfig`; the other quick-setting branches saved settings in isolation and left `state.cachedSettings` stale.
+- Detect earlier: after changing any tray or quick-settings handler, verify one toggle from each submenu updates persisted settings, `state.cachedSettings`, Electron hotkey state, and renderer subscriptions in the same run.
+- Prevention rule: every Electron tray/quick-settings mutation must use one shared persistence path that updates cached settings, reapplies hotkey config when relevant, and emits the canonical renderer settings refresh event.
+
+### Wildcard CORS with credentials
+- What went wrong: the FastAPI API allowed `allow_origins=["*"]` together with credentialed CORS responses, which is rejected by browsers and weakens intent around trusted origins.
+- Why it happened: the desktop-local API kept a permissive wildcard origin while also enabling credentials by default.
+- Detect earlier: inspect middleware configuration whenever API transport defaults change and reject wildcard-plus-credentials combinations in a focused test.
+- Prevention rule: never combine wildcard CORS origins with `allow_credentials=True`; if origins stay wildcard, credentials must stay disabled.
+
+### Local-only WebSocket auth fallback
+- What went wrong: the shared WebSocket server accepted unauthenticated connections outright and also kept a hardcoded token example, making the transport look protected when it was not.
+- Why it happened: the desktop-local assumption bypassed auth entirely instead of restricting unauthenticated access to loopback clients and environment-configured tokens.
+- Detect earlier: for every WebSocket auth change, test one loopback client, one non-loopback unauthenticated client, and one token-authenticated client against the same connection class.
+- Prevention rule: desktop-local WebSocket fallbacks may skip explicit auth only for verified loopback clients; any non-local access must require a real configured token, never a hardcoded placeholder.
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.
@@ -121,6 +220,8 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Keep one active SSE/WebSocket subscription per workflow/route with stable dependency cleanup.
 - Avoid repeated idle polling loops for `/api/settings`, `/api/devices`, `/api/session`, `/api/models/catalog`; load once, cache, and resubscribe only when needed.
 - Keep microphone and system audio as mutually exclusive active capture modes.
+- For risky fixes, include the smallest useful verification note in the change: what contract was checked, what tests ran, and what user-visible path was validated.
+- If a file move or ownership change leaves a temporary shim, add a follow-up cleanup note instead of pretending the migration is complete.
 
 ## Regression Checklist
 
@@ -131,10 +232,28 @@ Keep this file short. Add only concrete rules that prevent repeat regressions.
 - Transcription presets change active runtime profile behavior.
 - Code/log cleanup mode preserves numbers, percentages, versions, hotkeys, uppercase tokens, and command-like strings.
 - Models section owns runtime/download/cache controls only.
+- Backend/Electron/frontend consumers still agree on touched event payloads.
+- Settings changes preserve backend registry, generated frontend outputs, and renderer behavior alignment.
+- Moved files still resolve in package/build/runtime/test contexts where compatibility is expected.
+- Any new queue/cache/retry/background loop is bounded and has explicit cleanup behavior.
+
+## Stop-And-Rethink Triggers
+
+Pause and reassess before merging if:
+- a fix adds a second schema/default/config owner
+- a change introduces new polling, a new queue, or a new background loop without a bound
+- a UI control does not map to real behavior
+- a migration leaves old and new paths active without a clear ownership note
+- a docs change describes target architecture as already implemented
+- a change crosses backend/Electron/frontend boundaries without an explicit contract check
+- a bug fix “works” only because a failing test or consumer was bypassed
+- a report/doc claim is being repeated without verification against current code
 
 ## Before Merging
 
-- Run smallest relevant backend/frontend tests for touched areas.
+- Run the smallest relevant backend/frontend tests for touched areas.
 - For hotkey/session changes, verify transcript correctness and model routing in logs.
 - For download changes, verify resume/retry behavior and monotonic progress.
-
+- For settings/config/schema changes, verify backend registry, generated frontend outputs, and renderer consumers together.
+- For Electron file moves, verify imports, packaging globs, and packaged/runtime entrypoints.
+- For docs changes after runtime moves, verify inventory/source-of-truth paths are updated in the same batch.

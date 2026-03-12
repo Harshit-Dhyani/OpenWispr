@@ -8,18 +8,18 @@ source_of_truth:
   - benchmarks/
 ---
 
-# Transcripta Real-Time Transcription Audit Report
+# OpenWispr Real-Time Transcription Audit Report
 
 **Date:** March 1, 2026  
 **Analysis Scope:** End-to-end transcription pipeline  
 **Auditors:** 15 specialized diagnostic agents
-**Conclusion:** Transcripta is **NOT real-time** - latency ranges from 2.5s (best case) to 11.5s (worst case). Minimum achievable with current architecture: ~400ms.
+**Conclusion:** OpenWispr is **NOT real-time** - latency ranges from 2.5s (best case) to 11.5s (worst case). Minimum achievable with current architecture: ~400ms.
 
 ---
 
 ## Executive Summary
 
-### Why Transcripta Feels "Not Real-Time"
+### Why OpenWispr Feels "Not Real-Time"
 
 | Issue | Impact | Severity |
 |-------|--------|----------|
@@ -667,7 +667,7 @@ for chunk in chunks:
 
 ## Conclusion
 
-Transcripta is fundamentally architected as a **batch transcription tool** with real-time aspirations. The 2.4-4.5 second chunk accumulation is the primary blocker to real-time feel. Combined with 2.0s output throttling and 1.2s UI polling, users experience **3.5-4.6 seconds** of latency.
+OpenWispr is fundamentally architected as a **batch transcription tool** with real-time aspirations. The 2.4-4.5 second chunk accumulation is the primary blocker to real-time feel. Combined with 2.0s output throttling and 1.2s UI polling, users experience **3.5-4.6 seconds** of latency.
 
 **To achieve true real-time transcription (<500ms):**
 1. Reduce chunk sizes to 0.3-0.5 seconds

@@ -295,8 +295,8 @@ class ResourceMonitor:
 
             try:
                 open_files = len(self._process.open_files())
-            except:
-                open_files = 0
+            except Exception:
+                    open_files = 0
         else:
             # Fallback to basic monitoring
             import os

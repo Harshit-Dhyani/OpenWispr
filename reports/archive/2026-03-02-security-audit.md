@@ -8,7 +8,13 @@ source_of_truth:
   - app/core/logging_utils.py
 ---
 
-# Transcripta Security & Bug Audit Report
+# OpenWispr Security & Bug Audit Report
+
+## Verification Update - 2026-03-09
+- Verified against current code before reuse.
+- Already completed in later batches: unbounded SSE queue, PyAudio startup cleanup, QApplication reuse.
+- Completed in this pass: CORS credentials mismatch, hardcoded WebSocket token fallback, bare `except:`.
+- Still open or deferred findings below remain historical until re-verified individually.
 
 **Generated:** 2026-03-02  
 **Scope:** Application source code analysis  

@@ -474,9 +474,10 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         category="audio",
         type="enum",
         default=AudioConstants.DEFAULT_BACKEND,
-        label="Audio Backend",
-        description="Low-level Windows capture backend",
+        label="Legacy Audio Backend Alias",
+        description="Compatibility alias for migrated settings. Use audio_backend instead.",
         options=["auto", "pyaudio", "soundcard"],
+        is_fake=True,
     ),
     "audio_backend": SettingDefinition(
         name="audio_backend",

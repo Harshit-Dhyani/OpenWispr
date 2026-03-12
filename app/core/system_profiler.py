@@ -89,15 +89,15 @@ class SystemProfile:
 
     @property
     def recommended_quality_level(self) -> str:
-        """Return quality level: 'maximum', 'high', 'balanced', 'low'"""
+        """Return quality level using supported runtime labels only."""
         if self.gpu.can_run_large_models:
             return "maximum"
         elif self.gpu.can_run_medium_models or self.cpu.ram_gb >= 16:
-            return "high"
-        elif self.gpu.can_run_small_models or self.cpu.ram_gb >= 8:
             return "balanced"
+        elif self.gpu.can_run_small_models or self.cpu.ram_gb >= 8:
+            return "fast"
         else:
-            return "low"
+            return "low_memory"
 
 
 class SystemProfiler:

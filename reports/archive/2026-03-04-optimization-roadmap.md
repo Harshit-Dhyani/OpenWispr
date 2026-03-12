@@ -7,7 +7,7 @@ source_of_truth:
   - app/core/metrics.py
 ---
 
-# Transcripta Optimization Roadmap
+# OpenWispr Optimization Roadmap
 
 **Status:** Active and code-aligned  
 **Last Updated:** March 3, 2026  
@@ -15,7 +15,7 @@ source_of_truth:
 
 ## Purpose
 
-This roadmap tracks the real optimization work that matters for Transcripta today:
+This roadmap tracks the real optimization work that matters for OpenWispr today:
 
 - hotkey dictation reliability
 - live transcription latency
@@ -350,7 +350,7 @@ Do not spend time yet on:
 
 ## Definition of Better
 
-Transcripta is better when:
+OpenWispr is better when:
 
 - short dictation does not repeat or truncate text
 - the selected ASR model is the one actually used

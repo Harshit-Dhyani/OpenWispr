@@ -82,7 +82,7 @@ class ModelConstants:
     # Model catalog IDs mapping
     MODEL_CATALOG_MAPPING = {
         "tiny": "whisper-tiny",
-        "base": "whisper-small",
+        "base": "whisper-base",
         "small": "whisper-small",
         "medium": "whisper-medium",
         "large-v3": "whisper-large-v3",

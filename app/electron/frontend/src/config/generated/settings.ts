@@ -86,10 +86,10 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     category: "audio",
     type: "enum",
     default: "auto",
-    label: "Audio Backend",
-    description: "Low-level Windows capture backend",
+    label: "Legacy Audio Backend Alias",
+    description: "Compatibility alias for migrated settings. Use audio_backend instead.",
     options: ["auto", "pyaudio", "soundcard"],
-    isFake: false,
+    isFake: true,
     isAdvanced: false,
   },
   beam_size: {

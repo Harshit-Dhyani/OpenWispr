@@ -128,7 +128,7 @@ class BackendService:
                     and entry.runtime_model_name
                 ],
                 available_languages=available_language_codes(),
-                available_live_modes=["realtime", "low_latency", "balanced", "high_accuracy"],
+                available_live_modes=["ultra", "realtime", "low_latency", "balanced", "high_accuracy"],
                 available_execution_modes=["auto", "gpu_only", "cpu_only"],
                 runtime_revision=self._revision,
                 loading=self._loading,
