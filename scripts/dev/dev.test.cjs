@@ -19,6 +19,6 @@ test("resolveDevTargets launches backend and electron scripts directly", () => {
 
   assert.equal(targets.backend.command, process.execPath);
   assert.equal(targets.electron.command, process.execPath);
-  assert.equal(targets.backend.args[0], path.join(repoRoot, "scripts", "run-backend-dev.cjs"));
+  assert.equal(targets.backend.args[0], path.join(repoRoot, "scripts", "dev", "run-backend-dev.cjs"));
   assert.equal(targets.electron.args[0], path.join(repoRoot, "app", "electron", "scripts", "dev.js"));
 });
