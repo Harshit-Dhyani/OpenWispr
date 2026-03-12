@@ -33,9 +33,9 @@ import {
 } from './lib/liveTranscript';
 import { resolveSourceModelId, syncInheritedAsrModelIds } from './lib/asrRouting';
 import { getEligibleDevices, resolveRequestedDeviceId } from './lib/sessionStart';
-import { DEFAULT_SETTINGS, isFakeSetting } from './lib/settingsSchema';
-import type { SettingsState } from './lib/settingsSchema';
-import { sanitizeSettings } from './lib/settingsMigration';
+import { DEFAULT_SETTINGS, isFakeSetting } from './config/settingsSchema';
+import type { SettingsState } from './config/settingsSchema';
+import { sanitizeSettings } from './config/settingsMigration';
 import type {
   Device,
   Formula,
@@ -858,6 +858,7 @@ function App() {
   useEffect(() => {
     let disposeBackendExit: (() => void) | undefined;
     let disposeOpenSettings: (() => void) | undefined;
+    let disposeSettingsUpdated: (() => void) | undefined;
     let hotkeyStateListener:
       | ((event: unknown, state: HotkeyState | null | undefined) => void)
       | undefined;
@@ -996,6 +997,12 @@ function App() {
       setActivePage('settings');
       setQuickSettingsMode(null);
     });
+    disposeSettingsUpdated = window.openwisprDesktop.onSettingsUpdated?.(() => {
+      void loadSettings();
+      void loadDevices();
+      void loadHotkeyConfig();
+      void loadModelCatalog();
+    });
     hotkeyStateListener = (_event, state) => {
       setHotkeyState(state ?? null);
     };
@@ -1006,6 +1013,7 @@ function App() {
       }
       disposeBackendExit?.();
       disposeOpenSettings?.();
+      disposeSettingsUpdated?.();
       if (hotkeyStateListener) {
         window.openwisprDesktop.hotkey.removeStateChangeListener?.(hotkeyStateListener);
       }
@@ -1013,7 +1021,7 @@ function App() {
       disposeHotkeyTranscriptEvents?.();
       disconnect();
     };
-  }, [disconnect, loadModelCatalog]);
+  }, [disconnect, loadDevices, loadHotkeyConfig, loadModelCatalog, loadSettings]);
 
   useEffect(() => {
     if (isStarting) {

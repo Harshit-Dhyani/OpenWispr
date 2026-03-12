@@ -5,12 +5,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useSettingsSync, useSetting, useSyncStatus, useSettingsCategory } from '../useSettingsSync';
-import * as settingsApi from '../../lib/settingsApi';
-import { DEFAULT_SETTINGS, type SettingsState } from '../../lib/settingsSchema';
+import * as settingsApi from '../../api/settings';
+import { DEFAULT_SETTINGS, type SettingsState } from '../../config/settingsSchema';
 
 // Mock the settingsApi module
-vi.mock('../../lib/settingsApi', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/settingsApi')>('../../lib/settingsApi');
+vi.mock('../../api/settings', async () => {
+  const actual = await vi.importActual<typeof import('../../api/settings')>('../../api/settings');
   return {
     ...actual,
     loadSettings: vi.fn(),

@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
     ipcRenderer.on("open-settings", callback);
     return () => ipcRenderer.removeListener("open-settings", callback);
   },
+  onSettingsUpdated: (callback) => {
+    ipcRenderer.on("settings-updated", callback);
+    return () => ipcRenderer.removeListener("settings-updated", callback);
+  },
   getApiOrigin: () => "http://127.0.0.1:8765",
 
   // Fetch API for backend communication

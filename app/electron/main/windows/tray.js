@@ -124,6 +124,20 @@ async function createTray() {
   const microphoneDevices = devices.filter((device) => device.is_input && !(device.supports_loopback || device.is_loopback));
   const recentEntries = getRecentTranscriptEntries(8);
 
+  async function persistTraySettings(nextSettings) {
+    const { applyHotkeyConfig } = require("../ipc/hotkeyHandlers");
+    state.cachedSettings = nextSettings;
+    settings = nextSettings;
+    await saveUserSettings(nextSettings);
+    if (nextSettings.hotkey) {
+      await applyHotkeyConfig(nextSettings.hotkey);
+    }
+    if (state.mainWindow && !state.mainWindow.isDestroyed()) {
+      state.mainWindow.webContents.send("settings-updated");
+    }
+    await createTray();
+  }
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: `Show ${state.APP_NAME}`,
@@ -194,21 +208,14 @@ async function createTray() {
           label: "Enable Global Hotkey",
           type: "checkbox",
           checked: Boolean(hotkeySettings.enabled ?? state.hotkeyEnabled),
-          click: async (menuItem) => {
-            const { applyHotkeyConfig } = require("../ipc/hotkeyHandlers");
-            const next = {
+          click: async (menuItem) => {            const next = {
               ...(settings || {}),
               hotkey: {
                 ...(hotkeySettings || {}),
                 enabled: menuItem.checked,
               },
             };
-            await saveUserSettings(next);
-            await applyHotkeyConfig(next.hotkey);
-            if (state.mainWindow && !state.mainWindow.isDestroyed()) {
-              state.mainWindow.webContents.send("settings-updated");
-            }
-            await createTray();
+            await persistTraySettings(next);
           },
         },
         {
@@ -223,8 +230,7 @@ async function createTray() {
                 finish_mode_default: menuItem.checked ? "finish_and_paste" : "finish",
               },
             };
-            await saveUserSettings(next);
-            await createTray();
+            await persistTraySettings(next);
           },
         },
         { type: "separator" },
@@ -242,8 +248,7 @@ async function createTray() {
                   language: language.code,
                 },
               };
-              await saveUserSettings(next);
-              await createTray();
+              await persistTraySettings(next);
             },
           })),
         },
@@ -262,8 +267,7 @@ async function createTray() {
                     device_id: "default",
                   },
                 };
-                await saveUserSettings(next);
-                await createTray();
+                await persistTraySettings(next);
               },
             },
             ...microphoneDevices.map((device) => ({
@@ -278,8 +282,7 @@ async function createTray() {
                     device_id: device.id,
                   },
                 };
-                await saveUserSettings(next);
-                await createTray();
+                await persistTraySettings(next);
               },
             })),
           ],

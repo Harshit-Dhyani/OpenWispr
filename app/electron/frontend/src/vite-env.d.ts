@@ -10,6 +10,7 @@ declare global {
       // Backend lifecycle
       onBackendExit: (callback: () => void) => () => void;
       onOpenSettings: (callback: () => void) => () => void;
+      onSettingsUpdated: (callback: () => void) => () => void;
 
       // HTTP API wrapper
       getApiOrigin: () => Promise<string>;
@@ -35,7 +36,7 @@ declare global {
         register: (accelerator: string) => Promise<{ success: boolean; error?: string }>;
         unregister: () => Promise<{ success: boolean; error?: string }>;
         getState: () => Promise<{
-          config: import('./lib/settingsSchema').HotkeySettings;
+          config: import('./config/settingsSchema').HotkeySettings;
           session: import('./types/api').HotkeySession | null;
           is_registered: boolean;
           error: string | null;
@@ -48,7 +49,7 @@ declare global {
           }) => void
         ) => () => void;
         removeStateChangeListener: (callback: (event: unknown, state: import('./types/api').HotkeyState) => void) => void;
-        updateConfig: (config: Partial<import('./lib/settingsSchema').HotkeySettings>) => Promise<{ success: boolean; config?: import('./lib/settingsSchema').HotkeySettings; error?: string }>;
+        updateConfig: (config: Partial<import('./config/settingsSchema').HotkeySettings>) => Promise<{ success: boolean; config?: import('./config/settingsSchema').HotkeySettings; error?: string }>;
       };
 
       // Text injection
@@ -60,7 +61,7 @@ declare global {
       floatingWindow?: {
         show?: () => Promise<unknown>;
         hide?: () => Promise<unknown>;
-        updatePosition?: (position: import('./lib/settingsSchema').HotkeySettings['floating_window_position']) => Promise<void>;
+        updatePosition?: (position: import('./config/settingsSchema').HotkeySettings['floating_window_position']) => Promise<void>;
         updateOptions?: (options: Partial<import('./types/api').FloatingWindowOptions>) => Promise<void>;
       };
 

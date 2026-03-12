@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { SettingsState } from '../config/settingsSchema';
-import type { SyncStatus, SettingsChangeEvent, ConflictResolution } from '../lib/settingsApi';
+import type { SyncStatus, SettingsChangeEvent, ConflictResolution } from '../api/settings';
 import {
   loadSettings,
   saveSettings,
@@ -24,7 +24,7 @@ import {
   isApiReachable,
   type SettingsSyncResponse,
   type PendingChange,
-} from '../lib/settingsApi';
+} from '../api/settings';
 import { DEFAULT_SETTINGS, validateSettings } from '../config/settingsSchema';
 
 // ============================================

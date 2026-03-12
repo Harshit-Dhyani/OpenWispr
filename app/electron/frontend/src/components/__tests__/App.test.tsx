@@ -81,6 +81,7 @@ describe('App', () => {
     window.openwisprDesktop.models.onDownloadEvent.mockReturnValue(vi.fn());
     window.openwisprDesktop.onBackendExit.mockReturnValue(vi.fn());
     window.openwisprDesktop.onOpenSettings.mockReturnValue(vi.fn());
+    window.openwisprDesktop.onSettingsUpdated.mockReturnValue(vi.fn());
   });
 
   afterEach(() => {
@@ -138,7 +139,34 @@ describe('App', () => {
     });
   });
 
-  it('handles backend exit gracefully', async () => {
+  it('reloads settings when Electron signals settings-updated', async () => {
+    let settingsUpdatedHandler: (() => void) | null = null;
+    window.openwisprDesktop.onSettingsUpdated.mockImplementation((handler: () => void) => {
+      settingsUpdatedHandler = handler;
+      return vi.fn();
+    });
+
+    await act(async () => {
+      render(<App />);
+    });
+
+    await waitFor(() => {
+      expect(window.openwisprDesktop.fetchJson).toHaveBeenCalledWith('/api/settings', undefined);
+    });
+
+    const settingsCallsBefore = window.openwisprDesktop.fetchJson.mock.calls.filter(([path]: [string]) => path === '/api/settings').length;
+
+    await act(async () => {
+      settingsUpdatedHandler?.();
+    });
+
+    await waitFor(() => {
+      const settingsCallsAfter = window.openwisprDesktop.fetchJson.mock.calls.filter(([path]: [string]) => path === '/api/settings').length;
+      expect(settingsCallsAfter).toBeGreaterThan(settingsCallsBefore);
+    });
+  });
+
+it('handles backend exit gracefully', async () => {
     let backendExitHandler: (() => void) | null = null;
     window.openwisprDesktop.onBackendExit.mockImplementation((handler: () => void) => {
       backendExitHandler = handler;

@@ -24,6 +24,7 @@ export type MockElectronAPI = {
   choosePdf: ReturnType<typeof vi.fn>;
   onBackendExit: ReturnType<typeof vi.fn>;
   onOpenSettings: ReturnType<typeof vi.fn>;
+  onSettingsUpdated: ReturnType<typeof vi.fn>;
   getApiOrigin: ReturnType<typeof vi.fn>;
   hotkey: {
     getState: ReturnType<typeof vi.fn>;
@@ -80,6 +81,7 @@ function createMockElectronAPI(): MockElectronAPI {
     choosePdf: vi.fn(),
     onBackendExit: vi.fn(() => vi.fn()),
     onOpenSettings: vi.fn(() => vi.fn()),
+    onSettingsUpdated: vi.fn(() => vi.fn()),
     getApiOrigin: vi.fn(() => Promise.resolve('http://127.0.0.1:8765')),
     hotkey: {
       getState: vi.fn(),

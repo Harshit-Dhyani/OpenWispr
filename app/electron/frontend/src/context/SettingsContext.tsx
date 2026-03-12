@@ -38,7 +38,7 @@ import {
   type SettingsSyncResponse,
   type ConflictResolution,
   type SettingsChangeEvent,
-} from '../lib/settingsApi';
+} from '../api/settings';
 
 // ============================================
 // Debounce Utility

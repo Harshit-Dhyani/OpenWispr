@@ -4,7 +4,7 @@ import { SettingCard } from '../SettingCard';
 import { Toggle, Select } from '../controls';
 import { HotkeyRecorder } from '../HotkeyRecorder';
 import type { SectionProps } from '../types';
-import type { HotkeySettings } from '../../../lib/settingsSchema';
+import type { HotkeySettings } from '../../../config/settingsSchema';
 import { RENDERER_STRINGS } from '../../../strings/en';
 
 export function HotkeySection({

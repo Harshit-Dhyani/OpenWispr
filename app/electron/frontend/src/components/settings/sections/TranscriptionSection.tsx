@@ -13,7 +13,7 @@ import {
 } from '../../../config/text';
 import { getLanguageLabel } from '../../../lib/languages';
 import { RENDERER_STRINGS } from '../../../strings/en';
-import { isFakeSetting } from '../../../lib/settingsSchema';
+import { isFakeSetting } from '../../../config/settingsSchema';
 
 interface TranscriptionSectionProps extends SectionProps {
   selectedPreset: string;

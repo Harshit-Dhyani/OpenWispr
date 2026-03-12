@@ -4,7 +4,7 @@ import type {
   SystemProfile,
   OptimizationPreset,
 } from '../../types/api';
-import type { SettingsState, HotkeySettings } from '../../lib/settingsSchema';
+import type { SettingsState, HotkeySettings } from '../../config/settingsSchema';
 import type { ModelManagerState } from '../../lib/modelRegistry';
 
 export type SettingsCategory =

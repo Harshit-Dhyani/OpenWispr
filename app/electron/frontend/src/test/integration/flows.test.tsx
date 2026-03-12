@@ -10,7 +10,7 @@ import {
   MOCK_MODELS,
   MOCK_DEVICES,
 } from '../test/factories';
-import type { SettingsState } from '../lib/settingsSchema';
+import type { SettingsState } from '../config/settingsSchema';
 
 // Mock hooks
 vi.mock('../hooks/useEventSource', () => ({
