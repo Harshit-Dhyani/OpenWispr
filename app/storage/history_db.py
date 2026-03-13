@@ -15,9 +15,20 @@ logger = logging.getLogger(__name__)
 class HistoryDatabase:
     """Thread-safe SQLite wrapper for history, dictionary, snippets, and styles."""
 
+    def _cleanup_stale_wal_files(self) -> None:
+        wal_path = self.db_path.with_suffix(".db-wal")
+        shm_path = self.db_path.with_suffix(".db-shm")
+        for path in (wal_path, shm_path):
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
     def __init__(self, db_path: Path) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._cleanup_stale_wal_files()
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(
             str(self.db_path),

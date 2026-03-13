@@ -51,6 +51,7 @@ declare global {
         removeStateChangeListener: (callback: (event: unknown, state: import('./types/api').HotkeyState) => void) => void;
         updateConfig: (config: Partial<import('./config/settingsSchema').HotkeySettings>) => Promise<{ success: boolean; config?: import('./config/settingsSchema').HotkeySettings; error?: string }>;
       };
+      applyHotkeyConfig: (hotkeyConfig: import('./config/settingsSchema').HotkeySettings) => Promise<unknown>;
 
       // Text injection
       text?: {

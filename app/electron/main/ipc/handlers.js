@@ -277,6 +277,12 @@ ipcMain.handle("quick-settings:close", async () => {
   return { success: true };
 });
 
+// Apply hotkey config when settings are saved from main window
+ipcMain.handle("settings:apply-hotkey", async (event, hotkeyConfig) => {
+  await applyHotkeyConfig(hotkeyConfig);
+  return { success: true };
+});
+
 // Floating window actions
 ipcMain.on("floating-window-action", async (event, { action }) => {
   console.log("[main] Floating window action:", action);

@@ -289,6 +289,14 @@ export function SettingsProvider({
           }
           setSyncStatus('synced');
 
+          // Apply hotkey config after saving hotkey settings
+          if (category === 'hotkey' || !category) {
+            const hotkeyConfig = (newSettings as SettingsState).hotkey;
+            if (hotkeyConfig && window.openwisprDesktop?.applyHotkeyConfig) {
+              window.openwisprDesktop.applyHotkeyConfig(hotkeyConfig);
+            }
+          }
+
           // Cache successful settings
           localStorage.setItem('openwispr:settings:cache', JSON.stringify(newSettings));
         } else if (response.errors) {
