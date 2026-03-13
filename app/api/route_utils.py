@@ -5,8 +5,9 @@ import inspect
 import logging
 import os
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -47,8 +48,8 @@ def apply_runtime_log_levels(log_level: str) -> None:
 
 def log_route(method: str, path: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        setattr(func, "__endpoint_path__", path)
-        setattr(func, "__http_method__", method)
+        func.__endpoint_path__ = path
+        func.__http_method__ = method
         return log_endpoint(func)
 
     return decorator
@@ -96,6 +97,10 @@ def _get_request_info(kwargs: dict[str, Any]) -> dict[str, Any]:
                     if k not in ("password", "token", "secret", "api_key")
                 }
             except Exception:
+                logger.warning(
+                    "Failed to extract request info from %s | operation=get_request_dict",
+                    type(value).__name__,
+                )
                 request_info = {"type": type(value).__name__}
         elif key in ("device_id", "model_name", "duration"):
             request_info[key] = str(value)

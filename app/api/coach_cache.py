@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 from pathlib import Path
 from time import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class CoachCache:
@@ -21,16 +24,21 @@ class CoachCache:
         try:
             return json.loads(self.cache_path.read_text(encoding="utf-8"))
         except Exception:
+            logger.warning("Failed to load cache from %s", self.cache_path)
             return {}
 
     def _persist(self) -> None:
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
         payload = self._entries
         if len(payload) > self.max_entries:
-            ordered = sorted(payload.items(), key=lambda item: item[1].get("created_at", 0), reverse=True)
+            ordered = sorted(
+                payload.items(), key=lambda item: item[1].get("created_at", 0), reverse=True
+            )
             payload = dict(ordered[: self.max_entries])
             self._entries = payload
-        self.cache_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+        self.cache_path.write_text(
+            json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8"
+        )
 
     @staticmethod
     def build_key(*parts: object) -> str:

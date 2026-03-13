@@ -5,7 +5,7 @@ import os
 
 import uvicorn
 
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 
 
 def main() -> None:

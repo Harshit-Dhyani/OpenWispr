@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
-from app.api.strings.en import API_STRINGS
-from app.api.services.backend_service import BackendService
 from app.api.services import (
     DictionaryService,
     SnippetService,
     StyleService,
     TranscriptHistoryService,
 )
+from app.api.services.backend_service import BackendService
+from app.api.strings.en import API_STRINGS
 from app.storage.history_db import HistoryDatabase
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 service: BackendService | None = None
-hotkey_service: "HotkeyTranscriptionService | None" = None
+hotkey_service: HotkeyTranscriptionService | None = None
 history_db: HistoryDatabase | None = None
 history_service: TranscriptHistoryService | None = None
 dictionary_service: DictionaryService | None = None
@@ -33,7 +33,7 @@ def get_service() -> BackendService:
     return service
 
 
-def get_hotkey_service() -> "HotkeyTranscriptionService":
+def get_hotkey_service() -> HotkeyTranscriptionService:
     if hotkey_service is None:
         raise HTTPException(
             status_code=503,
@@ -64,4 +64,3 @@ def get_style_service() -> StyleService:
     if style_service is None:
         raise HTTPException(status_code=503, detail="Style service is not ready")
     return style_service
-

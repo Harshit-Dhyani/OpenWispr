@@ -20,13 +20,13 @@ import json
 import logging
 import os
 import time
-import zlib
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from starlette.websockets import WebSocketState
 
 from app.api.json_utils import make_json_safe
@@ -41,7 +41,6 @@ def _client_ip_is_local(client_ip: str) -> bool:
         return client_ip in {"localhost"}
 
     return address.is_loopback
-
 
 
 class MessageType(str, Enum):
@@ -394,9 +393,21 @@ class WebSocketConnection:
             # Handle compressed messages
             if message.get("_compressed"):
                 compressed_data = bytes.fromhex(message["_data"])
-                json_data = gzip.decompress(compressed_data).decode("utf-8")
-                decompressed = json.loads(json_data)
-                if isinstance(decompressed, dict) and "type" in decompressed and "payload" in decompressed:
+                try:
+                    json_data = gzip.decompress(compressed_data).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    logger.warning(f"Failed to decode WebSocket message: {e}")
+                    return
+                try:
+                    decompressed = json.loads(json_data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse WebSocket JSON: {e}")
+                    return
+                if (
+                    isinstance(decompressed, dict)
+                    and "type" in decompressed
+                    and "payload" in decompressed
+                ):
                     msg_type_str = decompressed.get("type", msg_type_str)
                     payload = decompressed.get("payload", payload)
                 else:
@@ -486,8 +497,8 @@ class WebSocketConnection:
 
         try:
             await self.websocket.close(code=code, reason=reason)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("WebSocket close failed: %s", exc)
 
         duration = time.time() - self.stats.connected_at
         logger.debug(
