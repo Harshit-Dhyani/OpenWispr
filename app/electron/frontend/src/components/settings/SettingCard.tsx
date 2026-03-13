@@ -7,6 +7,7 @@ interface SettingCardProps {
   children: React.ReactNode;
   changed?: boolean;
   onReset?: () => void;
+  badge?: string;
 }
 
 export function SettingCard({
@@ -15,6 +16,7 @@ export function SettingCard({
   children,
   changed = false,
   onReset,
+  badge,
 }: SettingCardProps) {
   return (
     <div className={cn(
@@ -25,6 +27,11 @@ export function SettingCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-sm font-bold">{title}</h4>
+            {badge && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold uppercase">
+                {badge}
+              </span>
+            )}
             {changed && (
               <span className="text-[10px] px-1.5 py-0.5 bg-lawn-accent text-lawn-bg font-bold uppercase">
                 Modified

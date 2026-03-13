@@ -5,6 +5,7 @@ import { Toggle, Slider, Select } from '../controls';
 import type { SectionProps } from '../types';
 import { SETTINGS_SECTION_TEXT, CAPTURE_MODE_LABELS, AUDIO_BACKEND_LABELS, SAMPLE_RATE_LABELS } from '../../../config/text';
 import { RENDERER_STRINGS } from '../../../strings/en';
+import { isFakeSetting } from '../../../config/settingsSchema';
 
 export function AudioSection({
   settings,
@@ -117,6 +118,48 @@ export function AudioSection({
             onChange={(value) => updateSetting('audio', 'mute_openwispr_audio_during_dictation', value)}
           />
         </SettingCard>
+
+        {isFakeSetting('audio', 'noiseFiltering') && (
+          <SettingCard
+            title={text.noise_filtering_title}
+            description={text.noise_filtering_description}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.audio.noiseFiltering)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
+
+        {isFakeSetting('audio', 'echoCancellation') && (
+          <SettingCard
+            title={text.echo_cancellation_title}
+            description={text.echo_cancellation_description}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.audio.echoCancellation)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
+
+        {isFakeSetting('audio', 'autoGainControl') && (
+          <SettingCard
+            title={text.auto_gain_control_title}
+            description={text.auto_gain_control_description}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.audio.autoGainControl)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
 
         <div className="border-2 border-lawn-border bg-lawn-panel p-4">
           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">

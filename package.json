@@ -252,14 +252,11 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "Harshit-Dhyani",
+      "owner": "openwispr",
       "repo": "OpenWispr",
       "releaseType": "release",
       "publishAutoUpdate": true
-    },
-    "afterSign": "scripts/notarize.js",
-    "afterPack": "scripts/afterPack.js",
-    "afterAllArtifactBuild": "scripts/afterAllArtifactBuild.js"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",

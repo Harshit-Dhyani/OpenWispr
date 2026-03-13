@@ -1,10 +1,11 @@
 import { Settings } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
-import { Slider, Select } from '../controls';
+import { Slider, Select, Toggle } from '../controls';
 import type { SectionProps } from '../types';
 import { getLanguageLabel } from '../../../lib/languages';
 import { RENDERER_STRINGS } from '../../../strings/en';
+import { isFakeSetting } from '../../../config/settingsSchema';
 
 interface GeneralSectionProps extends SectionProps {
   availableLanguages: string[];
@@ -119,6 +120,48 @@ export function GeneralSection({
             suffix="s"
           />
         </SettingCard>
+
+        {isFakeSetting('general', 'showNotifications') && (
+          <SettingCard
+            title={text.showNotificationsTitle}
+            description={text.showNotificationsDescription}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.general.showNotifications)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
+
+        {isFakeSetting('general', 'minimizeToTray') && (
+          <SettingCard
+            title={text.minimizeToTrayTitle}
+            description={text.minimizeToTrayDescription}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.general.minimizeToTray)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
+
+        {isFakeSetting('general', 'startupWithSystem') && (
+          <SettingCard
+            title={text.startupWithSystemTitle}
+            description={text.startupWithSystemDescription}
+            badge="Coming Soon"
+          >
+            <Toggle
+              checked={Boolean(settings.general.startupWithSystem)}
+              onChange={() => {}}
+              disabled
+            />
+          </SettingCard>
+        )}
       </div>
     </div>
   );

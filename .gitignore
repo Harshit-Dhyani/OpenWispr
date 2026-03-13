@@ -79,4 +79,9 @@ test-results/
 prompts/REPORTS.md
 scripts/reports/
 
+# Docs generated
+docs/pnpm-lock.yaml
+docs/.docusaurus/
+docs/build/
+
 

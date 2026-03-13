@@ -163,8 +163,6 @@ This project is under active development. Before using, please note:
 - **API Changes**: Settings and interfaces may change
 - **Not Production Ready**: Do not use for critical transcription jobs
 
-See [reports/](reports/) for detailed audit findings.
-
 ---
 
 ## System Requirements
