@@ -11,17 +11,17 @@ import logging
 import threading
 import time
 from collections import deque
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Literal, Protocol
+from typing import Any
 
 import numpy as np
 
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.core.settings.manager import get_settings_manager
 from app.stt.chunker import AudioChunk
-from app.stt.fast_whisper_backend import FastWhisperBackend, WhisperModel
+from app.stt.fast_whisper_backend import WhisperModel
 from app.stt.model_pool import ModelPool, ModelSlot
 from app.stt.quality import assess_segment_quality
 
@@ -700,7 +700,7 @@ class DualModeTranscriptionEngine:
             if ModelWarmupStrategy.warmup_tiny(self._wispr_slot.model):
                 logger.info(f"Wispr model ({self.wispr_model_name}) warmed successfully")
             else:
-                logger.warning(f"Wispr model warmup incomplete")
+                logger.warning("Wispr model warmup incomplete")
 
             # Acquire System model (medium, fp16 or int8 based on GPU)
             compute_type = "float16" if self._has_gpu() else "int8"
@@ -715,7 +715,7 @@ class DualModeTranscriptionEngine:
             if ModelWarmupStrategy.warmup_medium(self._system_slot.model):
                 logger.info(f"System model ({self.system_model_name}) warmed successfully")
             else:
-                logger.warning(f"System model warmup incomplete")
+                logger.warning("System model warmup incomplete")
 
             # Create engines
             wispr_config = StreamingConfig(
@@ -858,7 +858,7 @@ class DualModeTranscriptionEngine:
                         self._queue.get(),
                         timeout=0.1,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
 
                 await self._process_chunk(chunk)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 PROFILE_INSTRUCTIONS: Final[dict[str, str]] = {
     "clean_dictation": (
         "Keep the speaker's meaning intact, smooth dictation artifacts, and produce clean prose."

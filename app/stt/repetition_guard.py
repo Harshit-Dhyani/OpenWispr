@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?]+\s+")
 _TOKEN_RE = re.compile(r"[A-Za-z0-9']+")
 _SENTENCE_RE = re.compile(r"[^.!?]+[.!?]?")

@@ -256,8 +256,8 @@ class ModelPool:
 
     def release(self, slot: ModelSlot) -> None:
         """Release a model slot back to the pool."""
-        # Currently a no-op as models are cached
-        pass
+        if slot.key:
+            self.release_model(slot.key)
 
     def get_model(
         self,

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.stt.dictation_cleanup import clean_final_text, compose_transcript_text, normalize_dictation_text
+from app.stt.dictation_cleanup import (
+    clean_final_text,
+    compose_transcript_text,
+    normalize_dictation_text,
+)
 from app.stt.repetition_guard import is_repetitive_segment, trim_repetitive_segment
 
 

@@ -14,10 +14,10 @@ import threading
 import time
 import warnings
 from collections import OrderedDict, deque
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from queue import Empty, Full, Queue
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -37,23 +37,26 @@ except ImportError:
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.stt.chunker import AudioChunk
 from app.stt.fast_whisper_backend import (
-    FastWhisperBackend,
-    GPURuntimeError,
-    InferenceConfig,
-    ModeConfig,
-    OptimizedWhisperFactory,
     SYSTEM_MODE,
     WISPR_MODE,
+    FastWhisperBackend,
+    GPURuntimeError,
+    OptimizedWhisperFactory,
 )
 from app.stt.model_pool import ModelPool
 from app.stt.quality import assess_segment_quality
-from app.stt.repetition_guard import is_repetitive_segment, repeated_sentence_count, repetition_score
+from app.stt.repetition_guard import (
+    is_repetitive_segment,
+    repeated_sentence_count,
+    repetition_score,
+)
 from app.stt.streaming_engine import (
     AdaptiveBeamController,
     ContextCarryoverManager,
     PartialResult,
     PerformanceMetrics,
 )
+
 
 def _should_fallback_to_cpu(exc: Exception) -> bool:
     """Check if error indicates GPU failure requiring CPU fallback."""

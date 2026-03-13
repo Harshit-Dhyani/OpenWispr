@@ -6,7 +6,6 @@ from difflib import SequenceMatcher
 
 from app.stt.repetition_guard import dedupe_boundary, trim_repetitive_segment
 
-
 _WHITESPACE_RE = re.compile(r"\s+")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,.;:!?])")
 _TOKEN_PUNCT_RE = re.compile(r"(^[^\w]+|[^\w]+$)")

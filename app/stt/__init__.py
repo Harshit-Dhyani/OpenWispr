@@ -5,11 +5,13 @@ adaptive beam sizing, and GPU memory pooling.
 """
 
 from app.stt.fast_whisper_backend import (
-    FastWhisperBackend as OptimizedWhisperBackend,
-    ModeConfig,
-    OptimizedWhisperFactory,
     SYSTEM_MODE,
     WISPR_MODE,
+    ModeConfig,
+    OptimizedWhisperFactory,
+)
+from app.stt.fast_whisper_backend import (
+    FastWhisperBackend as OptimizedWhisperBackend,
 )
 from app.stt.model_pool import ModelPool
 from app.stt.streaming_engine import (

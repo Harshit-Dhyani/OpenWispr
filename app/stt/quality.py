@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Iterable
 
 from app.core.constants import (
     COMMON_FILLER_WORDS,
-    HALLUCINATION_PHRASES,
     HALLUCINATION_CONFIDENCE_THRESHOLD,
+    HALLUCINATION_PHRASES,
     QualityConstants,
 )
 

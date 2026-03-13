@@ -1,3 +1,13 @@
+"""Audio chunking utilities for STT processing.
+
+This module provides basic audio chunking functionality:
+- RollingChunker: Simple fixed-size sliding window chunker (no VAD)
+- AudioChunk: Dataclass for audio with timestamps
+- chunk_segments: Text-based transcript chunking (not audio)
+
+Use app.stt.fast_chunker.FastChunker for production VAD-based chunking.
+"""
+
 from __future__ import annotations
 
 from collections import deque

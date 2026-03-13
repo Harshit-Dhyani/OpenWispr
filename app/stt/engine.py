@@ -400,8 +400,8 @@ class WhisperTranscriber:
             if torch is not None and torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to cleanup GPU resources: {e}")
 
     def cleanup(self) -> None:
         """Public cleanup method for safe resource disposal."""
