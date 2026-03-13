@@ -201,7 +201,9 @@ def generate_constants_ts() -> str:
         f"  DEFAULT_HOTKEY: '{UIConstants.DEFAULT_HOTKEY}',",
         "} as const;",
         "",
-        "export const VALID_THEMES = " + json.dumps(sorted(UIConstants.VALID_THEMES)) + " as const;",
+        "export const VALID_THEMES = "
+        + json.dumps(sorted(UIConstants.VALID_THEMES))
+        + " as const;",
         "export const VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;",
         "",
         "// ============================================",
@@ -332,7 +334,9 @@ def generate_constants_ts() -> str:
         f"  DEFAULT_REFINEMENT_MODE: '{RefinerConstants.DEFAULT_REFINEMENT_MODE}' as const,",
         "} as const;",
         "",
-        "export const VALID_REFINER_ENGINES = ['llamacpp', 'ollama'] as const;",
+        "export const VALID_REFINER_ENGINES = "
+        + json.dumps(sorted(RefinerConstants.VALID_ENGINES))
+        + " as const;",
         "export const VALID_REFINEMENT_MODES = ['off', 'strict', 'polished'] as const;",
         "",
         "// ============================================",

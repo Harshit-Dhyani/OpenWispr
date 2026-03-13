@@ -5,6 +5,7 @@ import { SettingCard } from '../SettingCard';
 import { Select, Toggle } from '../controls';
 import type { SectionProps } from '../types';
 import { RENDERER_STRINGS } from '../../../strings/en';
+import { ProviderHealthDisplay } from '../ProviderHealthDisplay';
 
 type PromptPreviewResponse = {
   system_prompt: string;
@@ -175,6 +176,7 @@ export function CoachSection({
         </div>
       ) : null}
 
+      <ProviderHealthDisplay />
 
       <div className="border-2 border-lawn-border bg-lawn-panel p-4">
         <h4 className="mb-4 text-sm font-bold">{text.outputTitle}</h4>

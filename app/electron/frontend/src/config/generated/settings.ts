@@ -486,7 +486,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     default: "llamacpp",
     label: "Engine Preference",
     description: "Preferred LLM inference engine",
-    options: ["llamacpp", "ollama"],
+    options: ["llamacpp", "ollama", "lm_studio"],
     isFake: false,
     isAdvanced: false,
   },

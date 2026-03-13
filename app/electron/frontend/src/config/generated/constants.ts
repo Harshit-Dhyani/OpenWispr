@@ -61,7 +61,7 @@ export const ModelConstants = {
   MIN_SEGMENT_LENGTH: 0.5,
 } as const;
 
-export const VALID_MODEL_NAMES = ["base", "turbo", "medium", "large-v3", "tiny", "small"] as const;
+export const VALID_MODEL_NAMES = ["medium", "turbo", "tiny", "small", "base", "large-v3"] as const;
 export const VALID_COMPUTE_TYPES = ['float16', 'int8', 'int8_float16'] as const;
 
 export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-base", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;
@@ -238,7 +238,7 @@ export const RefinerConstants = {
   DEFAULT_REFINEMENT_MODE: 'off' as const,
 } as const;
 
-export const VALID_REFINER_ENGINES = ['llamacpp', 'ollama'] as const;
+export const VALID_REFINER_ENGINES = ["llamacpp", "lm_studio", "ollama"] as const;
 export const VALID_REFINEMENT_MODES = ['off', 'strict', 'polished'] as const;
 
 // ============================================

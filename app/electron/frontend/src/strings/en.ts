@@ -340,6 +340,21 @@ export const RENDERER_STRINGS = {
       promptPreviewDescription:
         'Backend-compiled preview of the exact prompt payload that will be sent at stop.',
     },
+    provider: {
+      title: 'Local LLM Provider',
+      description: 'Check the status of local LLM inference engines.',
+      statusTitle: 'Provider Status',
+      statusDescription: 'Health check results for available LLM providers.',
+      ollama: 'Ollama',
+      lmStudio: 'LM Studio',
+      llamaCpp: 'Llama.cpp',
+      available: 'Available',
+      unavailable: 'Unavailable',
+      checking: 'Checking...',
+      responseTime: 'Response time',
+      error: 'Error',
+      refreshButton: 'Refresh',
+    },
     history: {
       title: 'History Settings',
       description: 'Configure transcript retention, retry behavior, and analytics defaults.',

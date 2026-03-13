@@ -370,7 +370,7 @@ class RefinerConstants:
 
     DEFAULT_MODEL_ID = "qwen2.5-3b-instruct"
     DEFAULT_ENGINE_PREFERENCE = "llamacpp"
-    VALID_ENGINES = {"llamacpp", "ollama"}
+    VALID_ENGINES = {"llamacpp", "ollama", "lm_studio"}
     DEFAULT_REFINEMENT_MODE = "off"
     VALID_REFINEMENT_MODES = {"off", "strict", "polished"}
     DEFAULT_REFINEMENT_PROFILE = "clean_dictation"

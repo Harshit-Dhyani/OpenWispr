@@ -440,7 +440,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default=RefinerConstants.DEFAULT_ENGINE_PREFERENCE,
         label="Engine Preference",
         description="Preferred LLM inference engine",
-        options=["llamacpp", "ollama"],
+        options=["llamacpp", "ollama", "lm_studio"],
     ),
     "refiner_provider_base_url": SettingDefinition(
         name="refiner_provider_base_url",
