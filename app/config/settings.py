@@ -6,8 +6,9 @@ settings with their metadata, validation rules, and defaults.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Literal, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from app.config.coach_prompts import get_default_coach_templates
 from app.config.constants import (
@@ -31,14 +32,14 @@ class SettingDefinition:
     default: Any
     label: str
     description: str
-    options: Optional[list] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    step: Optional[float] = None
-    suffix: Optional[str] = None
+    options: list | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    suffix: str | None = None
     is_fake: bool = False
     is_advanced: bool = False
-    validation_fn: Optional[Callable[[Any], tuple[bool, str]]] = None
+    validation_fn: Callable[[Any], tuple[bool, str]] | None = None
 
 
 # ============================================

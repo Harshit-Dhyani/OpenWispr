@@ -9,14 +9,14 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from app.api.websocket_server import MessageType, WebSocketConnection
-from app.core.settings_manager import (
+from app.core.settings.manager import (
     SettingsManager,
-    SettingsState,
     get_settings_manager,
 )
 
@@ -325,7 +325,9 @@ class SettingsSynchronizer:
                         logger.exception("Change callback error: %s", exc)
 
             self._last_change_time = asyncio.get_running_loop().time()
-            logger.debug("Applied settings changes: %s updates=%s (from %s)", category, updates, source)
+            logger.debug(
+                "Applied settings changes: %s updates=%s (from %s)", category, updates, source
+            )
 
     async def _queue_changes(self, category: str, updates: dict[str, Any], source: str) -> None:
         """Queue changes for batched application."""

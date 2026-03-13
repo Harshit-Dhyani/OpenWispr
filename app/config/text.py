@@ -7,12 +7,11 @@ This enables:
 - Single source of truth
 """
 
-from typing import Dict
 
 # ============================================
 # Model Names
 # ============================================
-MODEL_NAMES: Dict[str, str] = {
+MODEL_NAMES: dict[str, str] = {
     "tiny": "Tiny (Fastest, Lowest Quality)",
     "base": "Base (Fast, Good Quality)",
     "small": "Small (Balanced)",
@@ -22,7 +21,7 @@ MODEL_NAMES: Dict[str, str] = {
 }
 
 # Short model names (for compact UI)
-MODEL_NAMES_SHORT: Dict[str, str] = {
+MODEL_NAMES_SHORT: dict[str, str] = {
     "tiny": "Tiny",
     "base": "Base",
     "small": "Small",
@@ -34,7 +33,7 @@ MODEL_NAMES_SHORT: Dict[str, str] = {
 # ============================================
 # Live Mode Labels
 # ============================================
-LIVE_MODE_LABELS: Dict[str, str] = {
+LIVE_MODE_LABELS: dict[str, str] = {
     "ultra": "Ultra (100ms chunks)",
     "realtime": "Real-Time (Ultra Low Latency)",
     "low_latency": "Low Latency",
@@ -42,7 +41,7 @@ LIVE_MODE_LABELS: Dict[str, str] = {
     "high_accuracy": "High Accuracy",
 }
 
-LIVE_MODE_DESCRIPTIONS: Dict[str, str] = {
+LIVE_MODE_DESCRIPTIONS: dict[str, str] = {
     "ultra": "Fastest response with smallest chunks. May reduce accuracy.",
     "realtime": "Ultra low latency for real-time applications. 200ms chunks.",
     "low_latency": "Fast transcription with good accuracy. 500ms chunks.",
@@ -53,7 +52,7 @@ LIVE_MODE_DESCRIPTIONS: Dict[str, str] = {
 # ============================================
 # Setting Category Labels
 # ============================================
-CATEGORY_LABELS: Dict[str, str] = {
+CATEGORY_LABELS: dict[str, str] = {
     "general": "General",
     "transcription": "Transcription",
     "audio": "Audio",
@@ -65,7 +64,7 @@ CATEGORY_LABELS: Dict[str, str] = {
 # ============================================
 # Setting Labels
 # ============================================
-SETTING_LABELS: Dict[str, str] = {
+SETTING_LABELS: dict[str, str] = {
     # General
     "defaultSessionTitle": "Default Session Title",
     "defaultLanguage": "Default Language",
@@ -137,7 +136,7 @@ SETTING_LABELS: Dict[str, str] = {
 # ============================================
 # Setting Descriptions
 # ============================================
-SETTING_DESCRIPTIONS: Dict[str, str] = {
+SETTING_DESCRIPTIONS: dict[str, str] = {
     # General
     "defaultSessionTitle": "Default name for new transcription sessions",
     "defaultLanguage": "Primary language for transcription",
@@ -208,7 +207,7 @@ SETTING_DESCRIPTIONS: Dict[str, str] = {
 # ============================================
 # Theme Labels
 # ============================================
-THEME_LABELS: Dict[str, str] = {
+THEME_LABELS: dict[str, str] = {
     "light": "Light (Lawn)",
     "dark": "Dark (Night)",
     "cyber": "Cyberpunk",
@@ -221,7 +220,7 @@ THEME_LABELS: Dict[str, str] = {
 # ============================================
 # Compute Type Labels
 # ============================================
-COMPUTE_TYPE_LABELS: Dict[str, str] = {
+COMPUTE_TYPE_LABELS: dict[str, str] = {
     "float16": "Float16 (Best Quality)",
     "float32": "Float32 (Maximum Quality)",
     "int8": "Int8 (Fast, Low VRAM)",
@@ -231,7 +230,7 @@ COMPUTE_TYPE_LABELS: Dict[str, str] = {
 # ============================================
 # Capture Mode Labels
 # ============================================
-CAPTURE_MODE_LABELS: Dict[str, str] = {
+CAPTURE_MODE_LABELS: dict[str, str] = {
     "system": "System Audio",
     "microphone": "Microphone",
 }
@@ -239,7 +238,7 @@ CAPTURE_MODE_LABELS: Dict[str, str] = {
 # ============================================
 # Audio Backend Labels
 # ============================================
-AUDIO_BACKEND_LABELS: Dict[str, str] = {
+AUDIO_BACKEND_LABELS: dict[str, str] = {
     "auto": "Auto (PyAudio first)",
     "pyaudio": "PyAudio WASAPI",
     "soundcard": "Soundcard (Legacy)",
@@ -248,7 +247,7 @@ AUDIO_BACKEND_LABELS: Dict[str, str] = {
 # ============================================
 # Sample Rate Labels
 # ============================================
-SAMPLE_RATE_LABELS: Dict[str, str] = {
+SAMPLE_RATE_LABELS: dict[str, str] = {
     "8000": "8 kHz",
     "16000": "16 kHz (Recommended)",
     "22050": "22.05 kHz",
@@ -259,7 +258,7 @@ SAMPLE_RATE_LABELS: Dict[str, str] = {
 # ============================================
 # Finish Action Labels
 # ============================================
-FINISH_ACTION_LABELS: Dict[str, str] = {
+FINISH_ACTION_LABELS: dict[str, str] = {
     "finish": "Finish Only",
     "finish_and_paste": "Finish & Paste",
     "cancel": "Cancel",
@@ -268,7 +267,7 @@ FINISH_ACTION_LABELS: Dict[str, str] = {
 # ============================================
 # Floating Window Position Labels
 # ============================================
-FLOATING_POSITION_LABELS: Dict[str, str] = {
+FLOATING_POSITION_LABELS: dict[str, str] = {
     "top-left": "Top Left",
     "top-right": "Top Right",
     "bottom-left": "Bottom Left",
@@ -279,7 +278,7 @@ FLOATING_POSITION_LABELS: Dict[str, str] = {
 # ============================================
 # Log Level Labels
 # ============================================
-LOG_LEVEL_LABELS: Dict[str, str] = {
+LOG_LEVEL_LABELS: dict[str, str] = {
     "DEBUG": "Debug (Most Verbose)",
     "INFO": "Info",
     "WARN": "Warning",
@@ -289,14 +288,14 @@ LOG_LEVEL_LABELS: Dict[str, str] = {
 # ============================================
 # Optimization Preset Labels
 # ============================================
-OPTIMIZATION_PRESET_LABELS: Dict[str, str] = {
+OPTIMIZATION_PRESET_LABELS: dict[str, str] = {
     "maximum": "Maximum Quality",
     "balanced": "Balanced",
     "fast": "Maximum Speed",
     "low_memory": "Low Memory",
 }
 
-PRESET_DESCRIPTIONS: Dict[str, str] = {
+PRESET_DESCRIPTIONS: dict[str, str] = {
     "maximum": "Best accuracy, needs 10GB+ GPU",
     "balanced": "Best balance for most systems",
     "fast": "Fastest transcription",
@@ -306,13 +305,13 @@ PRESET_DESCRIPTIONS: Dict[str, str] = {
 # ============================================
 # Refinement Mode Labels
 # ============================================
-REFINEMENT_MODE_LABELS: Dict[str, str] = {
+REFINEMENT_MODE_LABELS: dict[str, str] = {
     "off": "Off (No refinement)",
     "strict": "Strict (Minor corrections)",
     "polished": "Polished (Full rewrite)",
 }
 
-REFINEMENT_PROFILE_LABELS: Dict[str, str] = {
+REFINEMENT_PROFILE_LABELS: dict[str, str] = {
     "raw": "Raw",
     "clean_dictation": "Clean Dictation",
     "professional": "Professional",
@@ -323,7 +322,7 @@ REFINEMENT_PROFILE_LABELS: Dict[str, str] = {
 # ============================================
 # Refiner Engine Labels
 # ============================================
-REFINER_ENGINE_LABELS: Dict[str, str] = {
+REFINER_ENGINE_LABELS: dict[str, str] = {
     "llamacpp": "Llama.cpp (Local)",
     "ollama": "Ollama (Local)",
 }
@@ -331,7 +330,7 @@ REFINER_ENGINE_LABELS: Dict[str, str] = {
 # ============================================
 # Tab Labels
 # ============================================
-TAB_LABELS: Dict[str, str] = {
+TAB_LABELS: dict[str, str] = {
     "presets": "Presets",
     "manual": "Manual",
     "hotkey": "Hotkey",
@@ -344,7 +343,7 @@ TAB_LABELS: Dict[str, str] = {
 # ============================================
 # Button Labels
 # ============================================
-BUTTON_LABELS: Dict[str, str] = {
+BUTTON_LABELS: dict[str, str] = {
     "apply": "Apply",
     "cancel": "Cancel",
     "close": "Close",
@@ -372,7 +371,7 @@ BUTTON_LABELS: Dict[str, str] = {
 # ============================================
 # Status Labels
 # ============================================
-STATUS_LABELS: Dict[str, str] = {
+STATUS_LABELS: dict[str, str] = {
     "idle": "Idle",
     "recording": "Recording",
     "processing": "Processing",
@@ -388,7 +387,7 @@ STATUS_LABELS: Dict[str, str] = {
 # ============================================
 # Section Headers
 # ============================================
-SECTION_HEADERS: Dict[str, str] = {
+SECTION_HEADERS: dict[str, str] = {
     "systemProfile": "System Profile",
     "optimizationResults": "Optimization Results",
     "modelSettings": "Model Settings",
@@ -406,7 +405,7 @@ SECTION_HEADERS: Dict[str, str] = {
 # ============================================
 # Error Messages
 # ============================================
-ERROR_MESSAGES: Dict[str, str] = {
+ERROR_MESSAGES: dict[str, str] = {
     "backend_unavailable": "Cannot connect to backend. Please restart the application.",
     "device_not_found": "Selected audio device not found. Please check your microphone.",
     "model_load_failed": "Failed to load model. Check your GPU memory and try a smaller model.",
@@ -427,7 +426,7 @@ ERROR_MESSAGES: Dict[str, str] = {
 # ============================================
 # Tooltips
 # ============================================
-TOOLTIPS: Dict[str, str] = {
+TOOLTIPS: dict[str, str] = {
     "hotkey_record": "Press this key combination to start/stop recording",
     "vad_threshold": "Lower values detect more quiet speech",
     "chunk_duration": "Smaller chunks = lower latency, larger = better accuracy",
@@ -442,7 +441,7 @@ TOOLTIPS: Dict[str, str] = {
 # ============================================
 # Unit Labels
 # ============================================
-UNIT_LABELS: Dict[str, str] = {
+UNIT_LABELS: dict[str, str] = {
     "seconds": "s",
     "milliseconds": "ms",
     "percentage": "%",
@@ -457,7 +456,7 @@ UNIT_LABELS: Dict[str, str] = {
 # ============================================
 # Hardware Labels
 # ============================================
-HARDWARE_LABELS: Dict[str, str] = {
+HARDWARE_LABELS: dict[str, str] = {
     "gpu": "GPU",
     "cpu": "CPU",
     "vram": "VRAM",
@@ -474,7 +473,7 @@ HARDWARE_LABELS: Dict[str, str] = {
 # ============================================
 # Metric Labels
 # ============================================
-METRIC_LABELS: Dict[str, str] = {
+METRIC_LABELS: dict[str, str] = {
     "quality_level": "Quality Level",
     "vram_usage": "VRAM Usage",
     "latency": "Latency",
@@ -486,7 +485,7 @@ METRIC_LABELS: Dict[str, str] = {
 # ============================================
 # Settings Section UI Copy
 # ============================================
-SETTINGS_SECTION_TEXT: Dict[str, Dict[str, str]] = {
+SETTINGS_SECTION_TEXT: dict[str, dict[str, str]] = {
     "audio": {
         "title": "Audio Settings",
         "description": "Configure audio capture, VAD, and noise filtering",

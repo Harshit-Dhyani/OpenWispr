@@ -393,3 +393,6 @@ GPU_FALLBACK_KEYWORDS = [
     "no kernel image",
     "nvidia",
 ]
+
+# Module-level exports for generate_ts.py compatibility - reference existing module-level constants
+SAMPLE_RATES = AudioConstants.SAMPLE_RATES  # class attribute

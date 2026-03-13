@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-
 DEFAULT_COACH_TEMPLATE_ID = "default_english_coach"
 
 
