@@ -1,6 +1,6 @@
 from app.config.constants import AppConstants as ConfigAppConstants
 from app.core.constants import AppConstants as CoreAppConstants
-from app.config.constants import SAMPLE_RATES
+from app.config.constants import AudioConstants
 
 
 def test_config_constants_reexport_core_app_constants() -> None:
@@ -10,4 +10,4 @@ def test_config_constants_reexport_core_app_constants() -> None:
 
 
 def test_config_constants_exposes_expected_sample_rates() -> None:
-    assert SAMPLE_RATES == [8000, 16000, 22050, 44100, 48000]
+    assert AudioConstants.SAMPLE_RATES == [8000, 16000, 22050, 44100, 48000]

@@ -11,9 +11,9 @@ const venvPython =
     : path.join(repoRoot, ".venv", "bin", "python");
 
 function resolvePythonLaunch() {
-  if (process.env.TRANSCRIPTA_PYTHON) {
+  if (process.env.OPENWISPR_PYTHON) {
     return {
-      command: process.env.TRANSCRIPTA_PYTHON,
+      command: process.env.OPENWISPR_PYTHON,
       args: ["-m", "uvicorn", "app.api.server:app", "--reload", "--port", "8000"],
     };
   }

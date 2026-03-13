@@ -1,10 +1,40 @@
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+[![Vitest](https://img.shields.io/badge/Vitest-2.0+-green.svg)](https://vitest.dev/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://vitest.dev/guide/coverage.html)
+[![Testing Library](https://img.shields.io/badge/Testing_Library-16+-green.svg)](https://testing-library.com/)
+
+---
+
 # Frontend Testing Suite
+
+> ⚠️ **Work in Progress** - This project is not finished. See main [README](../../../../../../../README.md) for status.
+>
+> **Last Updated:** March 13, 2026
+
+---
 
 Comprehensive testing suite for the OpenWispr Electron frontend application.
 
+---
+
+## 📋 Table of Contents
+
+- [Test Structure](#test-structure)
+- [Running Tests](#running-tests)
+- [Test Categories](#test-categories)
+- [Coverage Targets](#coverage-targets)
+- [Test Utilities](#test-utilities)
+- [Writing Tests](#writing-tests)
+- [CI/CD Integration](#cicd-integration)
+- [Flaky Test Detection](#flaky-test-detection)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Test Structure
 
-```
+```bash
 src/
 ├── test/
 │   ├── setup.ts          # Test environment setup
@@ -21,6 +51,8 @@ src/
 └── lib/
     └── *.test.ts         # Utility tests
 ```
+
+---
 
 ## Running Tests
 
@@ -49,6 +81,8 @@ npm run test:ui
 npm run test:debug
 ```
 
+---
+
 ## Test Categories
 
 ### Unit Tests
@@ -67,6 +101,8 @@ Test multiple components and systems working together.
 - **Transcription Flow**: Start → Record → Stop → Verify
 - **WebSocket Flow**: Connect → Message → Reconnect → Disconnect
 
+---
+
 ## Coverage Targets
 
 | Category | Target |
@@ -77,6 +113,8 @@ Test multiple components and systems working together.
 | Statements | 80% |
 
 Configured in `vitest.config.ts`. Run `npm run test:coverage` to generate reports.
+
+---
 
 ## Test Utilities
 
@@ -135,6 +173,8 @@ await actAndFlush(() => fireEvent.click(button));
 await waitForPromises(3);
 ```
 
+---
+
 ## Writing Tests
 
 ### Component Test Example
@@ -185,6 +225,8 @@ describe('useMyHook', () => {
 });
 ```
 
+---
+
 ## CI/CD Integration
 
 Tests run automatically via:
@@ -202,6 +244,8 @@ Coverage reports are:
 - Posted as PR comments
 - Tracked over time
 
+---
+
 ## Flaky Test Detection
 
 Tests run multiple times in CI to detect flaky tests:
@@ -213,6 +257,8 @@ for i in {1..5}; do
 done
 ```
 
+---
+
 ## Best Practices
 
 1. **Use factories** for test data
@@ -221,6 +267,8 @@ done
 4. **Test behavior**, not implementation
 5. **Use accessible queries** (getByRole, getByLabelText)
 6. **Avoid snapshot tests** for dynamic content
+
+---
 
 ## Troubleshooting
 

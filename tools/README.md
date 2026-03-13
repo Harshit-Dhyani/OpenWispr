@@ -1,6 +1,20 @@
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Tools](https://img.shields.io/badge/tools-diagnostics-blue.svg)](https://docs.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
 # OpenWispr Development Tools
 
+> ⚠️ **Work in Progress** - This project is not finished. See main [README](../README.md) for status.
+>
+> **Last Updated:** March 13, 2026
+
+---
+
 This directory contains development, diagnostic, and maintenance tools for the OpenWispr project.
+
+---
 
 ## Quick Start
 
@@ -12,6 +26,7 @@ python tools/runner.py --all
 python tools/runner.py --system    # CUDA, dependencies
 python tools/runner.py --audio     # Audio devices
 python tools/runner.py --ci         # Pre-commit checks
+python tools/runner.py --lint       # Code quality checks
 python tools/runner.py --cleanup    # Log cleanup
 
 # Get JSON output for automation
@@ -33,11 +48,16 @@ python tools\runner.py --all --json | ConvertFrom-Json
 # Setup scripts
 .\tools\setup\install-pytorch-cuda.ps1
 .\tools\setup\install-ffmpeg.ps1
+
+# Run lint checks directly
+python -m tools.lint.check_renderer_strings
 ```
+
+---
 
 ## Directory Structure
 
-```
+```bash
 tools/
 ├── runner.py              # Unified interface for all tools
 ├── README.md              # This file
@@ -50,13 +70,16 @@ tools/
 │   ├── update-docs.py     # Documentation auto-update
 │   ├── generate-api-docs.py      # API docs generation
 │   └── generate-settings-docs.py # Settings docs generation
+├── lint/                  # Code quality checks
+│   └── check_renderer_strings.py # Renderer string validation
 ├── maintenance/           # Cleanup and maintenance
 │   └── cleanup-logs.py    # Log file management
-├── setup/                 # Installation scripts
-│   ├── install-pytorch-cuda.ps1
-│   └── install-ffmpeg.ps1
-└── check_renderer_strings.py    # Renderer string validation
+└── setup/                 # Installation scripts
+    ├── install-pytorch-cuda.ps1
+    └── install-ffmpeg.ps1
 ```
+
+---
 
 ## Tools Reference
 
@@ -68,10 +91,11 @@ Unified interface for all tools. Replaces running individual scripts.
 python tools/runner.py [options]
 
 Options:
-  --all       Run all diagnostics (system, audio, ci)
+  --all       Run all diagnostics (system, audio, ci, lint)
   --system    System diagnostics (CUDA, Python deps)
   --audio     Audio device diagnostics
   --ci        CI verification checks
+  --lint      Code quality checks
   --cleanup   Log cleanup
   --json      JSON output
   --verbose   Detailed output
@@ -92,7 +116,8 @@ python tools/diagnostics/check-system.py [--json] [--verbose]
 ```
 
 **Example Output:**
-```
+
+```text
 ==================================================
   System Diagnostics for OpenWispr
 ==================================================
@@ -100,18 +125,18 @@ python tools/diagnostics/check-system.py [--json] [--verbose]
   Python: 3.12.1
   Executable: C:\Python312\python.exe
 
-──────────────────────────────────────────────────
+────────────────────────────────────────────────────
   PyTorch
-──────────────────────────────────────────────────
+────────────────────────────────────────────────────
   [✓] CUDA available             Yes
-  [✓] CUDA version               12.1
-  [✓] GPU count                  1
-  [✓] Primary GPU                NVIDIA GeForce RTX 4090
-  [✓] GPU Memory                 24.00 GB
+  [✓] CUDA version              12.1
+  [✓] GPU count                 1
+  [✓] Primary GPU               NVIDIA GeForce RTX 4090
+  [✓] GPU Memory                24.00 GB
 
-==================================================
+=================================================
 SUMMARY
-==================================================
+=================================================
   [✓] pytorch_cuda: PASS
   [✓] ctranslate2_cuda: PASS
   [✓] faster_whisper: PASS
@@ -135,7 +160,8 @@ python tools/diagnostics/check-audio.py [--json] [--verbose] [--test DEVICE_ID]
 ```
 
 **Example Output:**
-```
+
+```text
 ============================================================
   Audio Diagnostics for OpenWispr
 ============================================================
@@ -224,7 +250,7 @@ Generates settings documentation:
 python tools/ci/generate-settings-docs.py [--output PATH]
 ```
 
-### check_renderer_strings.py
+### lint/check_renderer_strings.py
 
 Validates renderer strings per AGENTS.md requirements:
 - Ensures strings are properly externalized
@@ -232,7 +258,7 @@ Validates renderer strings per AGENTS.md requirements:
 - Checks for hardcoded UI text
 
 ```bash
-python tools/check_renderer_strings.py [--fix] [--strict]
+python -m tools.lint.check_renderer_strings [--fix] [--strict]
 ```
 
 ### maintenance/cleanup-logs.py
@@ -266,6 +292,8 @@ Installs FFmpeg for audio processing (Windows).
 .\tools\setup\install-ffmpeg.ps1
 ```
 
+---
+
 ## Exit Codes
 
 All tools use consistent exit codes:
@@ -277,6 +305,7 @@ All tools use consistent exit codes:
 | `124` | Timeout - Operation exceeded time limit |
 
 **Examples:**
+
 ```bash
 # Check exit code on Windows PowerShell
 python tools/runner.py --system
@@ -287,6 +316,8 @@ python tools/runner.py --system
 echo $?
 ```
 
+---
+
 ## CLI Standards
 
 All tools support:
@@ -294,6 +325,8 @@ All tools support:
 - `--verbose` - Detailed human-readable output
 - Consistent exit codes: 0 (success), 1 (failure)
 - Standard headers and formatting
+
+---
 
 ## JSON Output Format
 
@@ -315,15 +348,19 @@ When using `--json`, output follows this structure:
 }
 ```
 
+---
+
 ## Automation Examples
 
 **Pre-commit hook:**
+
 ```bash
 #!/bin/bash
 python tools/runner.py --ci || exit 1
 ```
 
 **CI/CD pipeline:**
+
 ```yaml
 - name: Run diagnostics
   run: |
@@ -335,6 +372,7 @@ python tools/runner.py --ci || exit 1
 ```
 
 **Windows batch script:**
+
 ```batch
 @echo off
 python tools\runner.py --all

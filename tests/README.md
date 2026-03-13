@@ -1,16 +1,41 @@
+---
+
 # Backend Testing Suite for OpenWispr
+
+> ⚠️ **Work in Progress** - This project is not finished. See main [README](../README.md) for status.
+>
+> **Last Updated:** March 13, 2026
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://docs.pytest.org/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](https://coverage.readthedocs.io/)
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Test Structure](#test-structure)
+- [Running Tests](#running-tests)
+- [Test Markers](#test-markers)
+- [Pytest Configuration](#pytest-configuration)
+- [Fixtures](#fixtures)
+- [Other Test Locations](#other-test-locations)
+- [CI/CD Integration](#cicd-integration)
+
+---
 
 ## Overview
 
 This testing suite provides comprehensive coverage for the OpenWispr Python backend.
 
-**Last Updated:** 2026-03-04
+---
 
 ## Test Structure
 
 Tests are organized in a hierarchical structure within the `tests/` directory:
 
-```
+```bash
 tests/
 ├── conftest.py                      # Shared fixtures and configuration
 ├── _contracts.py                    # Shared contract test helpers
@@ -80,52 +105,65 @@ tests/
     └── __init__.py
 ```
 
+---
+
 ## Running Tests
 
 ### Run all tests
+
 ```bash
 pytest
 ```
 
 ### Run with verbose output
+
 ```bash
 pytest -v
 ```
 
 ### Run specific test file
+
 ```bash
 pytest tests/test_vad_optimized.py -v
 ```
 
 ### Run with coverage report
+
 ```bash
 pytest --cov=app --cov-report=html
 ```
 
 ### Run excluding slow tests
+
 ```bash
 pytest -m "not slow"
 ```
 
 ### Run only unit tests
+
 ```bash
 pytest -m unit -v
 ```
 
 ### Run only integration tests
+
 ```bash
 pytest -m integration -v
 ```
 
 ### Run only performance tests
+
 ```bash
 pytest -m performance -v
 ```
 
 ### Run benchmark tests
+
 ```bash
 pytest -m benchmark -v
 ```
+
+---
 
 ## Test Markers
 
@@ -138,6 +176,8 @@ The following markers are available (defined in `pyproject.toml`):
 | `@pytest.mark.unit` | Unit tests |
 | `@pytest.mark.performance` | Performance tests |
 | `@pytest.mark.benchmark` | Benchmark tests |
+
+---
 
 ## Pytest Configuration
 
@@ -160,15 +200,19 @@ markers = [
 asyncio_mode = "auto"
 ```
 
+---
+
 ## Fixtures
 
 ### Path Fixtures
+
 - `project_root` - Project root directory
 - `temp_dir` - Temporary directory for test files
 - `test_data_dir` - Test data directory
 - `mock_settings_file` - Mock settings file on disk
 
 ### Audio Fixtures
+
 - `mock_audio_data` - Silent audio data (1 second of zeros)
 - `mock_speech_audio` - Speech-like audio data with harmonics
 - `mock_noisy_audio` - White noise audio data
@@ -176,6 +220,7 @@ asyncio_mode = "auto"
 - `mock_audio_devices` - Mock audio device list
 
 ### Model Fixtures
+
 - `mock_whisper_model` - Mock Whisper model with transcribe method
 - `mock_whisper_segments` - Mock transcription segments
 - `mock_torch` - Mock PyTorch (GPU available)
@@ -183,61 +228,28 @@ asyncio_mode = "auto"
 - `mock_torch_oom` - Mock PyTorch simulating out of memory
 
 ### Settings Fixtures
+
 - `test_settings` - Complete test settings dictionary
 - `mock_settings_manager` - Mock settings manager with test configuration
 
 ### Session Fixtures
+
 - `sample_segment` - Sample transcript segment data
 - `sample_session_state` - Sample session state dictionary
 - `mock_session_writer` - Mock session writer
 
 ### Device Fixtures
+
 - `mock_sounddevice` - Mock sounddevice module
 - `mock_soundcard` - Mock soundcard module
 - `mock_pyaudio` - Mock PyAudio module
 - `mock_recorder` - Mock audio recorder
 
 ### VAD Fixtures
+
 - `mock_vad` - Mock VAD instance
 - `mock_vad_config` - Mock VAD configuration dictionary
 
 ### Performance Fixtures
-- `performance_tracker` - Factory for tracking performance metrics
-- `benchmark_config` - Benchmark configuration dictionary
 
-### Event Loop Fixtures
-- `event_loop` - Event loop for async tests (session-scoped)
-- `async_client` - Async HTTP client mock
-
-### API Fixtures
-- `mock_fastapi_app` - Mock FastAPI application
-- `mock_websocket` - Mock WebSocket connection
-- `mock_http_client` - Mock async HTTP client
-
-### Error Handler Fixtures
-- `mock_error_handler` - Mock error handler
-- `mock_user_notifier` - Mock user notifier
-
-### Utility Fixtures
-- `async_context_manager_mock` - Factory for async context manager mocks
-- `async_iterator_mock` - Factory for async iterator mocks
-- `sample_rate` - Default sample rate (16000)
-
-## Other Test Locations
-
-### E2E Tests
-End-to-end tests are located in the `e2e/` directory at the project root.
-
-### Frontend Tests
-Frontend tests for the Electron application are located in:
-```
-app/electron/frontend/
-```
-
-## CI/CD Integration
-
-The test suite is configured for CI/CD with:
-- Strict marker and config checking (`--strict-markers`, `--strict-config`)
-- Verbose output (`-v`)
-- Short traceback format (`--tb=short`)
-- Auto async mode for asyncio tests
+- `performance_tracker` - Factory for performance tracking

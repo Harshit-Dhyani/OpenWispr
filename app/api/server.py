@@ -923,9 +923,13 @@ class HotkeyTranscriptionService:
                             ),
                             privacy_mode=privacy_mode,
                             runtime_enabled=bool(
-                                getattr(user_settings.refiner, "runtime_enabled", False)
+                                getattr(user_settings.coach, "coach_runtime_enabled", True)
                             ),
-                            model_id=getattr(user_settings.refiner, "selected_model_id", None),
+                            model_id=getattr(
+                                user_settings.coach,
+                                "coach_selected_model_id",
+                                "qwen2.5-3b-instruct",
+                            ),
                             custom_user_template=custom_prompt_text,
                             templates=[
                                 template.__dict__
@@ -949,8 +953,12 @@ class HotkeyTranscriptionService:
                             logger.info(
                                 "Coach running: session=%s model=%s runtime_enabled=%s",
                                 session.session_id,
-                                getattr(user_settings.refiner, "selected_model_id", None),
-                                bool(getattr(user_settings.refiner, "runtime_enabled", False)),
+                                getattr(
+                                    user_settings.coach,
+                                    "coach_selected_model_id",
+                                    "qwen2.5-3b-instruct",
+                                ),
+                                bool(getattr(user_settings.coach, "coach_runtime_enabled", True)),
                             )
                             raw_coach_result = await asyncio.wait_for(
                                 asyncio.to_thread(

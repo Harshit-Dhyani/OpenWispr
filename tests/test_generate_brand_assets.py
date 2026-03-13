@@ -1,37 +1,56 @@
+import importlib.util
+import tempfile
+import unittest
 from pathlib import Path
 
 from PIL import Image
 
-from scripts.generate_brand_assets import generate_brand_assets
+MODULE_PATH = Path(__file__).resolve().parent / 'generate_brand_assets.py'
+spec = importlib.util.spec_from_file_location('generate_brand_assets', MODULE_PATH)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
 
 
-def test_generate_brand_assets_creates_packaging_and_frontend_outputs(tmp_path, monkeypatch):
-    repo_root = tmp_path / 'repo'
-    build_dir = repo_root / 'build'
-    frontend_assets = repo_root / 'app' / 'electron' / 'frontend' / 'src' / 'assets'
-    build_dir.mkdir(parents=True)
-    frontend_assets.mkdir(parents=True)
+class GenerateBrandAssetsTests(unittest.TestCase):
+    def test_write_png_trims_transparent_padding_for_icons(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Image.new('RGBA', (100, 100), (0, 0, 0, 0))
+            for x in range(35, 65):
+                for y in range(35, 65):
+                    source.putpixel((x, y), (255, 255, 255, 255))
 
-    source = tmp_path / 'source-logo.png'
-    Image.new('RGBA', (512, 512), (32, 24, 68, 255)).save(source)
+            destination = Path(temp_dir) / 'icon.png'
+            module.write_png(module.trim_to_alpha_bounds(source), destination, 128, module.ICON_PADDING_RATIO)
 
-    monkeypatch.setattr('scripts.generate_brand_assets.REPO_ROOT', repo_root)
-    monkeypatch.setattr('scripts.generate_brand_assets.BUILD_DIR', build_dir)
-    monkeypatch.setattr('scripts.generate_brand_assets.FRONTEND_ASSETS_DIR', frontend_assets)
-    monkeypatch.setattr('scripts.generate_brand_assets.LINUX_ICON_DIR', build_dir / 'icons')
+            with Image.open(destination) as icon_file:
+                generated = icon_file.convert('RGBA')
+            bbox = generated.getchannel('A').getbbox()
+            assert bbox is not None
+            visible_width = bbox[2] - bbox[0]
+            visible_height = bbox[3] - bbox[1]
+            self.assertGreaterEqual(visible_width / generated.width, 0.8)
+            self.assertGreaterEqual(visible_height / generated.height, 0.8)
 
-    generated = generate_brand_assets(source)
+    def test_write_ico_keeps_large_visible_area(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Image.new('RGBA', (100, 100), (0, 0, 0, 0))
+            for x in range(35, 65):
+                for y in range(35, 65):
+                    source.putpixel((x, y), (255, 255, 255, 255))
 
-    expected = [
-        build_dir / 'logo.png',
-        build_dir / 'icon.ico',
-        build_dir / 'icon.icns',
-        build_dir / 'icons' / '16x16.png',
-        build_dir / 'icons' / '512x512.png',
-        frontend_assets / 'openwispr-logo.png',
-    ]
+            destination = Path(temp_dir) / 'icon.ico'
+            module.write_ico(module.trim_to_alpha_bounds(source), destination, (16, 32, 64, 128, 256), module.ICON_PADDING_RATIO)
 
-    for path in expected:
-        assert path.exists(), f'missing generated asset: {path}'
+            with Image.open(destination) as icon_file:
+                generated = icon_file.convert('RGBA')
+            bbox = generated.getchannel('A').getbbox()
+            assert bbox is not None
+            visible_width = bbox[2] - bbox[0]
+            visible_height = bbox[3] - bbox[1]
+            self.assertGreaterEqual(visible_width / generated.width, 0.8)
+            self.assertGreaterEqual(visible_height / generated.height, 0.8)
 
-    assert frontend_assets / 'openwispr-logo.svg' not in generated
+
+if __name__ == '__main__':
+    unittest.main()

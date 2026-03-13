@@ -810,6 +810,22 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Coach Prompt Templates",
         description="Versioned prompt templates available to the English Coach",
     ),
+    "coach_runtime_enabled": SettingDefinition(
+        name="coach_runtime_enabled",
+        category="coach",
+        type="boolean",
+        default=True,
+        label="Coach Runtime Enabled",
+        description="Enable runtime LLM for coach (when privacy_mode allows)",
+    ),
+    "coach_selected_model_id": SettingDefinition(
+        name="coach_selected_model_id",
+        category="coach",
+        type="string",
+        default="qwen2.5-3b-instruct",
+        label="Coach Model ID",
+        description="LLM model for English coach",
+    ),
     # ============================================
     # History Settings
     # ============================================

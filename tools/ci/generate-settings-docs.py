@@ -95,6 +95,57 @@ def extract_defaults_from_registry() -> dict[str, Any]:
         return {}
 
 
+def parse_settings_registry(file_path: Path) -> list[SettingClassInfo]:
+    """Parse settings from SETTINGS_REGISTRY by importing the module."""
+    import sys
+    from pathlib import Path as P
+
+    repo_root = P(__file__).parent.parent.parent
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    try:
+        from app.config.settings import SETTINGS_REGISTRY
+
+        classes_by_category = {}
+
+        for name, defn in SETTINGS_REGISTRY.items():
+            category = defn.category
+
+            if category not in classes_by_category:
+                classes_by_category[category] = SettingClassInfo(
+                    name=category.title() + "Settings",
+                    category=category,
+                    description=category.title() + " settings.",
+                    fields=[],
+                )
+
+            field_type_map = {
+                "string": "string",
+                "number": "number",
+                "boolean": "boolean",
+                "enum": "string",
+                "range": "number",
+                "object": "object",
+                "array": "array",
+            }
+            field_type = field_type_map.get(defn.type, defn.type)
+
+            field_info = FieldInfo(
+                name=name,
+                field_type=field_type,
+                default=defn.default,
+                category=category,
+                description="",
+            )
+            classes_by_category[category].fields.append(field_info)
+
+        return list(classes_by_category.values())
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return []
+
+
 def parse_settings_dataclasses(file_path: Path) -> list[SettingClassInfo]:
     """Parse settings dataclasses from the settings_manager.py file."""
     content = file_path.read_text(encoding="utf-8")
@@ -369,20 +420,14 @@ def main():
     parser.add_argument(
         "--settings-manager",
         type=Path,
-        default=Path("app/core/settings_manager.py"),
-        help="Path to settings_manager.py",
+        default=Path("app/config/settings.py"),
+        help="Path to settings.py (settings registry)",
     )
 
     args = parser.parse_args()
 
-    # Parse settings file structure
-    classes = parse_settings_dataclasses(args.settings_manager)
-
-    # Get defaults from registry
-    registry_defaults = extract_defaults_from_registry()
-
-    # Resolve defaults
-    resolve_defaults(classes, registry_defaults)
+    # Parse settings registry
+    classes = parse_settings_registry(args.settings_manager)
 
     # Generate documentation
     generated = generate_complete_documentation(classes)
