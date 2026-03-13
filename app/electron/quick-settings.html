@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' http://localhost:*">
   <title>Quick Settings</title>
   <link rel="stylesheet" href="./shared/theme-tokens.css" />
   <style>
@@ -292,7 +293,7 @@
 
     async function persist() {
       if (!state.settings) return;
-      await window.transcriptaQuickSettings.update(state.settings);
+      await window.openwisprQuickSettings.update(state.settings);
       state.dirty = false;
       render();
     }
@@ -309,12 +310,12 @@
     languageSelect.addEventListener("change", () => updateHotkey({ language: languageSelect.value }));
     deviceSelect.addEventListener("change", () => updateHotkey({ device_id: deviceSelect.value }));
 
-    document.getElementById("openFullBtn").addEventListener("click", () => window.transcriptaQuickSettings.openFullSettings());
-    document.getElementById("doneBtn").addEventListener("click", () => window.transcriptaQuickSettings.close());
-    document.getElementById("closeBtn").addEventListener("click", () => window.transcriptaQuickSettings.close());
+    document.getElementById("openFullBtn").addEventListener("click", () => window.openwisprQuickSettings.openFullSettings());
+    document.getElementById("doneBtn").addEventListener("click", () => window.openwisprQuickSettings.close());
+    document.getElementById("closeBtn").addEventListener("click", () => window.openwisprQuickSettings.close());
 
     (async () => {
-      const data = await window.transcriptaQuickSettings.getData();
+      const data = await window.openwisprQuickSettings.getData();
       const appName = data?.appName || "OpenWispr";
       document.title = `${appName} Quick Settings`;
       appNameHeading.textContent = appName;

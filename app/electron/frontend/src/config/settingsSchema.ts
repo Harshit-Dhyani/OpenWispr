@@ -238,6 +238,8 @@ export const coachSettingsSchema = z.object({
   }),
   privacy_mode: z.enum(['local_only', 'allow_llm']).default('local_only'),
   show_floating_coach_result: z.boolean().default(true),
+  coach_runtime_enabled: z.boolean().default(true),
+  coach_selected_model_id: z.string().default('qwen2.5-3b-instruct'),
   coach_prompt_templates: z.array(coachPromptTemplateSchema).default([
     {
       id: 'default_english_coach',
@@ -418,6 +420,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
     },
     privacy_mode: 'local_only',
     show_floating_coach_result: true,
+    coach_runtime_enabled: true,
+    coach_selected_model_id: 'qwen2.5-3b-instruct',
     coach_prompt_templates: [
       {
         id: 'default_english_coach',
