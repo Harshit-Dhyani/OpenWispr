@@ -251,6 +251,9 @@ class RefinerSettings:
         default_factory=lambda: get_setting("cleanup_instructions").default
     )
     engine_preference: str = field(default_factory=lambda: get_setting("engine_preference").default)
+    refiner_provider_base_url: str = field(
+        default_factory=lambda: get_setting("refiner_provider_base_url").default
+    )
 
 
 @dataclass
@@ -351,6 +354,9 @@ class CoachSettings:
     )
     coach_overrides: CoachPromptOverrides = field(default_factory=CoachPromptOverrides)
     privacy_mode: str = field(default_factory=lambda: get_setting("privacy_mode").default)
+    coach_provider_base_url: str = field(
+        default_factory=lambda: get_setting("coach_provider_base_url").default
+    )
     show_floating_coach_result: bool = field(
         default_factory=lambda: get_setting("show_floating_coach_result").default
     )
