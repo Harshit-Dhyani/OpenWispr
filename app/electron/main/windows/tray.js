@@ -32,20 +32,26 @@ function getRecentTranscriptEntries(limit = 8) {
     if (fs.existsSync(sessionJsonPath)) {
       try {
         sessionMeta = JSON.parse(fs.readFileSync(sessionJsonPath, "utf8"));
-      } catch {}
+      } catch (error) {
+        console.error("[tray] Failed to parse session.json:", error.message);
+      }
     }
 
     let preview = "";
     if (fs.existsSync(transcriptPath)) {
       try {
         preview = fs.readFileSync(transcriptPath, "utf8").trim().replace(/\s+/g, " ").slice(0, 120);
-      } catch {}
+      } catch (error) {
+        console.error("[tray] Failed to read transcript.txt:", error.message);
+      }
     }
 
     let modifiedAt = 0;
     try {
       modifiedAt = fs.statSync(sessionDir).mtimeMs;
-    } catch {}
+    } catch (error) {
+      console.error("[tray] Failed to get session directory stats:", error.message);
+    }
 
     entries.push({
       id: dirent.name,
@@ -66,7 +72,9 @@ function showPlaceholderDialog(title, message) {
     title,
     message,
     buttons: ["OK"],
-  }).catch(() => {});
+  }).catch((error) => {
+    console.error("[tray] Failed to show dialog:", error.message);
+  });
 }
 
 async function createTray() {

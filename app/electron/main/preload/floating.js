@@ -42,6 +42,16 @@ try {
   console.error("[floating:preload] Failed to resolve floating strings via IPC, using fallback:", error);
 }
 
+let floatingSettings = { showFloatingCoachResult: true };
+try {
+  const resolvedSettings = ipcRenderer.sendSync("floating:get-settings");
+  if (resolvedSettings && typeof resolvedSettings === "object") {
+    floatingSettings = resolvedSettings;
+  }
+} catch (error) {
+  console.error("[floating:preload] Failed to resolve floating settings via IPC, using default:", error);
+}
+
 const debugEnabled =
   String(process.env.OPENWISPR_LOG_LEVEL || "").toLowerCase() === "debug";
 
@@ -161,6 +171,7 @@ contextBridge.exposeInMainWorld("openwisprFloating", {
   // Platform info
   platform: process.platform,
   strings: floatingStrings,
+  settings: floatingSettings,
   debugEnabled,
 
   // Button actions

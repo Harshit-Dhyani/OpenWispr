@@ -41,6 +41,14 @@ ipcMain.on("floating:get-strings", (event) => {
   event.returnValue = ELECTRON_STRINGS.floating;
 });
 
+ipcMain.on("floating:get-settings", (event) => {
+  const showFloatingCoachResult =
+    state.hotkeyConfigState.show_floating_coach_result ??
+    state.cachedSettings?.coach?.show_floating_coach_result ??
+    true;
+  event.returnValue = { showFloatingCoachResult };
+});
+
 // Hotkey IPC handlers
 ipcMain.handle("hotkey:register", async (event, { accelerator }) => {
   if (!accelerator) {
@@ -157,6 +165,11 @@ ipcMain.handle("models:get-download-root", async () => {
 });
 
 ipcMain.handle("models:download", async (event, { modelId }) => {
+  // Validate modelId format
+  if (!modelId || typeof modelId !== 'string' || modelId.length > 100) {
+    return { ok: false, error: "invalid_model_id" };
+  }
+
   const requestContext = {
     modelId,
     timestamp: new Date().toISOString(),
@@ -187,6 +200,10 @@ ipcMain.handle("models:download", async (event, { modelId }) => {
 
 ipcMain.handle("models:cancel", async (event, { modelId }) => {
   console.log('[models:cancel:ipc] Request received:', { modelId, timestamp: new Date().toISOString() });
+  if (!modelId || typeof modelId !== 'string' || modelId.length > 100) {
+    console.error('[models:cancel:ipc] Invalid modelId:', { modelId });
+    return { ok: false, error: "invalid_model_id" };
+  }
   if (!state.modelDownloadManager) {
     console.error('[models:cancel:ipc] Manager not ready');
     return { ok: false, error: "model-download-manager-not-ready" };
@@ -198,6 +215,10 @@ ipcMain.handle("models:cancel", async (event, { modelId }) => {
 
 ipcMain.handle("models:remove", async (event, { modelId }) => {
   console.log('[models:remove:ipc] Request received:', { modelId, timestamp: new Date().toISOString() });
+  if (!modelId || typeof modelId !== 'string' || modelId.length > 100) {
+    console.error('[models:remove:ipc] Invalid modelId:', { modelId });
+    throw new Error("Invalid model ID");
+  }
   if (!state.modelDownloadManager) {
     console.error('[models:remove:ipc] Manager not ready');
     throw new Error("Model download manager is not ready");
