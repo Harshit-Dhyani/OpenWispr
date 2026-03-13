@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Electron
+app/desktop/dist/
+app/desktop/out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project specific
+sessions/*
+!sessions/.gitkeep
+models/*
+!models/.gitkeep
+.env
+user_settings.json
+debug_audio_flow.py
+fix_headphone_capture.py
+fix_model_download.py
+*.log
+nul
+
+# Temporary files
+*.tmp
+*.temp
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.avi
+*.mov
+logs/
+pr-body.md
+app/electron/frontend/test-results/
+
+# Local agent/tool artifacts
+.codex/
+.transcripta/
+test-results/
+
+# OpenWispr local data
+.openwispr/
+
+# Generated reports
+prompts/REPORTS.md
+scripts/reports/
+
+
+code/
+

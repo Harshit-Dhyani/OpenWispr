@@ -1,0 +1,343 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'polling' | 'error' | 'idle';
+
+export type EventSourceEvent = {
+  type: string;
+  payload: unknown;
+  timestamp: string;
+};
+
+type UseEventSourceOptions = {
+  url: string;
+  enabled?: boolean;
+  maxReconnectAttempts?: number;
+  baseReconnectDelay?: number;
+  maxReconnectDelay?: number;
+  pollInterval?: number;
+  onMessage?: (event: EventSourceEvent) => void;
+  onError?: (error: Error) => void;
+  onOpen?: () => void;
+};
+
+type UseEventSourceReturn = {
+  status: ConnectionStatus;
+  lastEvent: EventSourceEvent | null;
+  reconnectAttempts: number;
+  connect: () => void;
+  disconnect: () => void;
+};
+
+export function useEventSource(options: UseEventSourceOptions): UseEventSourceReturn {
+  const {
+    url,
+    enabled = true,
+    maxReconnectAttempts = 10,
+    baseReconnectDelay = 1000,
+    maxReconnectDelay = 30000,
+    pollInterval = 3000,
+    onMessage,
+    onError,
+    onOpen,
+  } = options;
+
+  const [status, setStatus] = useState<ConnectionStatus>('idle');
+  const [lastEvent, setLastEvent] = useState<EventSourceEvent | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollIntervalRef = useRef<number | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const startTimeoutRef = useRef<number | null>(null);
+  const isManuallyClosedRef = useRef(false);
+  const isConnectingRef = useRef(false);
+  const isPollingRef = useRef(false);
+  const processedEventIds = useRef<Set<string>>(new Set());
+  const eventSequenceRef = useRef(0);
+  const apiOriginRef = useRef<string>('http://127.0.0.1:8765');
+  const reconnectAttemptsRef = useRef(0);
+  const lastPolledRevisionRef = useRef<number | null>(null);
+
+  const resolveUrl = useCallback((path: string) => {
+    if (path.startsWith('http')) {
+      return path;
+    }
+    return `${apiOriginRef.current}${path}`;
+  }, []);
+
+  const disconnect = useCallback(() => {
+    isManuallyClosedRef.current = true;
+    isConnectingRef.current = false;
+
+    if (startTimeoutRef.current !== null) {
+      window.clearTimeout(startTimeoutRef.current);
+      startTimeoutRef.current = null;
+    }
+
+    if (reconnectTimeoutRef.current !== null) {
+      window.clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (pollIntervalRef.current !== null) {
+      window.clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current !== null) {
+      window.clearTimeout(pollIntervalRef.current);
+    }
+
+    setStatus('polling');
+
+    const pollOnce = async () => {
+      if (isPollingRef.current || isManuallyClosedRef.current) {
+        return;
+      }
+
+      isPollingRef.current = true;
+      try {
+        const response = await fetch(resolveUrl(url).replace('/events', '/session'));
+        if (response.ok) {
+          const data = await response.json();
+          const revision =
+            typeof data?.runtime_revision === 'number' ? data.runtime_revision : null;
+          if (revision !== null && revision === lastPolledRevisionRef.current) {
+            return;
+          }
+          if (revision !== null) {
+            lastPolledRevisionRef.current = revision;
+          }
+          const event: EventSourceEvent = {
+            type: 'state',
+            payload: data,
+            timestamp: new Date().toISOString(),
+          };
+          setLastEvent(event);
+          onMessage?.(event);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error('Polling failed');
+        onError?.(err);
+      } finally {
+        isPollingRef.current = false;
+        if (!isManuallyClosedRef.current) {
+          pollIntervalRef.current = window.setTimeout(pollOnce, pollInterval);
+        }
+      }
+    };
+
+    void pollOnce();
+  }, [resolveUrl, url, pollInterval, onMessage, onError]);
+
+  const connect = useCallback(() => {
+    if (isConnectingRef.current) {
+      return;
+    }
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    if (reconnectTimeoutRef.current !== null) {
+      window.clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    isManuallyClosedRef.current = false;
+
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      startPolling();
+      return;
+    }
+
+    isConnectingRef.current = true;
+    setStatus('reconnecting');
+
+    try {
+      const es = new EventSource(resolveUrl(url));
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        if (pollIntervalRef.current !== null) {
+          window.clearTimeout(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        reconnectAttemptsRef.current = 0;
+        setReconnectAttempts(0);
+        setStatus('connected');
+        isConnectingRef.current = false;
+        onOpen?.();
+      };
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as EventSourceEvent;
+
+          // Generate unique event ID using sequence number to prevent timestamp collisions
+          eventSequenceRef.current += 1;
+          const eventId = `${data.type}-${data.timestamp}-${eventSequenceRef.current}`;
+          if (processedEventIds.current.has(eventId)) {
+            return;
+          }
+          processedEventIds.current.add(eventId);
+
+          // Fix unbounded growth - clear half the set when limit exceeded
+          if (processedEventIds.current.size > 1000) {
+            const iterator = processedEventIds.current.values();
+            const itemsToDelete = Math.floor(processedEventIds.current.size / 2);
+            for (let i = 0; i < itemsToDelete; i++) {
+              const value = iterator.next().value;
+              if (value) {
+                processedEventIds.current.delete(value);
+              }
+            }
+          }
+
+          setLastEvent(data);
+          onMessage?.(data);
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error('Failed to parse event');
+          onError?.(err);
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        eventSourceRef.current = null;
+        isConnectingRef.current = false;
+
+        if (isManuallyClosedRef.current) {
+          return;
+        }
+
+        reconnectAttemptsRef.current += 1;
+        const nextAttempt = reconnectAttemptsRef.current;
+        setReconnectAttempts(nextAttempt);
+
+        if (nextAttempt >= maxReconnectAttempts) {
+          startPolling();
+          return;
+        }
+
+        const delay = Math.min(
+          baseReconnectDelay * Math.pow(2, nextAttempt - 1),
+          maxReconnectDelay
+        );
+
+        reconnectTimeoutRef.current = window.setTimeout(() => {
+          reconnectTimeoutRef.current = null;
+          connect();
+        }, delay);
+      };
+    } catch (error) {
+      isConnectingRef.current = false;
+      reconnectAttemptsRef.current += 1;
+      const nextAttempt = reconnectAttemptsRef.current;
+      setReconnectAttempts(nextAttempt);
+
+      if (nextAttempt >= maxReconnectAttempts) {
+        startPolling();
+        return;
+      }
+
+      const delay = Math.min(
+        baseReconnectDelay * Math.pow(2, nextAttempt - 1),
+        maxReconnectDelay
+      );
+
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connect();
+      }, delay);
+    }
+  }, [
+    resolveUrl,
+    url,
+    maxReconnectAttempts,
+    baseReconnectDelay,
+    maxReconnectDelay,
+    onMessage,
+    onError,
+    onOpen,
+    startPolling,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const start = async () => {
+      if (!enabled) {
+        setStatus('idle');
+        reconnectAttemptsRef.current = 0;
+        setReconnectAttempts(0);
+        return;
+      }
+
+      if (window.openwisprDesktop?.getApiOrigin) {
+        try {
+          apiOriginRef.current = await window.openwisprDesktop.getApiOrigin();
+        } catch {
+          apiOriginRef.current = 'http://127.0.0.1:8765';
+        }
+      }
+      if (cancelled) {
+        return;
+      }
+
+      reconnectAttemptsRef.current = 0;
+      isManuallyClosedRef.current = false;
+      isConnectingRef.current = false;
+      startTimeoutRef.current = window.setTimeout(() => {
+        startTimeoutRef.current = null;
+        if (!cancelled && !isManuallyClosedRef.current) {
+          connect();
+        }
+      }, 0);
+    };
+
+    void start();
+
+    return () => {
+      cancelled = true;
+      isManuallyClosedRef.current = true;
+      isConnectingRef.current = false;
+
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+
+      if (startTimeoutRef.current !== null) {
+        window.clearTimeout(startTimeoutRef.current);
+        startTimeoutRef.current = null;
+      }
+
+      if (pollIntervalRef.current !== null) {
+        window.clearTimeout(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [connect, enabled]);
+
+  return {
+    status,
+    lastEvent,
+    reconnectAttempts,
+    connect,
+    disconnect,
+  };
+}

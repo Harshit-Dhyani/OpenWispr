@@ -1,0 +1,294 @@
+{
+  "name": "openwispr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenWispr - AI-powered transcription and translation desktop application",
+  "author": "OpenWispr Team",
+  "license": "MIT",
+  "main": "app/electron/main/main.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "install:all": "pnpm run install:ui && pnpm run install:backend",
+    "install:ui": "pnpm --dir app/electron install",
+    "install:backend": "python -m pip install -e . || echo 'Backend optional'",
+    "postinstall": "pnpm run install:all",
+    "dev": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'dev', 'dev.cjs')).runDev()\"",
+    "dev:electron": "pnpm --dir app/electron run dev",
+    "dev:frontend": "pnpm --dir app/electron/frontend run dev",
+    "dev:backend": "node -e \"const path=require('path'); const pkg=process.env.npm_package_json||''; const prefix=String.fromCharCode(92,92,63,92); const base=pkg.startsWith(prefix) ? pkg.slice(4) : pkg; require(path.join(path.dirname(base), 'scripts', 'dev', 'run-backend-dev.cjs'))\"",
+    "build": "pnpm run build:clean && pnpm run build:frontend && pnpm run build:electron",
+    "build:clean": "rimraf app/electron/renderer/dist app/electron/dist dist release",
+    "build:frontend": "pnpm --dir app/electron/frontend run build",
+    "build:electron": "pnpm --dir app/electron run build:frontend",
+    "build:production": "cross-env NODE_ENV=production pnpm run build",
+    "build:analyze": "pnpm --dir app/electron/frontend run build -- --mode analyze",
+    "watch": "pnpm run build:frontend && pnpm run dev:electron",
+    "watch:frontend": "pnpm --dir app/electron/frontend run dev",
+    "test": "pnpm run test:frontend && pnpm run test:backend",
+    "test:frontend": "pnpm --dir app/electron/frontend run test",
+    "test:backend": "pytest",
+    "test:e2e": "playwright test",
+    "test:coverage": "pnpm --dir app/electron/frontend run test:coverage",
+    "lint": "pnpm run lint:frontend && pnpm run lint:electron && pnpm run lint:python && pnpm run check:renderer-strings",
+    "lint:frontend": "pnpm --dir app/electron/frontend run lint || echo 'No lint script'",
+    "lint:electron": "eslint app/electron/main --ext .js,.ts || echo 'ESLint optional'",
+    "lint:python": "ruff check . || echo 'Ruff optional'",
+    "check:renderer-strings": "python tools/check_renderer_strings.py",
+    "lint:fix": "pnpm run lint:frontend -- --fix && pnpm run lint:electron -- --fix",
+    "typecheck": "pnpm --dir app/electron/frontend run typecheck || echo 'No typecheck script'",
+    "code:export": "node scripts/export/export-code-for-chatgpt.cjs",
+    "tree:generate": "node scripts/generate/generate-tree.cjs",
+    "changes:since-last-commit": "node scripts/generate/generate-changes-since-last-commit.cjs",
+    "pack": "pnpm --dir app/electron run pack",
+    "pack:all": "pnpm run build:production && pnpm run dist:all",
+    "dist": "pnpm run build:production && pnpm run dist:current",
+    "dist:current": "pnpm --dir app/electron run dist",
+    "dist:all": "pnpm run build:production && pnpm run dist:win && pnpm run dist:mac && pnpm run dist:linux",
+    "dist:win": "pnpm --dir app/electron run dist -- --win",
+    "dist:mac": "pnpm --dir app/electron run dist -- --mac",
+    "dist:linux": "pnpm --dir app/electron run dist -- --linux",
+    "dist:portable": "pnpm run build:production && pnpm --dir app/electron run dist -- --win portable",
+    "scripts:build": "python scripts/build/build.py",
+    "scripts:package": "python scripts/package.py",
+    "scripts:release": "python scripts/release.py",
+    "version": "node scripts/version.js",
+    "version:bump": "npm version patch -m \"chore(release): bump version to %s\"",
+    "version:minor": "npm version minor -m \"chore(release): bump version to %s\"",
+    "version:major": "npm version major -m \"chore(release): bump version to %s\"",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "changelog:generate": "git log --pretty=format:\"%h %s (%an)\" --no-merges > CHANGELOG.txt",
+    "release": "pnpm run build:production && pnpm run dist:all && pnpm run release:publish",
+    "release:draft": "pnpm run build:production && pnpm run dist:all && pnpm run release:publish -- --draft",
+    "release:publish": "node scripts/publish-release.js",
+    "clean": "rimraf app/electron/renderer/dist app/electron/dist dist release node_modules app/electron/node_modules app/electron/frontend/node_modules",
+    "clean:cache": "rimraf .cache .parcel-cache .turbo",
+    "clean:all": "pnpm run clean && pnpm run clean:cache",
+    "postversion": "pnpm run changelog && git push && git push --tags",
+    "brand:icons": "python scripts/generate/generate_brand_assets.py",
+    "brand:icons:default": "python scripts/generate/generate_brand_assets.py"
+  },
+  "build": {
+    "appId": "com.openwispr.desktop",
+    "productName": "OpenWispr",
+    "copyright": "Copyright Â© 2026 OpenWispr Team",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/electron/main/**/*",
+      "app/electron/strings/**/*",
+      "app/electron/renderer/dist/**/*",
+      "app/electron/package.json",
+      "node_modules/**/*",
+      "!node_modules/**/*.map",
+      "!**/*.d.ts"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/*.pyc"
+        ]
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-key-sender/**/*"
+    ],
+    "compression": "maximum",
+    "removePackageScripts": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "publisherName": "OpenWispr Team",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OpenWispr",
+      "license": "LICENSE",
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64",
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "pkg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "signIgnore": [
+        "node_modules/node-key-sender/**/*"
+      ]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "rpm",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "snap",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icons",
+      "category": "Office",
+      "maintainer": "OpenWispr Team",
+      "vendor": "OpenWispr",
+      "synopsis": "AI-powered transcription and translation",
+      "description": "OpenWispr is an AI-powered desktop application for transcription and translation.",
+      "desktop": {
+        "Name": "OpenWispr",
+        "Comment": "AI-powered transcription and translation",
+        "Categories": "Office;AudioVideo;",
+        "StartupWMClass": "openwispr"
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Harshit-Dhyani",
+      "repo": "OpenWispr",
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    },
+    "afterSign": "scripts/notarize.js",
+    "afterPack": "scripts/afterPack.js",
+    "afterAllArtifactBuild": "scripts/afterAllArtifactBuild.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-notarize": "^1.2.2",
+    "rimraf": "^5.0.5"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "update-electron-app": "^3.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+
+
+
+
+

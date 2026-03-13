@@ -1,0 +1,241 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { HotkeyState, HotkeyStatus } from '../types/api';
+import type { HotkeySettings } from '../config/settingsSchema';
+
+export type HotkeyEvent = {
+  type: 'activated' | 'deactivated' | 'text_ready' | 'error' | 'state_change';
+  payload: unknown;
+  timestamp: string;
+};
+
+export type UseHotkeyOptions = {
+  onActivated?: () => void;
+  onDeactivated?: () => void;
+  onTextReady?: (text: string) => void;
+  onError?: (error: string) => void;
+  onStateChange?: (state: HotkeyState) => void;
+};
+
+export type UseHotkeyReturn = {
+  state: HotkeyState | null;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  enableHotkey: () => Promise<void>;
+  disableHotkey: () => Promise<void>;
+  toggleHotkey: () => Promise<void>;
+  updateConfig: (config: Partial<HotkeySettings>) => Promise<void>;
+  testHotkey: () => Promise<void>;
+  showFloatingWindow: () => Promise<void>;
+  hideFloatingWindow: () => Promise<void>;
+  
+  // State helpers
+  isEnabled: boolean;
+  isActive: boolean;
+  status: HotkeyStatus;
+  currentText: string;
+};
+
+export function useHotkey(options: UseHotkeyOptions = {}): UseHotkeyReturn {
+  const { onActivated, onDeactivated, onTextReady, onError, onStateChange } = options;
+
+  const [state, setState] = useState<HotkeyState | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hotkeyApi = window.openwisprDesktop?.hotkey;
+  
+  // Fetch initial hotkey state
+  const loadState = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const result = await hotkeyApi.getState();
+      setState(result as HotkeyState);
+      setError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load hotkey state';
+      setError(errorMessage);
+      console.error('Failed to load hotkey state:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hotkeyApi]);
+  
+  // Initial load
+  useEffect(() => {
+    void loadState();
+  }, [loadState]);
+  
+  // Listen for hotkey state changes from main process
+  useEffect(() => {
+    if (!hotkeyApi) return;
+
+    const handleStateChange = (_event: unknown, statePayload: unknown) => {
+      const newState = statePayload as HotkeyState;
+      // Use functional update to avoid stale closure
+      setState((prevState) => {
+        onStateChange?.(newState);
+
+        // Trigger callbacks based on state changes
+        const oldStatus = prevState?.session?.status;
+        const newStatus = newState.session?.status;
+
+        if (oldStatus !== 'listening' && newStatus === 'listening') {
+          onActivated?.();
+        }
+
+        if (oldStatus === 'listening' && newStatus !== 'listening') {
+          onDeactivated?.();
+        }
+
+        if (newState.session?.current_text && newState.session.current_text !== prevState?.session?.current_text) {
+          onTextReady?.(newState.session.current_text);
+        }
+
+        if (newState.error) {
+          onError?.(newState.error);
+        }
+
+        return newState;
+      });
+    };
+
+    hotkeyApi.onStateChange(handleStateChange);
+
+    return () => {
+      hotkeyApi.removeStateChangeListener(handleStateChange);
+    };
+  }, [hotkeyApi, onActivated, onDeactivated, onTextReady, onError, onStateChange]);
+  
+  // Enable hotkey
+  const enableHotkey = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      await hotkeyApi.toggle(true);
+      await loadState();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to enable hotkey';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hotkeyApi, loadState]);
+  
+  // Disable hotkey
+  const disableHotkey = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      await hotkeyApi.toggle(false);
+      await loadState();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to disable hotkey';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hotkeyApi, loadState]);
+  
+  // Toggle hotkey
+  const toggleHotkey = useCallback(async () => {
+    if (state?.config.enabled) {
+      await disableHotkey();
+    } else {
+      await enableHotkey();
+    }
+  }, [state?.config.enabled, enableHotkey, disableHotkey]);
+  
+  // Update config via IPC instead of non-existent HTTP endpoint
+  const updateConfig = useCallback(async (config: Partial<HotkeySettings>) => {
+    try {
+      setIsLoading(true);
+      await hotkeyApi.updateConfig(config);
+      await loadState();
+      setError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update config';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hotkeyApi, loadState]);
+  
+  // Show floating window
+  const showFloatingWindow = useCallback(async () => {
+    try {
+      await window.openwisprDesktop.floatingWindow?.show?.();
+    } catch (err) {
+      console.error('Failed to show floating window:', err);
+    }
+  }, []);
+  
+  // Hide floating window
+  const hideFloatingWindow = useCallback(async () => {
+    try {
+      await window.openwisprDesktop.floatingWindow?.hide?.();
+    } catch (err) {
+      console.error('Failed to hide floating window:', err);
+    }
+  }, []);
+
+  // Test hotkey (shows floating window)
+  const testHotkey = useCallback(async () => {
+    try {
+      await hotkeyApi.toggle(true);
+      await showFloatingWindow();
+
+      // Clear any existing timeout before setting new one
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        void hideFloatingWindow();
+      }, 3000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to test hotkey';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [hotkeyApi, showFloatingWindow, hideFloatingWindow]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Computed values
+  const isEnabled = state?.config.enabled ?? false;
+  const isActive = state?.session?.is_recording ?? false;
+  const status = state?.session?.status ?? 'idle';
+  const currentText = state?.session?.current_text ?? '';
+  
+  return {
+    state,
+    isLoading,
+    error,
+    
+    // Actions
+    enableHotkey,
+    disableHotkey,
+    toggleHotkey,
+    updateConfig,
+    testHotkey,
+    showFloatingWindow,
+    hideFloatingWindow,
+    
+    // State helpers
+    isEnabled,
+    isActive,
+    status,
+    currentText,
+  };
+}

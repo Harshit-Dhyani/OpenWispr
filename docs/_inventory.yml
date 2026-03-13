@@ -1,0 +1,348 @@
+# Documentation Inventory
+# This file tracks all documentation in the OpenWispr project.
+# Each entry includes ownership, audience, verification status, and source of truth.
+
+schema_version: 1
+last_updated: 2026-03-08
+
+docs:
+  - path: README.md
+    title: Documentation Home
+    owner: docs/ux
+    audience: all
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - docs/
+      - README.md
+    critical: true
+
+  - path: troubleshooting.md
+    title: Troubleshooting Guide
+    owner: docs/ux
+    audience: operators
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/recovery_strategies.py
+      - app/audio/devices.py
+      - app/api/service.py
+    critical: true
+
+## Project Documentation
+
+  - path: project/folder-ownership.md
+    title: Folder Ownership
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+      - docs/
+    critical: false
+
+  - path: project/project-structure.md
+    title: Project Structure
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+      - tests/
+      - tools/
+    critical: false
+
+## Operations and Deployment
+
+  - path: operations/OPERATIONS.md
+    title: Operations Guide
+    owner: docs/ux
+    audience: operators
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/api/server.py
+      - app/core/metrics.py
+      - app/core/session_manager.py
+    critical: true
+
+  - path: deployment/DEPLOYMENT.md
+    title: Deployment Guide
+    owner: docs/ux
+    audience: operators
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - tools/setup/
+      - package.json
+      - requirements.txt
+    critical: true
+
+## Architecture Documentation
+
+  - path: architecture/MODEL_SYSTEM.md
+    title: Model System Architecture
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/model_catalog.py
+      - app/api/model_service.py
+      - app/audio/transcription.py
+    critical: true
+
+  - path: api/endpoints.md
+    title: API Endpoints Reference
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/api/server.py
+      - app/api/websocket_server.py
+    critical: true
+
+  - path: reference/config.md
+    title: Configuration Reference
+    owner: docs/ux
+    audience: operators
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/config/settings.py
+      - app/config/constants.py
+      - app/core/modes.py
+    critical: true
+
+  - path: reference/features.md
+    title: Features Documentation
+    owner: docs/ux
+    audience: all
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/audio/capture.py
+      - app/api/service.py
+      - app/core/mode_manager.py
+      - app/core/modes.py
+      - app/stt/fast_engine.py
+    critical: true
+
+## Branding
+
+  - path: branding/brand-assets.md
+    title: Brand Asset Pipeline
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - scripts/generate_brand_assets.py
+      - package.json
+    critical: false
+
+## Engineering Documentation
+
+  - path: engineering/contributing-docs.md
+    title: Contributing to Documentation
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - docs/_style.md
+      - tools/ci/verify-docs.py
+    critical: false
+
+  - path: engineering/architecture-electron-backend-contract.md
+    title: Electron-Backend Contract
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/electron/main/preload/main.js
+      - app/api/websocket_server.py
+      - app/api/server.py
+      - app/electron/main/ipc/handlers.js
+    critical: true
+
+  - path: engineering/architecture-overview.md
+    title: Architecture Overview
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/electron/main/index.js
+      - app/electron/main/shared/state.js
+    critical: true
+
+  - path: engineering/latency-playbook.md
+    title: Latency Playbook
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/metrics.py
+      - app/audio/pipeline_factory.py
+      - app/stt/fast_engine.py
+    critical: false
+
+  - path: engineering/model-runtime.md
+    title: Model Runtime and Routing
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/model_catalog.py
+      - app/api/model_service.py
+      - app/stt/model_pool.py
+      - app/electron/main/services/modelDownloadManager.js
+      - app/core/system_profiler.py
+    critical: true
+
+  - path: engineering/performance.md
+    title: Performance Documentation
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/metrics.py
+      - app/audio/pipeline_factory.py
+      - app/core/auto_optimizer.py
+    critical: false
+
+  - path: engineering/security.md
+    title: Security Documentation
+    owner: docs/ux
+    audience: security
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/api/server.py
+      - app/electron/main/preload/main.js
+      - app/core/logging_utils.py
+    critical: false
+
+  - path: engineering/testing.md
+    title: Testing Guide
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - tests/conftest.py
+      - tests/unit/
+      - tests/integration/
+      - e2e/
+      - app/electron/frontend/vitest.config.ts
+    critical: false
+
+  - path: engineering/audio-capture.md
+    title: Audio Capture System
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/audio/capture.py
+      - app/audio/backends/
+      - app/audio/devices.py
+    critical: true
+
+  - path: engineering/events-streaming.md
+    title: Events and Streaming
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/api/websocket_server.py
+      - app/electron/frontend/src/hooks/useEventSource.ts
+      - app/electron/frontend/src/hooks/useWebSocket.ts
+      - app/api/server.py
+    critical: true
+
+  - path: engineering/dictation-pipeline.md
+    title: Dictation Pipeline
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/stt/dictation_cleanup.py
+      - app/stt/utterance_aggregator.py
+      - app/stt/stability.py
+    critical: true
+
+  - path: engineering/english-coach.md
+    title: English Coach System
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/api/coach_service.py
+      - app/api/refiner_service.py
+    critical: false
+
+  - path: engineering/settings.md
+    title: Settings System
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: monthly
+    source_of_truth:
+      - app/core/settings_manager.py
+      - app/api/settings_sync.py
+      - app/config/settings.py
+    critical: true
+
+  - path: engineering/folder-ownership.md
+    title: Folder Ownership
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+      - docs/
+    critical: false
+
+  - path: engineering/restructure-audit.md
+    title: Restructure Audit
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+    critical: false
+
+  - path: engineering/restructure-discovery.md
+    title: Restructure Discovery
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/
+    critical: false
+
+  - path: engineering/settings-source-of-truth.md
+    title: Settings Source of Truth
+    owner: docs/ux
+    audience: developers
+    last_verified: 2026-03-08
+    review_cadence: quarterly
+    source_of_truth:
+      - app/config/settings.py
+      - app/config/text.py
+    critical: false

@@ -1,0 +1,46 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Python
+        run: pnpm run lint:python
+
+      - name: Lint Frontend
+        run: pnpm run lint:frontend
+        continue-on-error: true
+        # Linting can be unstable due to competing rules; warn but don't fail
+
+      - name: TypeCheck
+        run: pnpm run typecheck
+
+      - name: Run Python tests
+        run: pnpm run test:backend
+
+      - name: Run Frontend tests
+        run: pnpm run test:frontend
+
+      - name: Build Electron
+        run: pnpm run build:electron

@@ -1,0 +1,147 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'app/electron/frontend/**'
+      - '.github/workflows/frontend-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'app/electron/frontend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'app/electron/frontend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: app/electron/frontend
+        run: npm ci
+
+      - name: Run type check
+        working-directory: app/electron/frontend
+        run: npx tsc --noEmit
+
+      - name: Run linter
+        working-directory: app/electron/frontend
+        run: npm run lint || true
+
+      - name: Run tests
+        working-directory: app/electron/frontend
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          directory: app/electron/frontend/coverage
+          files: lcov.info
+          flags: frontend
+          name: frontend-coverage
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.node-version }}
+          path: |
+            app/electron/frontend/test-results/
+            app/electron/frontend/coverage/
+
+  flaky-test-detection:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: 'app/electron/frontend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: app/electron/frontend
+        run: npm ci
+
+      - name: Run tests multiple times for flaky detection
+        working-directory: app/electron/frontend
+        run: |
+          for i in {1..5}; do
+            echo "Test run $i"
+            npm run test || exit 1
+          done
+
+  coverage-report:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results-20.x
+          path: coverage
+
+      - name: Generate coverage badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ secrets.COVERAGE_GIST_ID }}
+          filename: frontend-coverage.json
+          label: coverage
+          message: ${{ needs.test.outputs.coverage }}%
+          color: ${{ needs.test.outputs.coverage > 80 && 'brightgreen' || needs.test.outputs.coverage > 60 && 'yellow' || 'red' }}
+
+  build-verification:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: 'app/electron/frontend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: app/electron/frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: app/electron/frontend
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: app/electron/frontend
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Build output not found"
+            exit 1
+          fi
+          echo "Build verified successfully"

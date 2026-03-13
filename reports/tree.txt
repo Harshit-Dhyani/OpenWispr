@@ -1,0 +1,585 @@
+# OpenWispr Tree
+
+Generated: 2026-03-09T03:42:53.793Z
+Files: 479
+
+.
+├── .github
+│   └── workflows
+│       └── docs.yml
+├── app
+│   ├── api
+│   │   ├── routes
+│   │   │   ├── __init__.py
+│   │   │   ├── dictionary.py
+│   │   │   ├── history.py
+│   │   │   ├── models.py
+│   │   │   ├── session.py
+│   │   │   ├── settings.py
+│   │   │   ├── snippets.py
+│   │   │   ├── style.py
+│   │   │   └── system.py
+│   │   ├── services
+│   │   │   ├── __init__.py
+│   │   │   ├── backend_service.py
+│   │   │   ├── coach_service.py
+│   │   │   ├── dictionary_service.py
+│   │   │   ├── model_service.py
+│   │   │   ├── refinement_queue.py
+│   │   │   ├── refiner_service.py
+│   │   │   ├── snippet_service.py
+│   │   │   ├── streaming_metrics.py
+│   │   │   ├── style_service.py
+│   │   │   └── transcript_history_service.py
+│   │   ├── strings
+│   │   │   └── en.py
+│   │   ├── transport
+│   │   │   ├── __init__.py
+│   │   │   └── settings_sync.py
+│   │   ├── __init__.py
+│   │   ├── coach_cache.py
+│   │   ├── coach_service.py
+│   │   ├── deps.py
+│   │   ├── json_utils.py
+│   │   ├── model_service.py
+│   │   ├── refinement_queue.py
+│   │   ├── refiner_service.py
+│   │   ├── route_utils.py
+│   │   ├── schemas.py
+│   │   ├── server.py
+│   │   ├── service.py
+│   │   ├── session_resolution.py
+│   │   ├── settings_sync.py
+│   │   ├── streaming_metrics.py
+│   │   └── websocket_server.py
+│   ├── audio
+│   │   ├── backends
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── factory.py
+│   │   │   ├── pyaudio_wasapi.py
+│   │   │   └── soundcard_backend.py
+│   │   ├── __init__.py
+│   │   ├── audio_processing.py
+│   │   ├── capture.py
+│   │   ├── chunker.py
+│   │   ├── chunking.py
+│   │   ├── devices.py
+│   │   ├── pipeline_base.py
+│   │   ├── pipeline_factory.py
+│   │   ├── system_pipeline.py
+│   │   ├── vad_optimized.py
+│   │   └── wispr_pipeline.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   ├── coach_prompts.py
+│   │   ├── constants.py
+│   │   ├── generate_ts.py
+│   │   ├── settings.py
+│   │   └── text.py
+│   ├── core
+│   │   ├── settings
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   ├── manager.py
+│   │   │   ├── migrations.py
+│   │   │   └── validator.py
+│   │   ├── tests
+│   │   │   └── test_metrics.py
+│   │   ├── __init__.py
+│   │   ├── auto_optimizer.py
+│   │   ├── config.py
+│   │   ├── constants.py
+│   │   ├── error_handler.py
+│   │   ├── formula_extraction.py
+│   │   ├── formulas.py
+│   │   ├── hotkey_session.py
+│   │   ├── language_profiles.py
+│   │   ├── logging_utils.py
+│   │   ├── metrics.py
+│   │   ├── mode_manager.py
+│   │   ├── model_catalog.py
+│   │   ├── models.py
+│   │   ├── modes.py
+│   │   ├── performance_monitor.py
+│   │   ├── recovery_strategies.py
+│   │   ├── session_manager.py
+│   │   ├── settings_manager.py
+│   │   ├── settings_migrations.py
+│   │   ├── settings_validator.py
+│   │   ├── system_profiler.py
+│   │   └── system_session.py
+│   ├── electron
+│   │   ├── frontend
+│   │   │   ├── .github
+│   │   │   │   └── workflows
+│   │   │   │       └── tests.yml
+│   │   │   ├── src
+│   │   │   │   ├── api
+│   │   │   │   │   └── settings.ts
+│   │   │   │   ├── assets
+│   │   │   │   │   └── openwispr-logo.svg
+│   │   │   │   ├── components
+│   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   ├── ActivityFeed.test.tsx
+│   │   │   │   │   │   ├── ActivityFeedLayout.test.tsx
+│   │   │   │   │   │   ├── App.test.tsx
+│   │   │   │   │   │   ├── FloatingWindow.test.tsx
+│   │   │   │   │   │   ├── MainContentCoach.test.tsx
+│   │   │   │   │   │   ├── SettingsPanel.test.tsx
+│   │   │   │   │   │   ├── Sidebar.test.tsx
+│   │   │   │   │   │   └── themeContrastStyles.test.ts
+│   │   │   │   │   ├── pages
+│   │   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   │   └── HomePage.test.tsx
+│   │   │   │   │   │   ├── DictionaryPage.tsx
+│   │   │   │   │   │   ├── FeaturePageShell.tsx
+│   │   │   │   │   │   ├── HomePage.tsx
+│   │   │   │   │   │   └── SnippetsPage.tsx
+│   │   │   │   │   ├── settings
+│   │   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   │   ├── HotkeyRecorder.test.tsx
+│   │   │   │   │   │   │   ├── HotkeySection.test.tsx
+│   │   │   │   │   │   │   └── SettingCard.test.tsx
+│   │   │   │   │   │   ├── controls
+│   │   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   │   ├── NumberInput.tsx
+│   │   │   │   │   │   │   ├── Select.tsx
+│   │   │   │   │   │   │   ├── Slider.tsx
+│   │   │   │   │   │   │   └── Toggle.tsx
+│   │   │   │   │   │   ├── sections
+│   │   │   │   │   │   │   ├── AdvancedSection.tsx
+│   │   │   │   │   │   │   ├── AudioSection.tsx
+│   │   │   │   │   │   │   ├── CoachSection.tsx
+│   │   │   │   │   │   │   ├── DictionarySection.tsx
+│   │   │   │   │   │   │   ├── GeneralSection.tsx
+│   │   │   │   │   │   │   ├── HistorySection.tsx
+│   │   │   │   │   │   │   ├── HotkeySection.tsx
+│   │   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   │   ├── ModelSection.tsx
+│   │   │   │   │   │   │   ├── SnippetsSection.tsx
+│   │   │   │   │   │   │   ├── StyleSection.tsx
+│   │   │   │   │   │   │   └── TranscriptionSection.tsx
+│   │   │   │   │   │   ├── AdvancedSettings.tsx
+│   │   │   │   │   │   ├── categories.ts
+│   │   │   │   │   │   ├── HardwareProfileDisplay.tsx
+│   │   │   │   │   │   ├── HotkeyRecorder.tsx
+│   │   │   │   │   │   ├── HotkeySettings.test.tsx
+│   │   │   │   │   │   ├── HotkeySettings.tsx
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   ├── ModelComponents.tsx
+│   │   │   │   │   │   ├── presets.ts
+│   │   │   │   │   │   ├── SectionHeader.tsx
+│   │   │   │   │   │   ├── SettingCard.tsx
+│   │   │   │   │   │   ├── SettingsPanel.tsx
+│   │   │   │   │   │   ├── types.ts
+│   │   │   │   │   │   └── utils.ts
+│   │   │   │   │   ├── ActivityFeed.tsx
+│   │   │   │   │   ├── AdvancedSettings.tsx
+│   │   │   │   │   ├── AppSidebar.tsx
+│   │   │   │   │   ├── AudioVisualizer.test.tsx
+│   │   │   │   │   ├── AudioVisualizer.tsx
+│   │   │   │   │   ├── ErrorBoundary.tsx
+│   │   │   │   │   ├── FloatingWindow.tsx
+│   │   │   │   │   ├── HotkeySettings.test.tsx
+│   │   │   │   │   ├── HotkeySettings.tsx
+│   │   │   │   │   ├── MainContent.tsx
+│   │   │   │   │   ├── ModeCardsRow.tsx
+│   │   │   │   │   ├── ModeSelector.test.tsx
+│   │   │   │   │   ├── ModeSelector.tsx
+│   │   │   │   │   ├── ModeSettings.test.tsx
+│   │   │   │   │   ├── ModeSettings.tsx
+│   │   │   │   │   ├── PartialText.test.tsx
+│   │   │   │   │   ├── PartialText.tsx
+│   │   │   │   │   ├── QuickSettingsDrawer.tsx
+│   │   │   │   │   ├── SettingsPanel.tsx
+│   │   │   │   │   ├── Sidebar.tsx
+│   │   │   │   │   └── TranscriptionStream.tsx
+│   │   │   │   ├── config
+│   │   │   │   │   ├── generated
+│   │   │   │   │   │   ├── constants.ts
+│   │   │   │   │   │   ├── index.ts
+│   │   │   │   │   │   ├── settings.ts
+│   │   │   │   │   │   └── text.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── settings.ts
+│   │   │   │   │   ├── settingsMigration.ts
+│   │   │   │   │   ├── settingsSchema.ts
+│   │   │   │   │   └── text.ts
+│   │   │   │   ├── context
+│   │   │   │   │   └── SettingsContext.tsx
+│   │   │   │   ├── hooks
+│   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   ├── useEventSource.test.ts
+│   │   │   │   │   │   ├── useHotkey.test.ts
+│   │   │   │   │   │   ├── useHotkey.test.tsx
+│   │   │   │   │   │   └── useSettingsSync.test.ts
+│   │   │   │   │   ├── useEventSource.ts
+│   │   │   │   │   ├── useHotkey.ts
+│   │   │   │   │   ├── useSettingsSync.ts
+│   │   │   │   │   ├── useWebSocket.test.ts
+│   │   │   │   │   └── useWebSocket.ts
+│   │   │   │   ├── lib
+│   │   │   │   │   ├── asrRouting.test.ts
+│   │   │   │   │   ├── asrRouting.ts
+│   │   │   │   │   ├── constants.ts
+│   │   │   │   │   ├── languages.ts
+│   │   │   │   │   ├── liveTranscript.test.ts
+│   │   │   │   │   ├── liveTranscript.ts
+│   │   │   │   │   ├── modelRegistry.downloads.test.ts
+│   │   │   │   │   ├── modelRegistry.test.ts
+│   │   │   │   │   ├── modelRegistry.ts
+│   │   │   │   │   ├── sessionReducer.test.ts
+│   │   │   │   │   ├── sessionReducer.ts
+│   │   │   │   │   ├── sessionStart.test.ts
+│   │   │   │   │   ├── sessionStart.ts
+│   │   │   │   │   ├── settingsApi.test.ts
+│   │   │   │   │   ├── settingsApi.ts
+│   │   │   │   │   ├── settingsMigration.test.ts
+│   │   │   │   │   ├── settingsMigration.ts
+│   │   │   │   │   └── settingsSchema.ts
+│   │   │   │   ├── pages
+│   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   └── HomePage.test.tsx
+│   │   │   │   │   ├── DictionaryPage.tsx
+│   │   │   │   │   ├── FeaturePageShell.tsx
+│   │   │   │   │   ├── HomePage.tsx
+│   │   │   │   │   └── SnippetsPage.tsx
+│   │   │   │   ├── services
+│   │   │   │   │   └── healthService.ts
+│   │   │   │   ├── strings
+│   │   │   │   │   └── en.ts
+│   │   │   │   ├── test
+│   │   │   │   │   ├── integration
+│   │   │   │   │   │   ├── flows.test.tsx
+│   │   │   │   │   │   └── websocket.test.tsx
+│   │   │   │   │   ├── factories.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── README.md
+│   │   │   │   │   ├── setup.ts
+│   │   │   │   │   └── utils.ts
+│   │   │   │   ├── types
+│   │   │   │   │   └── api.ts
+│   │   │   │   ├── App.tsx
+│   │   │   │   ├── floating-main.tsx
+│   │   │   │   ├── index.css
+│   │   │   │   ├── main.tsx
+│   │   │   │   └── vite-env.d.ts
+│   │   │   ├── test-results
+│   │   │   │   └── junit.xml
+│   │   │   ├── .nycrc.json
+│   │   │   ├── floating.html
+│   │   │   ├── index.html
+│   │   │   ├── package-lock.json
+│   │   │   ├── package.json
+│   │   │   ├── postcss.config.cjs
+│   │   │   ├── tailwind.config.cjs
+│   │   │   ├── tsconfig.json
+│   │   │   ├── tsconfig.node.json
+│   │   │   ├── vite.config.ts
+│   │   │   └── vitest.config.ts
+│   │   ├── main
+│   │   │   ├── ipc
+│   │   │   │   ├── handlers.js
+│   │   │   │   ├── handlers.test.js
+│   │   │   │   ├── hotkeyHandlers.js
+│   │   │   │   ├── hotkeyStopPolicy.js
+│   │   │   │   └── hotkeyStopPolicy.test.js
+│   │   │   ├── preload
+│   │   │   │   ├── floating.js
+│   │   │   │   ├── floating.test.js
+│   │   │   │   ├── main.js
+│   │   │   │   └── quickSettings.js
+│   │   │   ├── services
+│   │   │   │   ├── backendSpawn.js
+│   │   │   │   ├── holdModeHotkeys.js
+│   │   │   │   ├── holdModeHotkeys.test.js
+│   │   │   │   ├── modelDownloadManager.js
+│   │   │   │   ├── modelDownloadManager.test.js
+│   │   │   │   └── textInjector.js
+│   │   │   ├── shared
+│   │   │   │   ├── generated
+│   │   │   │   │   └── appMeta.js
+│   │   │   │   ├── iconPaths.js
+│   │   │   │   └── state.js
+│   │   │   ├── utils
+│   │   │   │   └── api.js
+│   │   │   ├── windows
+│   │   │   │   ├── floatingWindow.js
+│   │   │   │   ├── floatingWindow.test.js
+│   │   │   │   ├── floatingWindowContentPath.js
+│   │   │   │   ├── floatingWindowState.js
+│   │   │   │   ├── floatingWindowState.test.js
+│   │   │   │   ├── mainWindow.js
+│   │   │   │   ├── mainWindow.test.js
+│   │   │   │   ├── quickSettingsWindow.js
+│   │   │   │   ├── tray.js
+│   │   │   │   ├── tray.test.js
+│   │   │   │   └── trayUtils.js
+│   │   │   ├── config.js
+│   │   │   ├── index.js
+│   │   │   ├── main.js
+│   │   │   ├── model-download-manager.js
+│   │   │   ├── preload-floating.js
+│   │   │   ├── preload-floating.test.js
+│   │   │   ├── preload-quick-settings.js
+│   │   │   └── preload.js
+│   │   ├── scripts
+│   │   │   ├── build-frontend.js
+│   │   │   └── dev.js
+│   │   ├── shared
+│   │   │   └── theme-tokens.css
+│   │   ├── strings
+│   │   │   └── en.js
+│   │   ├── .gitignore
+│   │   ├── floating-window.html
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   └── quick-settings.html
+│   ├── stem
+│   │   ├── __init__.py
+│   │   ├── formula_extractor.py
+│   │   ├── postprocess.py
+│   │   └── unit_checker.py
+│   ├── storage
+│   │   ├── __init__.py
+│   │   ├── document_store.py
+│   │   ├── history_db.py
+│   │   ├── migrations.py
+│   │   ├── session_store.py
+│   │   └── session_writer.py
+│   ├── stt
+│   │   ├── __init__.py
+│   │   ├── chunker.py
+│   │   ├── deterministic_postprocess.py
+│   │   ├── dictation_cleanup.py
+│   │   ├── engine.py
+│   │   ├── fast_chunker.py
+│   │   ├── fast_engine.py
+│   │   ├── fast_whisper_backend.py
+│   │   ├── model_pool.py
+│   │   ├── prompts.py
+│   │   ├── quality.py
+│   │   ├── refiner_prompts.py
+│   │   ├── repetition_guard.py
+│   │   ├── stability.py
+│   │   ├── streaming_engine.py
+│   │   └── utterance_aggregator.py
+│   ├── ui
+│   │   ├── __init__.py
+│   │   ├── main_window.py
+│   │   └── README.md
+│   ├── __init__.py
+│   ├── api_main.py
+│   ├── coach_cache.json
+│   └── main.py
+├── docs
+│   ├── api
+│   │   └── endpoints.md
+│   ├── architecture
+│   │   └── MODEL_SYSTEM.md
+│   ├── branding
+│   │   └── brand-assets.md
+│   ├── debug
+│   │   └── floating-window-regression.md
+│   ├── deployment
+│   │   └── DEPLOYMENT.md
+│   ├── engineering
+│   │   ├── architecture-electron-backend-contract.md
+│   │   ├── architecture-overview.md
+│   │   ├── audio-capture.md
+│   │   ├── contributing-docs.md
+│   │   ├── dictation-pipeline.md
+│   │   ├── english-coach.md
+│   │   ├── events-streaming.md
+│   │   ├── folder-ownership.md
+│   │   ├── latency-playbook.md
+│   │   ├── model-runtime.md
+│   │   ├── performance.md
+│   │   ├── restructure-audit.md
+│   │   ├── restructure-discovery.md
+│   │   ├── security.md
+│   │   ├── settings-source-of-truth.md
+│   │   ├── settings.md
+│   │   └── testing.md
+│   ├── operations
+│   │   └── OPERATIONS.md
+│   ├── project
+│   │   ├── folder-ownership.md
+│   │   └── project-structure.md
+│   ├── reference
+│   │   ├── config.md
+│   │   └── features.md
+│   ├── _inventory.yml
+│   ├── _style.md
+│   ├── pnpm-lock.yaml
+│   ├── README.md
+│   └── troubleshooting.md
+├── e2e
+│   ├── conftest.py
+│   ├── test_hotkey_mode.py
+│   ├── test_models_flow.py
+│   └── test_system_mode.py
+├── prompts
+│   ├── PROMPT_DOCS_AUTO_UPDATE.md
+│   └── REPORTS_FILES_CREATE.md
+├── reports
+│   ├── archive
+│   │   ├── 2026-03-01-performance-audit.md
+│   │   ├── 2026-03-02-security-audit.md
+│   │   └── 2026-03-04-optimization-roadmap.md
+│   ├── architecture-structure-audit-2026-03-08.md
+│   ├── changes-since-last-commit.md
+│   ├── docs-source-of-truth-audit-2026-03-08.md
+│   ├── docs-update-2026-03-04.md
+│   ├── master-improvement-roadmap-2026-03-08.md
+│   ├── performance-optimization-2026-03-08.md
+│   ├── release-readiness-audit-2026-03-08.md
+│   ├── security-audit-2026-03-08.md
+│   ├── settings-config-audit-2026-03-08.md
+│   ├── testing-gap-analysis-2026-03-08.md
+│   └── tree.txt
+├── scripts
+│   ├── build.py
+│   ├── dev.cjs
+│   ├── dev.test.cjs
+│   ├── export-code-for-chatgpt.cjs
+│   ├── export-code-for-chatgpt.test.cjs
+│   ├── generate_brand_assets.py
+│   ├── generate-changes-since-last-commit.cjs
+│   ├── generate-tree.cjs
+│   ├── package-scripts.test.cjs
+│   ├── run-backend-dev.cjs
+│   ├── test_generate_brand_assets.py
+│   ├── test_settings_download_root.py
+│   ├── test_verified_report_fixes.py
+│   └── validate.py
+├── skills
+│   ├── openwispr-agents-memory
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-maintainer
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-release-validation
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-repo-discovery
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-runtime-debug
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-safe-refactor
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-settings-wiring-check
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-ui-fix
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   └── README.md
+├── tests
+│   ├── integration
+│   │   ├── __init__.py
+│   │   ├── test_api_endpoints.py
+│   │   ├── test_file_io.py
+│   │   ├── test_serialization.py
+│   │   └── test_websocket.py
+│   ├── performance
+│   │   ├── __init__.py
+│   │   ├── test_concurrency.py
+│   │   ├── test_latency.py
+│   │   ├── test_memory.py
+│   │   └── test_throughput.py
+│   ├── support
+│   │   └── __init__.py
+│   ├── unit
+│   │   ├── __init__.py
+│   │   ├── test_audio_pipeline.py
+│   │   ├── test_error_handler.py
+│   │   ├── test_session_handler.py
+│   │   ├── test_settings_manager.py
+│   │   ├── test_system_pipeline.py
+│   │   ├── test_transcription_engine.py
+│   │   └── test_vad.py
+│   ├── __init__.py
+│   ├── _contracts.py
+│   ├── conftest.py
+│   ├── README.md
+│   ├── test_audio_capture_contract.py
+│   ├── test_audio_pipelines.py
+│   ├── test_audio_probe.py
+│   ├── test_chunking_contract.py
+│   ├── test_coach_service.py
+│   ├── test_constants_exports.py
+│   ├── test_deterministic_postprocess.py
+│   ├── test_dictation_cleanup.py
+│   ├── test_error_handling.py
+│   ├── test_fast_engine_metrics.py
+│   ├── test_fast_whisper_backend.py
+│   ├── test_fixes.py
+│   ├── test_flow_control.py
+│   ├── test_formula_extraction_contract.py
+│   ├── test_generate_brand_assets.py
+│   ├── test_gpu_fallback.py
+│   ├── test_hotkey_service_lifecycle.py
+│   ├── test_hotkey_session.py
+│   ├── test_incremental_output.py
+│   ├── test_mode_manager.py
+│   ├── test_model_catalog.py
+│   ├── test_refinement_queue.py
+│   ├── test_refiner_service.py
+│   ├── test_repetition_guard.py
+│   ├── test_runtime_log_levels.py
+│   ├── test_server_logging.py
+│   ├── test_server_serialization.py
+│   ├── test_session_device_resolution.py
+│   ├── test_session_writer_contract.py
+│   ├── test_settings_manager.py
+│   ├── test_sse_events.py
+│   ├── test_stability.py
+│   ├── test_stream_event_contract.py
+│   ├── test_stream_quality_contract.py
+│   ├── test_system_session.py
+│   ├── test_utterance_aggregator.py
+│   ├── test_vad_config.py
+│   ├── test_vad_optimized.py
+│   └── test_windows_mvp_sanity.py
+├── tools
+│   ├── ci
+│   │   ├── DOCS_AUTO_UPDATE_PROMPT.md
+│   │   ├── generate-api-docs.py
+│   │   ├── generate-settings-docs.py
+│   │   ├── update-docs.py
+│   │   ├── verify-docs.py
+│   │   └── verify-fixes.py
+│   ├── diagnostics
+│   │   ├── check-audio.py
+│   │   └── check-system.py
+│   ├── maintenance
+│   │   └── cleanup-logs.py
+│   ├── setup
+│   │   ├── install-ffmpeg.ps1
+│   │   └── install-pytorch-cuda.ps1
+│   ├── check_renderer_strings.py
+│   ├── README.md
+│   └── runner.py
+├── .env.example
+├── .gitignore
+├── AGENTS.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── package.json
+├── pyproject.toml
+├── README.md
+└── requirements.txt

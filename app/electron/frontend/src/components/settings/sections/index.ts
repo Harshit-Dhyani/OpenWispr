@@ -1,0 +1,11 @@
+export { GeneralSection } from './GeneralSection';
+export { ModelSection } from './ModelSection';
+export { TranscriptionSection } from './TranscriptionSection';
+export { AudioSection } from './AudioSection';
+export { HotkeySection } from './HotkeySection';
+export { CoachSection } from './CoachSection';
+export { HistorySection } from './HistorySection';
+export { DictionarySection } from './DictionarySection';
+export { SnippetsSection } from './SnippetsSection';
+export { StyleSection } from './StyleSection';
+export { AdvancedSection } from './AdvancedSection';

@@ -1,0 +1,82 @@
+{
+  "name": "openwispr-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop shell for OpenWispr",
+  "main": "main/index.js",
+  "scripts": {
+    "build:frontend": "node ./scripts/build-frontend.js",
+    "dev": "node ./scripts/dev.js",
+    "start": "node ./node_modules/electron/cli.js .",
+    "pack": "node ./node_modules/electron-builder/cli.js --dir",
+    "dist": "node ./node_modules/electron-builder/cli.js"
+  },
+  "build": {
+    "appId": "com.openwispr.desktop",
+    "productName": "OpenWispr",
+    "files": [
+      "main/index.js",
+      "main/preload/**/*",
+      "main/shared/**/*",
+      "main/utils/**/*",
+      "main/windows/**/*",
+      "main/ipc/**/*",
+      "main/services/**/*",
+      "strings/**/*",
+      "floating-window.html",
+      "quick-settings.html",
+      "renderer/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "../../build"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OpenWispr"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "extraResources": [
+      {
+        "filter": [
+          "**/*",
+          "!electron{,/**}",
+          "!**/__pycache__",
+          "!**/*.pyc"
+        ],
+        "from": "../../app",
+        "to": "backend/app"
+      }
+    ]
+  },
+  "dependencies": {
+    "node-key-sender": "^1.0.11",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "optionalDependencies": {
+    "iohook": "^0.9.3",
+    "robotjs": "^0.6.0"
+  },
+  "author": "OpenWispr Team"
+}

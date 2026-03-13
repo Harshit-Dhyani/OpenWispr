@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' http://localhost:*">
+  <title>Quick Settings</title>
+  <link rel="stylesheet" href="./shared/theme-tokens.css" />
+  <style>
+    :root {
+      color-scheme: light;
+      --qs-muted: color-mix(in srgb, var(--color-text) 62%, transparent);
+      --qs-soft: color-mix(in srgb, var(--color-panel) 82%, var(--color-bg));
+      --qs-line: var(--color-border);
+      --qs-shadow: var(--color-shadow, rgba(24, 25, 27, 0.16));
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 38%),
+        linear-gradient(180deg, color-mix(in srgb, var(--color-bg) 96%, #ffffff) 0%, var(--color-bg) 100%);
+      color: var(--color-text);
+      overflow: hidden;
+    }
+
+    .shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--color-panel);
+      border: 2px solid var(--qs-line);
+      padding: 14px;
+      box-shadow: 6px 6px 0 0 var(--qs-line);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 4px;
+      font-weight: 900;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+      font-weight: 900;
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--qs-muted);
+      font-weight: 700;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--qs-muted);
+      font-weight: 900;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 2px solid color-mix(in srgb, var(--qs-line) 18%, transparent);
+    }
+
+    .row:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .label {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .label strong {
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--qs-muted);
+    }
+
+    select,
+    button {
+      font: inherit;
+    }
+
+    select {
+      width: 170px;
+      padding: 8px 10px;
+      border: 2px solid var(--qs-line);
+      background: var(--color-bg);
+      color: var(--color-text);
+      outline: none;
+      font-weight: 700;
+      box-shadow: 3px 3px 0 0 var(--qs-line);
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 0.7rem center;
+      background-size: 1.1em;
+      padding-right: 2.5rem;
+    }
+
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 2px solid var(--qs-line);
+      background: color-mix(in srgb, var(--color-panel) 65%, var(--color-bg));
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .switch input { display: none; }
+
+    .switch .thumb {
+      position: absolute;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--color-panel);
+      border: 2px solid var(--qs-line);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .switch[data-on="true"] {
+      background: color-mix(in srgb, var(--color-accent) 24%, var(--color-bg));
+      border-color: var(--color-accent);
+    }
+
+    .switch[data-on="true"] .thumb {
+      transform: translateX(20px);
+      background: var(--color-accent);
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 11px 14px;
+      border: 2px solid var(--qs-line);
+      background: var(--color-panel);
+      color: var(--color-text);
+      cursor: pointer;
+      font-weight: 800;
+      box-shadow: 4px 4px 0 0 var(--qs-line);
+    }
+
+    .btn.primary {
+      background: var(--color-accent);
+      color: var(--color-bg);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card header">
+      <div>
+        <div class="eyebrow">Quick Settings</div>
+        <h1 id="appNameHeading">App</h1>
+        <div class="status" id="statusText">Loading…</div>
+      </div>
+      <button class="btn" id="closeBtn" style="flex:0 0 auto; padding:8px 10px;">Close</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Recording</div>
+      <div class="row">
+        <div class="label">
+          <strong>Global Hotkey</strong>
+          <span class="hint">Enable quick microphone dictation from anywhere.</span>
+        </div>
+        <label class="switch" id="hotkeySwitch" data-on="false"><input type="checkbox" id="hotkeyToggle"><span class="thumb"></span></label>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Paste on Stop</strong>
+          <span class="hint">Use Finish & Paste as the default hotkey stop action.</span>
+        </div>
+        <label class="switch" id="pasteSwitch" data-on="false"><input type="checkbox" id="pasteToggle"><span class="thumb"></span></label>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Dictation Language</strong>
+          <span class="hint">Choose the default language for hotkey dictation.</span>
+        </div>
+        <select id="languageSelect"></select>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Microphone</strong>
+          <span class="hint">Hotkey dictation uses microphone input only.</span>
+        </div>
+        <select id="deviceSelect"></select>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button class="btn" id="openFullBtn">Open Full Settings</button>
+      <button class="btn primary" id="doneBtn">Done</button>
+    </div>
+  </div>
+
+  <script>
+    const state = { settings: null, devices: [], languages: [], dirty: false };
+
+    const statusText = document.getElementById("statusText");
+    const appNameHeading = document.getElementById("appNameHeading");
+    const hotkeyToggle = document.getElementById("hotkeyToggle");
+    const hotkeySwitch = document.getElementById("hotkeySwitch");
+    const pasteToggle = document.getElementById("pasteToggle");
+    const pasteSwitch = document.getElementById("pasteSwitch");
+    const languageSelect = document.getElementById("languageSelect");
+    const deviceSelect = document.getElementById("deviceSelect");
+
+    function setSwitch(node, input, checked) {
+      input.checked = checked;
+      node.dataset.on = checked ? "true" : "false";
+    }
+
+    function microphoneDevices(devices) {
+      return devices.filter((device) => device.is_input && !(device.supports_loopback || device.is_loopback));
+    }
+
+    function render() {
+      if (!state.settings) return;
+      const hotkey = state.settings.hotkey || {};
+      setSwitch(hotkeySwitch, hotkeyToggle, !!hotkey.enabled);
+      setSwitch(pasteSwitch, pasteToggle, (hotkey.finish_mode_default || "finish_and_paste") === "finish_and_paste");
+
+      languageSelect.innerHTML = "";
+      for (const language of state.languages) {
+        const option = document.createElement("option");
+        option.value = language.code;
+        option.textContent = language.label;
+        option.selected = (hotkey.language || "auto") === language.code;
+        languageSelect.appendChild(option);
+      }
+
+      deviceSelect.innerHTML = "";
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "default";
+      defaultOption.textContent = "Default microphone";
+      deviceSelect.appendChild(defaultOption);
+
+      for (const device of microphoneDevices(state.devices)) {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.textContent = device.name;
+        option.selected = (hotkey.device_id || "default") === device.id;
+        deviceSelect.appendChild(option);
+      }
+
+      statusText.textContent = `Hotkey ${hotkey.enabled ? "enabled" : "disabled"} • ${hotkey.key_combination || "Ctrl+Shift+T"}`;
+    }
+
+    async function persist() {
+      if (!state.settings) return;
+      await window.openwisprQuickSettings.update(state.settings);
+      state.dirty = false;
+      render();
+    }
+
+    function updateHotkey(partial) {
+      state.settings.hotkey = { ...(state.settings.hotkey || {}), ...partial };
+      state.dirty = true;
+      render();
+      void persist();
+    }
+
+    hotkeyToggle.addEventListener("change", () => updateHotkey({ enabled: hotkeyToggle.checked }));
+    pasteToggle.addEventListener("change", () => updateHotkey({ finish_mode_default: pasteToggle.checked ? "finish_and_paste" : "finish" }));
+    languageSelect.addEventListener("change", () => updateHotkey({ language: languageSelect.value }));
+    deviceSelect.addEventListener("change", () => updateHotkey({ device_id: deviceSelect.value }));
+
+    document.getElementById("openFullBtn").addEventListener("click", () => window.openwisprQuickSettings.openFullSettings());
+    document.getElementById("doneBtn").addEventListener("click", () => window.openwisprQuickSettings.close());
+    document.getElementById("closeBtn").addEventListener("click", () => window.openwisprQuickSettings.close());
+
+    (async () => {
+      const data = await window.openwisprQuickSettings.getData();
+      const appName = data?.appName || "OpenWispr";
+      document.title = `${appName} Quick Settings`;
+      appNameHeading.textContent = appName;
+      document.documentElement.dataset.theme = data?.settings?.general?.theme || "light";
+      state.settings = data.settings;
+      state.devices = data.devices || [];
+      state.languages = data.languages || [];
+      render();
+    })().catch((error) => {
+      statusText.textContent = error.message || "Failed to load quick settings.";
+    });
+  </script>
+</body>
+</html>
