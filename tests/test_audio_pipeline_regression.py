@@ -111,21 +111,19 @@ class TestContextCarryover:
 
     def test_context_carryover_sufficient(self) -> None:
         """Should have enough context words for proper transcription."""
-        from app.stt.streaming_engine import ContextCarryoverManager, StreamingConfig
+        from app.stt.streaming_engine import ContextCarryoverManager
 
-        config = StreamingConfig()
-        manager = ContextCarryoverManager(config)
+        manager = ContextCarryoverManager(max_prefix_words=15)
 
-        sample_words = ["hello", "world", "this", "is", "a", "test", "sentence", "for", "context"]
+        manager.update_context(
+            "hello world this is a test sentence for context carryover", confidence=0.9
+        )
 
-        for word in sample_words:
-            manager.push_word(word)
-
-        context = manager.get_context()
+        context = manager.get_prefix()
         context_words = context.split() if context else []
 
-        assert len(context_words) >= 3, (
-            f"Context should have at least 3 words for proper transcription. "
+        assert len(context_words) >= 10, (
+            f"Context should have at least 10 words for proper transcription. "
             f"Got: {len(context_words)} words"
         )
 
@@ -136,6 +134,6 @@ class TestContextCarryover:
         config = StreamingConfig()
 
         assert hasattr(config, "max_prefix_words")
-        assert config.max_prefix_words >= 3, (
-            "Should have at least 3 context words for transcription quality"
+        assert config.max_prefix_words >= 5, (
+            "Should have at least 5 context words for transcription quality"
         )
