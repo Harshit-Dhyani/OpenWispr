@@ -129,7 +129,14 @@ class StyleService:
             INSERT INTO style_profiles(id, name, style_key, description, rules_json, enabled, built_in, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             """,
-            (profile_id, name.strip(), style_key.strip(), description, json.dumps(rules or {}), 1 if enabled else 0),
+            (
+                profile_id,
+                name.strip(),
+                style_key.strip(),
+                description,
+                json.dumps(rules or {}),
+                1 if enabled else 0,
+            ),
         )
         created = self.get_profile(profile_id)
         if created is None:
@@ -201,7 +208,9 @@ class StyleService:
         )
         return self.list_assignments()
 
-    def resolve_profile(self, *, context: str = "other", profile_id: str | None = None) -> dict[str, Any] | None:
+    def resolve_profile(
+        self, *, context: str = "other", profile_id: str | None = None
+    ) -> dict[str, Any] | None:
         if profile_id:
             return self.get_profile(profile_id)
 
@@ -238,7 +247,9 @@ class StyleService:
 
         return StyleApplyResult(text=transformed, profile=profile)
 
-    def preview(self, text: str, *, context: str = "other", profile_id: str | None = None) -> dict[str, Any]:
+    def preview(
+        self, text: str, *, context: str = "other", profile_id: str | None = None
+    ) -> dict[str, Any]:
         result = self.apply_style(text, context=context, profile_id=profile_id)
         return {
             "input_text": text,

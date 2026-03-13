@@ -37,6 +37,7 @@ from app.api.route_utils import (
 from app.api.routes import (
     dictionary_router,
     history_router,
+    hotkey_router,
     models_router,
     session_router,
     settings_router,
@@ -63,6 +64,9 @@ from app.api.services import (
 from app.storage.history_db import HistoryDatabase
 from app.audio.capture import LoopbackAudioSource
 from app.audio.devices import list_audio_devices
+
+# Note: CoreHotkeySession is in app.core.hotkey_session but is not used in this file
+# The API layer uses the dataclass below for session state management
 from app.core.settings.config import AppSettings
 from app.core.model_catalog import runtime_name_for_model
 from app.core.system_profiler import SystemProfiler
@@ -294,7 +298,7 @@ class HotkeySession:
     postprocessed_text: str = ""
     paste_text: str = ""
     latest_live_buffer_text: str = ""
-    coach_result: CoachResult | None = None
+    coach_result: "CoachResult" | None = None
     coach_cache_hit: bool = False
     coach_error: str | None = None
     audio_level: float = 0.0
@@ -303,7 +307,7 @@ class HotkeySession:
     _callbacks: list[Callable[[str, dict[str, Any]], None]] = field(default_factory=list)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     processing_task: asyncio.Task | None = None
-    draft_stabilizer: PartialStabilizer | None = None
+    draft_stabilizer: "PartialStabilizer" | None = None
     cancel_requested: bool = False
     stop_requested_at: float | None = None
     stop_ack_at: float | None = None
@@ -319,7 +323,7 @@ class HotkeySession:
     adaptive_silence_gate_relaxed: bool = False
     submitted_audio_seconds: float = 0.0
     finalize_task: asyncio.Task | None = None
-    final_response: HotkeyStopResponse | None = None
+    final_response: "HotkeyStopResponse" | None = None
     finalization_error: str | None = None
     stop_websockets: set[WebSocket] = field(default_factory=set)
 
@@ -702,7 +706,8 @@ class HotkeyTranscriptionService:
                 stats = getattr(transcriber, "stats", None)
                 if isinstance(stats, dict):
                     queue_depth = stats.get("queue_depth")
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get transcriber stats: %s", e)
                 queue_depth = None
 
             if queue_depth is None:
@@ -1286,8 +1291,8 @@ class HotkeyTranscriptionService:
         for websocket in active_websockets:
             try:
                 await websocket.close(code=code, reason=reason)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to close websocket: {e}")
             finally:
                 self._websockets.discard(websocket)
 
@@ -1509,8 +1514,8 @@ class HotkeyTranscriptionService:
         finally:
             try:
                 session.audio_source.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to stop audio source in finally block: %s", e)
 
     def _calculate_audio_level(self, audio: np.ndarray) -> float:
         """Calculate audio level for visualizer (0.0 to 1.0)."""
@@ -1890,7 +1895,8 @@ class HotkeyTranscriptionService:
     def _is_debug_mode_enabled(self) -> bool:
         try:
             return bool(get_settings_manager().get_settings().advanced.debugMode)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get debug mode setting: %s", e)
             return False
 
     @staticmethod
@@ -1955,7 +1961,8 @@ class HotkeyTranscriptionService:
     def _should_collect_hotkey_audio_debug(self) -> bool:
         try:
             hotkey_settings = getattr(get_settings_manager().get_settings(), "hotkey", None)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get hotkey settings: {e}")
             hotkey_settings = None
         return self._is_debug_mode_enabled() or bool(
             getattr(hotkey_settings, "save_debug_wav", False)
@@ -2141,7 +2148,8 @@ class HotkeyTranscriptionService:
                             logger.debug(
                                 "Dropping async hotkey event without active loop: %s", event_type
                             )
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to process hotkey event: {e}")
                 continue
 
 
@@ -2179,6 +2187,12 @@ async def lifespan(_: FastAPI):
             )
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         logger.debug("Lifespan startup complete: service initialized in %.2fms", elapsed_ms)
+
+        # Start health metrics broadcast
+        global _health_broadcast_task
+        if _health_broadcast_task is None or _health_broadcast_task.done():
+            _health_broadcast_task = asyncio.create_task(_broadcast_health_metrics())
+            logger.debug("Started health metrics broadcast task")
     except Exception as exc:
         logger.error("Lifespan startup failed: %s", str(exc))
         raise
@@ -2216,6 +2230,18 @@ async def lifespan(_: FastAPI):
         except Exception as exc:
             logger.debug("History db shutdown error: %s", str(exc))
 
+    # Stop health broadcast and disconnect WebSockets
+    if _health_broadcast_task and not _health_broadcast_task.done():
+        _health_broadcast_task.cancel()
+        try:
+            await _health_broadcast_task
+        except asyncio.CancelledError:
+            pass
+        logger.debug("Stopped health metrics broadcast task")
+
+    if _ws_manager is not None:
+        await _ws_manager.disconnect_all(1001, "Server shutting down")
+
 
 _app_settings = AppSettings()
 app = FastAPI(
@@ -2238,405 +2264,7 @@ app.include_router(history_router)
 app.include_router(dictionary_router)
 app.include_router(snippets_router)
 app.include_router(style_router)
-
-
-# ============================================================================
-# Hotkey Endpoints
-# ============================================================================
-
-
-@app.post("/api/transcription/hotkey/start")
-@log_endpoint
-async def hotkey_start(
-    request: HotkeyStartRequest,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> HotkeyStartResponse:
-    """Start hotkey push-to-talk transcription.
-
-    Creates a temporary session that doesn't save to disk.
-    Uses shorter chunks for lower latency.
-    """
-    hotkey_start.__endpoint_path__ = "/api/transcription/hotkey/start"
-    hotkey_start.__http_method__ = "POST"
-
-    logger.debug(
-        "Hotkey start: source=%s, model=%s, lang=%s, mode=%s, device=%s, exec=%s",
-        request.capture_source or "default",
-        request.model_name,
-        request.language_mode,
-        request.transcription_mode,
-        request.device_id or "default",
-        request.execution_mode,
-    )
-
-    return await svc.start_session(
-        capture_source=request.capture_source,
-        device_id=request.device_id,
-        model_name=request.model_name,
-        language_mode=request.language_mode,
-        execution_mode=request.execution_mode,
-        transcription_mode=request.transcription_mode,
-    )
-
-
-@app.post("/api/transcription/hotkey/stop")
-@log_endpoint
-async def hotkey_stop(
-    request: HotkeyStopRequest | None = None,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-    history_svc: TranscriptHistoryService = Depends(get_history_service),
-) -> HotkeyStopResponse:
-    """Stop hotkey transcription and return final transcription."""
-    hotkey_stop.__endpoint_path__ = "/api/transcription/hotkey/stop"
-    hotkey_stop.__http_method__ = "POST"
-
-    logger.debug("Hotkey stop: requesting session stop")
-
-    result = await svc.stop_session(mode=(request.mode if request else "finish_and_paste"))
-
-    logger.debug(
-        "Hotkey stop complete: duration=%dms, segments=%d, text_length=%d, backend=%s",
-        result.duration_ms,
-        result.segment_count,
-        len(result.composed_text or result.final_transcription),
-        result.source_backend,
-    )
-
-    try:
-        history_svc.ingest_hotkey_result(
-            result, settings_snapshot=get_settings_manager().get_settings_dict()
-        )
-    except Exception as exc:
-        logger.warning("History ingest failed for hotkey stop: %s", exc)
-
-    return result
-
-
-@app.post("/api/coach/prompt-preview")
-@log_endpoint
-async def coach_prompt_preview(
-    request: CoachPromptPreviewRequest,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> dict[str, Any]:
-    """Compile the effective coach prompt for preview in settings."""
-    coach_prompt_preview.__endpoint_path__ = "/api/coach/prompt-preview"
-    coach_prompt_preview.__http_method__ = "POST"
-
-    context = CoachRequestContext(
-        text=request.original_text,
-        language_mode=request.language_mode,
-        detail_level=request.detail_level,
-        capture_source=request.capture_source,
-        template_id=request.template_id,
-        overrides=request.overrides,
-        privacy_mode=request.privacy_mode,
-        runtime_enabled=False,
-        model_id=None,
-        custom_user_template=request.custom_user_template,
-        templates=request.templates,
-    )
-    return svc._get_coach_service().prompt_preview(context)
-
-
-@app.get("/api/transcription/hotkey/status")
-@log_endpoint
-def hotkey_status(
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> HotkeyStatusResponse:
-    """Get current hotkey session status.
-
-    Returns recording state, partial text, and audio level for visualizer.
-    """
-    hotkey_status.__endpoint_path__ = "/api/transcription/hotkey/status"
-    hotkey_status.__http_method__ = "GET"
-
-    status = svc.get_status()
-    return status
-
-
-@app.get("/api/refiner/status")
-@log_endpoint
-def get_refiner_status() -> dict[str, Any]:
-    settings = get_settings_manager().get_settings()
-    selected_model_id = settings.refiner.selected_model_id
-    runtime_enabled = settings.refiner.runtime_enabled
-
-    import_available = is_llama_cpp_available()
-
-    refiner = RefinerService(AppSettings().download_root)
-    model_installed = bool(selected_model_id and refiner.is_available(selected_model_id))
-
-    reason = None
-    if not runtime_enabled:
-        reason = "runtime_disabled"
-    elif not import_available:
-        reason = "llama_cpp_missing"
-    elif not selected_model_id:
-        reason = "no_model_selected"
-    elif not model_installed:
-        reason = "model_not_installed"
-
-    return {
-        "runtime_enabled": runtime_enabled,
-        "import_available": import_available,
-        "selected_model_id": selected_model_id,
-        "model_installed": model_installed,
-        "available": runtime_enabled and import_available and model_installed,
-        "reason": reason,
-    }
-
-
-@app.post("/api/transcription/hotkey/inject")
-@log_endpoint
-def hotkey_inject(
-    request: HotkeyInjectRequest,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> HotkeyInjectResponse:
-    """Inject text into active window.
-
-    Called by Electron after receiving transcription.
-    This is a placeholder - actual injection is handled by Electron.
-    """
-    hotkey_inject.__endpoint_path__ = "/api/transcription/hotkey/inject"
-    hotkey_inject.__http_method__ = "POST"
-
-    logger.debug("Hotkey inject: text_length=%d", len(request.text))
-
-    # In a real implementation, this would communicate with the OS
-    # to inject text. For now, we just acknowledge the request.
-    # The actual injection is typically handled by the Electron frontend
-    # using OS-level APIs.
-
-    return HotkeyInjectResponse(
-        success=True,
-        message=API_STRINGS.messages.hotkey_inject_ready,
-    )
-
-
-@app.post("/api/hotkey/config")
-@log_endpoint
-def update_hotkey_config(
-    request: HotkeyConfigRequest,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> HotkeyConfigResponse:
-    """Update hotkey transcription configuration.
-
-    Allows runtime adjustment of hotkey-specific settings like
-    chunk duration, VAD thresholds, and filtering options.
-    """
-    update_hotkey_config.__endpoint_path__ = "/api/hotkey/config"
-    update_hotkey_config.__http_method__ = "POST"
-
-    logger.debug("Hotkey config update: %s", request.model_dump(exclude_none=True))
-
-    # Update config with provided values
-    if request.chunk_seconds is not None:
-        svc._config.chunk_seconds = request.chunk_seconds
-    if request.overlap_seconds is not None:
-        svc._config.overlap_seconds = request.overlap_seconds
-    if request.vad_threshold_db is not None:
-        svc._config.vad_threshold_db = request.vad_threshold_db
-    if request.vad_min_silence_ms is not None:
-        svc._config.vad_min_silence_ms = request.vad_min_silence_ms
-    if request.vad_speech_pad_ms is not None:
-        svc._config.vad_speech_pad_ms = request.vad_speech_pad_ms
-    if request.confidence_threshold is not None:
-        svc._config.confidence_threshold = request.confidence_threshold
-    if request.enable_filler_filter is not None:
-        svc._config.enable_filler_filter = request.enable_filler_filter
-
-    return HotkeyConfigResponse(
-        success=True,
-        config=svc._config,
-        message=API_STRINGS.messages.hotkey_config_updated,
-    )
-
-
-@app.websocket("/api/transcription/hotkey/ws")
-async def hotkey_websocket(websocket: WebSocket):
-    """WebSocket endpoint for real-time hotkey updates.
-
-    Streams partial transcriptions and audio levels to the hotkey window.
-    """
-    await websocket.accept()
-
-    client_id = id(websocket)
-    logger.debug("Hotkey WebSocket connected: client_id=%s", client_id)
-
-    svc = get_hotkey_service()
-    svc.register_websocket(websocket)
-
-    # Track last audio level for throttling
-    last_audio_update = 0.0
-    audio_throttle_ms = 50.0  # Send audio updates at 20fps max
-
-    async def send_event(event_type: str, data: dict[str, Any]) -> None:
-        nonlocal last_audio_update
-        try:
-            # Throttle audio level updates to avoid flooding
-            if event_type == "hotkey_audio_level":
-                now = time.time() * 1000
-                if now - last_audio_update < audio_throttle_ms:
-                    return
-                last_audio_update = now
-
-            await websocket.send_json(
-                {
-                    "type": event_type,
-                    "payload": _make_json_safe(data),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-        except Exception as exc:
-            logger.debug("WebSocket send error: %s", exc)
-
-    # Register callback
-    svc.register_callback(send_event)
-
-    try:
-        # Send initial status
-        status = svc.get_status()
-        await websocket.send_json(
-            {
-                "type": "hotkey_status",
-                "payload": _make_json_safe(
-                    {
-                        "state": status.state,
-                        "is_recording": status.is_recording,
-                        "partial_text": status.partial_text,
-                        "raw_partial_text": status.raw_partial_text,
-                        "display_partial_text": status.display_partial_text,
-                        "audio_level": status.audio_level,
-                        "levels": [status.audio_level] * 36
-                        if status.audio_level > 0
-                        else [0.0] * 36,
-                        "session_id": status.session_id,
-                        "duration_ms": status.duration_ms,
-                    }
-                ),
-            }
-        )
-
-        # Keep connection alive and handle client messages
-        while True:
-            try:
-                message = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
-
-                # Handle client commands
-                if message.get("action") == "ping":
-                    await websocket.send_json({"type": "pong"})
-
-            except asyncio.TimeoutError:
-                # Send keepalive
-                await websocket.send_json({"type": "keepalive"})
-
-    except WebSocketDisconnect:
-        logger.debug("Hotkey WebSocket disconnected: client_id=%s", client_id)
-    except Exception as exc:
-        logger.debug("Hotkey WebSocket error: %s", exc)
-    finally:
-        svc.unregister_callback(send_event)
-        svc.unregister_websocket(websocket)
-        try:
-            await websocket.close(code=1000, reason="hotkey-websocket-closed")
-        except Exception:
-            pass
-
-
-@app.get("/api/transcription/hotkey/events")
-async def hotkey_events(
-    request: Request,
-    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
-) -> StreamingResponse:
-    """SSE endpoint for hotkey transcription events.
-
-    Alternative to WebSocket for real-time updates.
-    """
-    client_id = id(request)
-    logger.debug("Hotkey SSE connect: client_id=%s", client_id)
-
-    queue = _create_sse_event_queue()
-    loop = asyncio.get_running_loop()
-
-    # Track last audio update for throttling
-    last_audio_update = 0.0
-    audio_throttle_ms = 50.0  # 20fps max for audio updates
-
-    def on_event(event_type: str, data: dict[str, Any]) -> None:
-        nonlocal last_audio_update
-
-        # Throttle audio level updates
-        if event_type == "hotkey_audio_level":
-            now = time.time() * 1000
-            if now - last_audio_update < audio_throttle_ms:
-                return
-            last_audio_update = now
-
-        def _enqueue() -> None:
-            try:
-                queue.put_nowait((event_type, data))
-            except asyncio.QueueFull:
-                pass  # Drop events if queue is full
-
-        loop.call_soon_threadsafe(_enqueue)
-
-    svc.register_callback(on_event)
-
-    async def event_generator():
-        try:
-            # Send initial status with full audio level data
-            status = svc.get_status()
-            initial_payload = _make_json_safe(
-                {
-                    "type": "hotkey_status",
-                    "payload": {
-                        "is_recording": status.is_recording,
-                        "partial_text": status.partial_text,
-                        "raw_partial_text": status.raw_partial_text,
-                        "display_partial_text": status.display_partial_text,
-                        "audio_level": status.audio_level,
-                        "levels": [status.audio_level] * 36
-                        if status.audio_level > 0
-                        else [0.0] * 36,
-                    },
-                }
-            )
-            yield f"data: {json.dumps(initial_payload)}\n\n"
-
-            while True:
-                if await request.is_disconnected():
-                    break
-
-                try:
-                    event_type, data = await asyncio.wait_for(queue.get(), timeout=15.0)
-                    payload = json.dumps(
-                        _make_json_safe(
-                            {
-                                "type": event_type,
-                                "payload": data,
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                            }
-                        )
-                    )
-                    yield f"data: {payload}\n\n"
-                except asyncio.TimeoutError:
-                    yield ":\n\n"  # SSE comment as keepalive
-
-        except (ConnectionResetError, asyncio.CancelledError):
-            pass
-        finally:
-            svc.unregister_callback(on_event)
-            logger.debug("Hotkey SSE disconnect: client_id=%s", client_id)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+app.include_router(hotkey_router)
 
 
 @app.get("/api/events")
@@ -3135,34 +2763,3 @@ async def websocket_broadcast(message: dict[str, Any]) -> dict[str, Any]:
     count = await manager.broadcast(msg_enum, payload)
 
     return {"success": True, "clients_notified": count}
-
-
-# Start health metrics broadcast on startup
-@app.on_event("startup")
-async def start_health_broadcast():
-    """Start the health metrics background broadcast task."""
-    global _health_broadcast_task
-    if _health_broadcast_task is None or _health_broadcast_task.done():
-        _health_broadcast_task = asyncio.create_task(_broadcast_health_metrics())
-        logger.debug("Started health metrics broadcast task")
-
-
-@app.on_event("shutdown")
-async def stop_health_broadcast():
-    """Stop the health metrics background broadcast task."""
-    global _health_broadcast_task, _ws_manager, _settings_sync
-
-    if _health_broadcast_task and not _health_broadcast_task.done():
-        _health_broadcast_task.cancel()
-        try:
-            await _health_broadcast_task
-        except asyncio.CancelledError:
-            pass
-        logger.debug("Stopped health metrics broadcast task")
-
-    # Disconnect all WebSocket clients
-    if _ws_manager is not None:
-        await _ws_manager.disconnect_all(1001, "Server shutting down")
-        _ws_manager = None
-
-    _settings_sync = None
