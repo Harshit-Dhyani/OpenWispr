@@ -162,18 +162,21 @@ class PyAudioWasapiBackend(AudioBackend):
                 attempts=self.attempts,
                 message=f"No compatible PyAudio/WASAPI capture path could be opened for '{self.device_id}'.",
             ) from last_exc
-        except Exception:
+        except Exception as init_exc:
+            logger.warning("PyAudio/WASAPI stream initialization failed: %s", init_exc)
             if self._stream is not None:
                 try:
                     self._stream.close()
-                except Exception:
-                    logger.debug("PyAudio stream cleanup failed", exc_info=True)
+                except Exception as close_exc:
+                    logger.warning("Failed to close PyAudio stream during cleanup: %s", close_exc)
                 self._stream = None
             if self._pa is not None:
                 try:
                     self._pa.terminate()
-                except Exception:
-                    logger.debug("PyAudio instance cleanup failed", exc_info=True)
+                except Exception as term_exc:
+                    logger.warning(
+                        "Failed to terminate PyAudio instance during cleanup: %s", term_exc
+                    )
                 self._pa = None
             raise
 
@@ -199,7 +202,8 @@ class PyAudioWasapiBackend(AudioBackend):
             available = 0
             try:
                 available = int(self._stream.get_read_available())
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to get available frames from PyAudio stream: %s", exc)
                 available = self.block_size
 
             frames_to_read = max(1, min(self.block_size, available or self.block_size))

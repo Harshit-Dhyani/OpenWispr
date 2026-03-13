@@ -1,6 +1,13 @@
 """Audio capture, processing, and device discovery."""
 
-from app.audio.vad_optimized import (
+from app.audio.processing import (
+    AudioPreprocessor,
+    ProcessingConfig,
+    ProcessingMode,
+    create_preprocessor,
+    preprocess_audio,
+)
+from app.audio.vad import (
     NoiseProfiler,
     OptimizedVAD,
     SpeechSegmenter,
@@ -9,13 +16,6 @@ from app.audio.vad_optimized import (
     VADState,
     create_vad,
     detect_speech_regions,
-)
-from app.audio.audio_processing import (
-    AudioPreprocessor,
-    ProcessingConfig,
-    ProcessingMode,
-    preprocess_audio,
-    create_preprocessor,
 )
 
 __all__ = [

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.audio.backends.base import AudioBackend, AudioBackendError
+from app.audio.backends.base import AudioBackend
 from app.audio.backends.pyaudio_wasapi import PyAudioWasapiBackend
 from app.audio.devices import resolve_capture_name_hints
 

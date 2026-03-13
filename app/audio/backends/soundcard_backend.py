@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -13,8 +14,10 @@ from app.audio.backends.base import (
     sanitize_audio,
     to_mono,
 )
-from app.core.models import DeviceProbeResult
 from app.audio.devices import candidate_channel_counts, resolve_capture_device_candidates
+from app.core.models import DeviceProbeResult
+
+logger = logging.getLogger(__name__)
 
 
 class SoundcardBackend(AudioBackend):
@@ -71,8 +74,11 @@ class SoundcardBackend(AudioBackend):
                         if recorder_context is not None:
                             try:
                                 recorder_context.__exit__(type(exc), exc, exc.__traceback__)
-                            except Exception:
-                                pass
+                            except Exception as ctx_exit_exc:
+                                logger.warning(
+                                    "Failed to clean up recorder context after backend initialization failure: %s",
+                                    ctx_exit_exc,
+                                )
                         last_exc = exc
                         self.attempts.append(
                             BackendAttempt(
