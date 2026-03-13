@@ -116,7 +116,7 @@ Verify:
 - [ ] Configuration options match actual code
 
 ### 4.4 docs/engineering/settings.md
-**Source of truth:** `app/core/settings_manager.py`, `app/api/settings_sync.py`
+**Source of truth:** `app/core/settings/manager.py`, `app/api/transport/settings_sync.py`
 
 Verify:
 - [ ] Settings categories match code
@@ -189,7 +189,7 @@ Verify:
 - [ ] Security audit findings status table up to date
 
 ### 4.12 docs/engineering/performance.md
-**Source of truth:** `app/core/performance_monitor.py`, `app/stt/streaming_engine.py`
+**Source of truth:** `app/core/metrics/performance_monitor.py`, `app/stt/streaming_engine.py`
 
 Verify:
 - [ ] Tunable parameters match code

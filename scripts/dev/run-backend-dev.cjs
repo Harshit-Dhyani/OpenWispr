@@ -14,27 +14,27 @@ function resolvePythonLaunch() {
   if (process.env.OPENWISPR_PYTHON) {
     return {
       command: process.env.OPENWISPR_PYTHON,
-      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
+      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8765"],
     };
   }
 
   if (fs.existsSync(venvPython)) {
     return {
       command: venvPython,
-      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
+      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8765"],
     };
   }
 
   if (process.platform === "win32") {
     return {
       command: "py",
-      args: ["-3", "-m", "uvicorn", "app.api.server:app", "--port", "8000"],
+      args: ["-3", "-m", "uvicorn", "app.api.server:app", "--port", "8765"],
     };
   }
 
   return {
     command: "python3",
-    args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
+    args: ["-m", "uvicorn", "app.api.server:app", "--port", "8765"],
   };
 }
 
