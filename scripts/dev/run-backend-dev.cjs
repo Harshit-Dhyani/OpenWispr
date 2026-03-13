@@ -14,27 +14,27 @@ function resolvePythonLaunch() {
   if (process.env.OPENWISPR_PYTHON) {
     return {
       command: process.env.OPENWISPR_PYTHON,
-      args: ["-m", "uvicorn", "app.api.server:app", "--reload", "--port", "8000"],
+      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
     };
   }
 
   if (fs.existsSync(venvPython)) {
     return {
       command: venvPython,
-      args: ["-m", "uvicorn", "app.api.server:app", "--reload", "--port", "8000"],
+      args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
     };
   }
 
   if (process.platform === "win32") {
     return {
       command: "py",
-      args: ["-3", "-m", "uvicorn", "app.api.server:app", "--reload", "--port", "8000"],
+      args: ["-3", "-m", "uvicorn", "app.api.server:app", "--port", "8000"],
     };
   }
 
   return {
     command: "python3",
-    args: ["-m", "uvicorn", "app.api.server:app", "--reload", "--port", "8000"],
+    args: ["-m", "uvicorn", "app.api.server:app", "--port", "8000"],
   };
 }
 
@@ -45,6 +45,7 @@ const child = spawn(command, args, {
   env: {
     ...process.env,
     PYTHONPATH: pythonPath,
+    OPENWISPR_DEV_EXTERNAL_BACKEND: "1",
   },
   stdio: "inherit",
   windowsHide: false,

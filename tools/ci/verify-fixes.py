@@ -13,7 +13,6 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -573,7 +572,7 @@ class FixVerifier:
                 # Add parent references for context
                 for node in ast.walk(tree):
                     for child in ast.iter_child_nodes(node):
-                        setattr(child, "parent", node)
+                        child.parent = node
 
                 # Run checks
                 checks = [

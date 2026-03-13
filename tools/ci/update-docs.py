@@ -5,12 +5,11 @@ Updates all documentation to match current codebase state.
 Run this to regenerate API docs, settings schema, and detect drift.
 """
 
+import re
 import subprocess
 import sys
-import re
-import yaml
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 DOCS_DIR = Path("docs")
 REPORTS_DIR = Path("reports")

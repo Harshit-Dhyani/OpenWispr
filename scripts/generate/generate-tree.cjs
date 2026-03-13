@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const repoRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(__dirname, '../..');
 const outputDir = path.join(repoRoot, 'reports');
 const outputPath = path.join(outputDir, 'tree.txt');
 

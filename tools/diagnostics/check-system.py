@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 
@@ -27,6 +27,9 @@ class CheckResult:
     passed: bool
     message: str = ""
     details: dict[str, Any] = field(default_factory=dict)
+
+
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 
 class SystemDiagnostics:
@@ -176,8 +179,8 @@ class SystemDiagnostics:
                     supported = ctranslate2.get_supported_compute_types("cuda")
                     result.details["compute_types"] = list(supported)
                     self._print_result("CUDA compute types", ", ".join(sorted(supported)), "ok")
-            except Exception:
-                pass
+            except Exception as e:
+                logging.warning("Failed to check CUDA compute types for faster-whisper: %s", e)
 
             self.results.append(result)
             return result

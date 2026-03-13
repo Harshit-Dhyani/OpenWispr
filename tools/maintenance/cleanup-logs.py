@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import logging
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,7 +68,12 @@ class LogCleaner:
             stat = file_path.stat()
             mtime = datetime.fromtimestamp(stat.st_mtime)
             return mtime < self.cutoff_date
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to check age for file %s during cleanup: %s",
+                file_path,
+                e,
+            )
             return False
 
     def cleanup(self, project_root: Path | None = None) -> list[CleanupResult]:
@@ -100,6 +106,13 @@ class LogCleaner:
                         print(f"  {action}: {file_path} ({size / 1024:.1f} KB)")
 
                 except Exception as e:
+                    operation = "size check" if self.dry_run else "delete"
+                    logger.warning(
+                        "Failed to %s file %s during cleanup: %s",
+                        operation,
+                        file_path,
+                        e,
+                    )
                     result = CleanupResult(
                         path=file_path, size_bytes=0, deleted=False, error=str(e)
                     )

@@ -25,15 +25,15 @@ import asyncio
 import gc
 import json
 import logging
-import os
 import sys
 import threading
 import time
 import traceback
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import numpy as np
 
@@ -144,7 +144,6 @@ class SystemValidator:
         try:
             from app.core.mode_manager import (
                 ModeLifecycleState,
-                ModeManager,
                 get_mode_manager,
                 reset_mode_manager,
             )
@@ -171,7 +170,6 @@ class SystemValidator:
         """Validate mode switching functionality."""
         try:
             from app.core.mode_manager import (
-                ModeLifecycleState,
                 TranscriptionMode,
                 get_mode_manager,
                 reset_mode_manager,
@@ -216,8 +214,9 @@ class SystemValidator:
     def validate_settings_synchronization(self) -> tuple[bool, str, dict]:
         """Validate settings sync between components."""
         try:
-            from app.core.mode_manager import get_mode_manager, reset_mode_manager
             from app.core.settings_manager import SettingsManager
+
+            from app.core.mode_manager import get_mode_manager, reset_mode_manager
 
             reset_mode_manager()
 
@@ -344,7 +343,7 @@ class SystemValidator:
 
             return (
                 passed,
-                f"System mode configuration supports <1s first-word latency",
+                "System mode configuration supports <1s first-word latency",
                 {"simulated_latency_ms": elapsed_ms},
             )
         except Exception as e:
@@ -548,6 +547,7 @@ class SystemValidator:
         """Validate system session lifecycle."""
         try:
             from app.core.config import AppSettings
+
             from app.core.system_session import SystemSessionConfig, SystemSessionHandler
 
             settings = AppSettings()

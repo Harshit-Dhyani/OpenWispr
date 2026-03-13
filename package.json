@@ -29,7 +29,7 @@
     "watch:frontend": "pnpm --dir app/electron/frontend run dev",
     "test": "pnpm run test:frontend && pnpm run test:backend",
     "test:frontend": "pnpm --dir app/electron/frontend run test",
-    "test:backend": "pytest || echo 'Backend tests optional'",
+    "test:backend": "pytest",
     "test:e2e": "playwright test",
     "test:coverage": "pnpm --dir app/electron/frontend run test:coverage",
     "lint": "pnpm run lint:frontend && pnpm run lint:electron && pnpm run lint:python && pnpm run check:renderer-strings",

@@ -1,4 +1,5 @@
 const { spawn } = require("child_process");
+const http = require("http");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
@@ -13,6 +14,10 @@ function resolveChildCwd() {
 }
 
 function resolveDevTargets() {
+  const devEnv = {
+    ...process.env,
+    OPENWISPR_DEV_EXTERNAL_BACKEND: "1",
+  };
   return {
     backend: {
       command: nodeExe,
@@ -21,6 +26,7 @@ function resolveDevTargets() {
     electron: {
       command: nodeExe,
       args: [path.join(repoRoot, "app", "electron", "scripts", "dev.js")],
+      env: devEnv,
     },
   };
 }
@@ -40,7 +46,7 @@ function runDev() {
       cwd: childCwd,
       stdio: ["inherit", "pipe", "pipe"],
       windowsHide: false,
-      env: process.env,
+      env: target.env || process.env,
     });
 
     const prefix = `[${name}] `;

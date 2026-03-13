@@ -6,12 +6,11 @@ Validates documentation frontmatter, inventory sync, and internal links.
 Exit code 0 on success, 1 on failure.
 """
 
-import os
 import re
 import sys
-import yaml
 from pathlib import Path
-from typing import List, Tuple, Optional
+
+import yaml
 
 DOCS_DIR = Path("docs")
 INVENTORY_FILE = DOCS_DIR / "_inventory.yml"
@@ -25,7 +24,7 @@ def error(msg: str) -> None:
     print(f"ERROR: {msg}", file=sys.stderr)
 
 
-def check_frontmatter(file_path: Path) -> List[str]:
+def check_frontmatter(file_path: Path) -> list[str]:
     """
     Validate YAML frontmatter in a markdown file.
     Returns list of error messages.
@@ -102,7 +101,7 @@ def check_frontmatter(file_path: Path) -> List[str]:
     return errors
 
 
-def check_inventory_sync() -> List[str]:
+def check_inventory_sync() -> list[str]:
     """
     Verify all .md files in docs/ are listed in _inventory.yml
     Returns list of error messages.
@@ -154,7 +153,7 @@ def check_inventory_sync() -> List[str]:
     return errors
 
 
-def check_links() -> List[str]:
+def check_links() -> list[str]:
     """
     Validate internal markdown links point to existing files.
     Returns list of error messages.
