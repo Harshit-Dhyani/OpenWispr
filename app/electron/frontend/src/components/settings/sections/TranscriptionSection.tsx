@@ -57,12 +57,6 @@ export function TranscriptionSection({
     microphoneHotkey: settings.hotkey.microphone_key_combination || common.unassigned,
     systemHotkey: settings.hotkey.system_key_combination || common.unassigned,
   };
-  const fakeAdvancedControls = [
-    { key: 'patience', label: text.patience_label },
-    { key: 'use_parallel_processing', label: text.parallel_processing_title },
-    { key: 'preload_model', label: text.preload_model_title },
-    { key: 'max_workers', label: text.max_workers_title },
-  ].filter((control) => isFakeSetting('transcription', control.key));
 
   const handleSourceModelChange = (captureSource: 'microphone' | 'system', modelId: string) => {
     const field = captureSource === 'system' ? 'system_asr_model_id' : 'microphone_asr_model_id';
@@ -551,26 +545,6 @@ export function TranscriptionSection({
             ) : null}
           </div>
             </div>
-            {fakeAdvancedControls.length ? (
-              <article className="border-2 border-lawn-border bg-lawn-panel p-4">
-                <h5 className="text-xs font-black uppercase tracking-[0.12em] text-lawn-muted">
-                  {common.comingSoon}
-                </h5>
-                <p className="mt-1 text-xs text-stone-500">
-                  These controls are intentionally hidden from runtime until implementation is complete.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {fakeAdvancedControls.map((control) => (
-                    <span
-                      key={control.key}
-                      className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
-                    >
-                      {control.label}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ) : null}
           </>
         ) : null}
       </div>

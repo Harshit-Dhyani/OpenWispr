@@ -154,7 +154,7 @@ export function SettingsPanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transcripta-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `openwispr-settings-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }, [settings]);
@@ -193,15 +193,15 @@ export function SettingsPanel({
   }, []);
 
   // Save settings to backend
-  const saveSettings = useCallback(async () => {
+  const saveSettings = useCallback(async (settingsToSave: SettingsState) => {
     if (!onSettingsChange) return;
 
     setSaveStatus('saving');
     setSaveError(null);
 
     try {
-      await onSettingsChange(settings);
-      setOriginalSettings(settings);
+      await onSettingsChange(settingsToSave);
+      setOriginalSettings(settingsToSave);
       setHasChanges(false);
       setSaveStatus('saved');
 
@@ -214,7 +214,7 @@ export function SettingsPanel({
       setSaveError(err instanceof Error ? err.message : 'Failed to save settings');
       setSaveStatus('error');
     }
-  }, [onSettingsChange, settings]);
+  }, [onSettingsChange]);
 
   // Reset all settings to defaults
   const handleResetAll = useCallback(async () => {
@@ -233,6 +233,10 @@ export function SettingsPanel({
     }
   }, [onSettingsReset]);
 
+  // Ref to hold current settings for auto-save without triggering re-renders
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   // Auto-save with debounce
   const saveTimeoutRef = useRef<number | null>(null);
 
@@ -245,7 +249,7 @@ export function SettingsPanel({
 
       // Set new timeout for auto-save
       saveTimeoutRef.current = window.setTimeout(() => {
-        void saveSettings();
+        void saveSettings(settingsRef.current);
       }, 1500);
     }
 
@@ -254,7 +258,7 @@ export function SettingsPanel({
         window.clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [settings, hasChanges, onSettingsChange, saveSettings]);
+  }, [hasChanges, onSettingsChange]);
 
   // Filter settings based on search
   const filteredCategories = useMemo(() => {
@@ -474,7 +478,7 @@ export function SettingsPanel({
               Close
             </button>
             <button
-              onClick={() => void saveSettings()}
+              onClick={() => void saveSettings(settings)}
               disabled={saveStatus === 'saving' || !hasChanges}
               className="flex-1 sm:flex-none px-6 py-2 border-2 border-lawn-accent bg-lawn-accent text-lawn-bg hover:shadow-brutal-sm text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >

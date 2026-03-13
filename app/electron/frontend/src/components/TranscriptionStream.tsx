@@ -423,7 +423,7 @@ export const TranscriptionStream = forwardRef<TranscriptionStreamRef, Transcript
       bufferMessages: true,
       onMessage: (message: WebSocketMessage) => {
         // Handle real-time transcription updates
-        console.log('WebSocket message:', message);
+        console.debug('WebSocket message:', message);
       },
     });
 

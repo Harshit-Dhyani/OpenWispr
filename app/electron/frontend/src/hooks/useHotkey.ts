@@ -43,14 +43,8 @@ export function useHotkey(options: UseHotkeyOptions = {}): UseHotkeyReturn {
   const [state, setState] = useState<HotkeyState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const stateRef = useRef(state);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hotkeyApi = window.openwisprDesktop?.hotkey;
-  
-  // Keep ref in sync with state for event handlers
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
   
   // Fetch initial hotkey state
   const loadState = useCallback(async () => {

@@ -19,7 +19,7 @@ const MODE_OPTIONS: ModeOption[] = [
     description: 'Activate transcription with a keyboard shortcut. Perfect for quick dictation while working in any application.',
     icon: Mic,
     features: ['Keyboard shortcut activation', 'Auto-inject to any app', 'Floating window preview', 'Instant transcription'],
-    color: 'lawn-accent',
+    color: 'hotkey',
   },
   {
     id: 'system',
@@ -27,9 +27,24 @@ const MODE_OPTIONS: ModeOption[] = [
     description: 'Continuous recording with session management. Ideal for meetings, interviews, and long-form content.',
     icon: Monitor,
     features: ['Continuous recording', 'Session management', 'Multi-format export', 'Auto-segmentation'],
-    color: 'theme-info',
+    color: 'system',
   },
 ];
+
+const MODE_COLOR_CLASSES: Record<string, { border: string; bg: string; bgLight: string; text: string }> = {
+  hotkey: {
+    border: 'border-lawn-accent',
+    bg: 'bg-lawn-accent',
+    bgLight: 'bg-lawn-accent/10',
+    text: 'text-lawn-accent',
+  },
+  system: {
+    border: 'border-theme-info',
+    bg: 'bg-theme-info',
+    bgLight: 'bg-theme-info/10',
+    text: 'text-theme-info',
+  },
+};
 
 interface ModeSelectorProps {
   currentMode: TranscriptionMode;
@@ -94,7 +109,7 @@ export function ModeSelector({
                 ${disabled || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 ${
                   isSelected
-                    ? `border-${mode.color} bg-${mode.color}/10`
+                    ? `${MODE_COLOR_CLASSES[mode.color].border} ${MODE_COLOR_CLASSES[mode.color].bgLight}`
                     : 'border-lawn-border bg-lawn-bg hover:border-lawn-border/60'
                 }
                 ${isHovered && !isSelected && !disabled ? 'shadow-brutal-sm' : ''}
@@ -110,7 +125,7 @@ export function ModeSelector({
                   flex items-center justify-center transition-all
                   ${
                     isSelected
-                      ? `border-${mode.color} bg-${mode.color}`
+                      ? `${MODE_COLOR_CLASSES[mode.color].border} ${MODE_COLOR_CLASSES[mode.color].bg}`
                       : 'border-stone-300 bg-transparent'
                   }
                 `}
@@ -125,14 +140,14 @@ export function ModeSelector({
                   border-2 rounded-sm transition-colors
                   ${
                     isSelected
-                      ? `border-${mode.color} bg-${mode.color}/20`
+                      ? `${MODE_COLOR_CLASSES[mode.color].border} ${MODE_COLOR_CLASSES[mode.color].bgLight}`
                       : 'border-lawn-border bg-lawn-panel'
                   }
                 `}
               >
                 <Icon
                   className={`w-5 h-5 ${
-                    isSelected ? `text-${mode.color}` : 'text-stone-500'
+                    isSelected ? MODE_COLOR_CLASSES[mode.color].text : 'text-stone-500'
                   }`}
                 />
               </div>
@@ -160,7 +175,7 @@ export function ModeSelector({
                     <span
                       className={`
                         w-1 h-1 rounded-full flex-shrink-0
-                        ${isSelected ? `bg-${mode.color}` : 'bg-stone-300'}
+                        ${isSelected ? MODE_COLOR_CLASSES[mode.color].bg : 'bg-stone-300'}
                       `}
                     />
                     {feature}
@@ -174,7 +189,7 @@ export function ModeSelector({
                   className={`
                     absolute bottom-3 right-3 px-2 py-0.5
                     text-[9px] font-black uppercase
-                    bg-${mode.color} text-lawn-bg
+                    ${MODE_COLOR_CLASSES[mode.color].bg} text-lawn-bg
                   `}
                 >
                   Active
@@ -231,7 +246,7 @@ export function ModeSelectorCompact({
               ${disabled || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               ${
                 isSelected
-                  ? `border-${mode.color} bg-${mode.color}/10 text-${mode.color}`
+                  ? `${MODE_COLOR_CLASSES[mode.color].border} ${MODE_COLOR_CLASSES[mode.color].bgLight} ${MODE_COLOR_CLASSES[mode.color].text}`
                   : 'border-lawn-border bg-lawn-bg text-stone-500 hover:border-lawn-border/60'
               }
             `}

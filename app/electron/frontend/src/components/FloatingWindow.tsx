@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { HotkeyStopResponse } from '../types/api';
+import { FloatingAudioVisualizer, FloatingModelPreparation } from './FloatingWindowVisualizer';
+import { FloatingFooter } from './FloatingWindowDisplay';
+
+type FloatingStyle = CSSProperties & { WebkitAppRegion?: string };
 
 type FloatingPhase = 'idle' | 'preparing' | 'listening' | 'transcribing' | 'finalizing' | 'done' | 'error';
-type FloatingStyle = CSSProperties & { WebkitAppRegion?: 'drag' | 'no-drag' };
 
 type FloatingStrings = NonNullable<Window['openwisprFloating']>['strings'];
 
@@ -252,6 +256,10 @@ export function FloatingWindow() {
   const handleCoachResult = useCallback(
     (payload: CoachResultPayload | null | undefined) => {
       traceEvent('coach-result', payload);
+      if (floatingApi?.settings?.showFloatingCoachResult === false) {
+        traceEvent('coach-result-suppressed-by-setting');
+        return;
+      }
       if (payload?.session_id) {
         beginSession(payload.session_id);
       }
@@ -273,7 +281,7 @@ export function FloatingWindow() {
       flattenWaveform();
       setIsPinnedToBottom(true);
     },
-    [beginSession, flattenWaveform, stopTimer, traceEvent],
+    [beginSession, flattenWaveform, stopTimer, traceEvent, floatingApi],
   );
 
   const handleCoachResultClear = useCallback(() => {
@@ -559,14 +567,14 @@ export function FloatingWindow() {
       default:
         return 'rgba(139, 155, 180, 0.85)';
     }
-  }, [phase]);
+  }, [effectivePhase]);
 
   const visibleTranscript = useMemo(() => {
     if (phase === 'done') {
       return finalText || committedText;
     }
     return committedText || partialText;
-  }, [committedText, finalText, mode, partialText, phase]);
+  }, [committedText, finalText, partialText, phase]);
 
   const waitingLabel = strings?.waitingForSpeech || 'Waiting for speech...';
   const resultMetaLabel =
@@ -667,102 +675,21 @@ export function FloatingWindow() {
           padding: '12px 16px 8px',
           borderBottom: '1px solid rgba(255,255,255,0.04)',
           WebkitAppRegion: 'no-drag',
-        } as FloatingStyle}
+        } as CSSProperties & { WebkitAppRegion?: string }}
       >
         {showModelPreparationPanel ? (
-          <div
-            data-testid="floating-model-preparation"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              padding: '4px 0',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(240, 249, 255, 0.96)' }}>
-                  {strings?.modelPrep?.title || 'Preparing speech model'}
-                </div>
-                <div style={{ fontSize: 12, color: 'rgba(186, 230, 253, 0.78)', marginTop: 2 }}>
-                  {modelPreparation.message || 'Loading transcription runtime...'}
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: 0.3,
-                  color: 'rgba(125, 211, 252, 0.92)',
-                  textTransform: 'uppercase',
-                  flexShrink: 0,
-                }}
-              >
-                {modelPreparation.stage || 'loading'}
-              </div>
-            </div>
-            <div
-              aria-label="Model loading progress"
-              style={{
-                position: 'relative',
-                overflow: 'hidden',
-                height: 10,
-                borderRadius: 999,
-                background: 'rgba(125, 211, 252, 0.12)',
-                border: '1px solid rgba(125, 211, 252, 0.18)',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '42%',
-                  borderRadius: 999,
-                  background: 'linear-gradient(90deg, rgba(56, 189, 248, 0.2) 0%, rgba(125, 211, 252, 0.95) 50%, rgba(34, 197, 94, 0.25) 100%)',
-                  boxShadow: '0 0 18px rgba(56, 189, 248, 0.28)',
-                  animation: 'floating-model-progress 1.35s ease-in-out infinite',
-                }}
-              />
-            </div>
-          </div>
+          <FloatingModelPreparation
+            stage={modelPreparation.stage || 'loading'}
+            message={modelPreparation.message || ''}
+          />
         ) : (
-          <div
-            aria-label="Audio waveform"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              height: 52,
-            }}
-          >
-            {audioLevels.map((level, index) => {
-              const height = Math.max(4, Math.round(6 + Math.pow(level, 0.72) * 42));
-              return (
-                <div
-                  key={index}
-                  className="floating-waveform-bar"
-                  style={{
-                    width: 5,
-                    height,
-                    borderRadius: 999,
-                    background:
-                      level > 0.025
-                        ? 'linear-gradient(to top, #4af626, rgba(74, 246, 38, 0.55))'
-                        : 'linear-gradient(to top, rgba(139, 155, 180, 0.45), rgba(139, 155, 180, 0.18))',
-                    boxShadow: level > 0.025 ? '0 0 8px rgba(74, 246, 38, 0.26)' : 'none',
-                    transition: 'height 70ms ease-out',
-                  }}
-                />
-              );
-            })}
-          </div>
+          <FloatingAudioVisualizer audioLevels={audioLevels} />
         )}
       </div>
 
       <div
         ref={transcriptScrollRef}
         onScroll={handleTranscriptScroll}
-        data-testid="floating-transcript-scroll"
         style={{
           WebkitAppRegion: 'no-drag',
           flex: 1,
@@ -772,7 +699,7 @@ export function FloatingWindow() {
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
-        } as FloatingStyle}
+        } as CSSProperties & { WebkitAppRegion?: string }}
       >
         {effectivePhase === 'error' ? (
           <div
@@ -851,60 +778,16 @@ export function FloatingWindow() {
         )}
       </div>
 
-      <div
-        style={{
-          WebkitAppRegion: 'no-drag',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: '10px 16px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-        } as FloatingStyle}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            color: 'rgba(255,255,255,0.5)',
-            lineHeight: 1.4,
-            minWidth: 0,
-          }}
-        >
-          {resultMetaLabel}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {showActiveControls ? (
-            <>
-              <button
-                type="button"
-                onClick={() => window.openwisprFloating?.cancelRecording?.()}
-                style={buttonStyle('secondary')}
-              >
-                {strings?.actions?.cancel || 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.openwisprFloating?.finishRecording?.()}
-                disabled={effectivePhase === 'preparing' || effectivePhase === 'finalizing'}
-                style={buttonStyle('primary', effectivePhase === 'preparing' || effectivePhase === 'finalizing')}
-              >
-                {strings?.actions?.finish || 'Finish'}
-              </button>
-            </>
-          ) : null}
-
-          {showClose ? (
-            <button
-              type="button"
-              onClick={() => window.openwisprFloating?.dismissResult?.()}
-              style={buttonStyle('primary')}
-            >
-              {strings?.actions?.close || 'Close'}
-            </button>
-          ) : null}
-        </div>
-      </div>
+      <FloatingFooter
+        resultMetaLabel={resultMetaLabel}
+        showActiveControls={showActiveControls}
+        showClose={showClose}
+        effectivePhase={effectivePhase}
+        strings={strings}
+        onCancel={() => window.openwisprFloating?.cancelRecording?.()}
+        onFinish={() => window.openwisprFloating?.finishRecording?.()}
+        onClose={() => window.openwisprFloating?.dismissResult?.()}
+      />
       <style>{`
         @keyframes floating-model-progress {
           0% { transform: translateX(-70%); opacity: 0.72; }
@@ -915,32 +798,3 @@ export function FloatingWindow() {
     </div>
   );
 }
-
-function buttonStyle(variant: 'primary' | 'secondary', disabled = false): FloatingStyle {
-  if (variant === 'primary') {
-    return {
-      WebkitAppRegion: 'no-drag',
-      border: '1px solid rgba(74, 246, 38, 0.35)',
-      background: disabled ? 'rgba(74, 246, 38, 0.15)' : 'rgba(74, 246, 38, 0.22)',
-      color: disabled ? 'rgba(255,255,255,0.45)' : '#f5fff2',
-      borderRadius: 10,
-      padding: '8px 14px',
-      fontSize: 13,
-      fontWeight: 700,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-    };
-  }
-
-  return {
-    WebkitAppRegion: 'no-drag',
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.88)',
-    borderRadius: 10,
-    padding: '8px 14px',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-  };
-}
-

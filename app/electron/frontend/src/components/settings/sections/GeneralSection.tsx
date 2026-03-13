@@ -1,4 +1,4 @@
-import { Settings, Sliders } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
 import { Slider, Select } from '../controls';
@@ -119,32 +119,6 @@ export function GeneralSection({
             suffix="s"
           />
         </SettingCard>
-
-        <div className="border-2 border-lawn-border bg-lawn-panel p-4">
-          <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-lawn-accent" />
-            {text.behaviorTitle}
-          </h4>
-          <div className="space-y-3">
-            <p className="text-xs text-stone-500">
-              Runtime-only behavior controls are hidden until they are fully implemented end-to-end.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                text.showNotificationsTitle,
-                text.minimizeToTrayTitle,
-                text.startupWithSystemTitle,
-              ].map((label) => (
-                <span
-                  key={label}
-                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
-                >
-                  {label} · {common.comingSoon}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -130,73 +130,73 @@ export function SnippetsPage({ request, enabled }: SnippetsPageProps) {
         </div>
       }
     >
-      <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-          <section className="border-2 border-lawn-border bg-lawn-panel p-3 shadow-brutal-sm">
+      <div className="grid h-full min-h-0 gap-2 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
+          <section className="border-2 border-lawn-border bg-lawn-panel p-2 shadow-brutal-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">{text.addTitle}</h3>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2 grid gap-2">
               <input
                 value={trigger}
                 onChange={(event) => setTrigger(event.target.value)}
                 placeholder={text.triggerPlaceholder}
-                className="border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
+                className="border-2 border-lawn-border bg-lawn-bg px-2 py-1.5 text-sm font-bold text-lawn-border outline-none"
               />
               <input
                 value={expansion}
                 onChange={(event) => setExpansion(event.target.value)}
                 placeholder={text.expansionPlaceholder}
-                className="border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
+                className="border-2 border-lawn-border bg-lawn-bg px-2 py-1.5 text-sm font-bold text-lawn-border outline-none"
               />
               <button
                 type="button"
                 onClick={() => void createEntry()}
-                className="border-2 border-lawn-accent bg-lawn-accent px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-lawn-bg"
+                className="border-2 border-lawn-accent bg-lawn-accent px-2 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-lawn-bg"
               >
                 {text.addButton}
               </button>
             </div>
           </section>
 
-          <section className="border-2 border-lawn-border bg-lawn-panel p-3 shadow-brutal-sm">
+          <section className="border-2 border-lawn-border bg-lawn-panel p-2 shadow-brutal-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">{text.previewTitle}</h3>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2 grid gap-2">
               <input
                 value={previewInput}
                 onChange={(event) => setPreviewInput(event.target.value)}
                 placeholder={text.previewPlaceholder}
-                className="border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
+                className="border-2 border-lawn-border bg-lawn-bg px-2 py-1.5 text-sm font-bold text-lawn-border outline-none"
               />
               <button
                 type="button"
                 onClick={() => void previewExpand()}
-                className="border-2 border-lawn-border bg-lawn-dark px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-lawn-bg"
+                className="border-2 border-lawn-border bg-lawn-dark px-2 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-lawn-bg"
               >
                 {text.previewButton}
               </button>
             </div>
-            <p className="mt-3 text-sm font-bold text-lawn-border">{previewOutput || text.noPreview}</p>
+            <p className="mt-2 text-sm font-bold text-lawn-border">{previewOutput || text.noPreview}</p>
           </section>
         </div>
 
         <section className="min-h-0 overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal-sm">
-          <div className="flex items-center justify-between border-b-2 border-lawn-border bg-lawn-bg p-3">
+          <div className="flex items-center justify-between border-b-2 border-lawn-border bg-lawn-bg p-2">
             <div>
               <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Snippet library</h3>
-              <p className="mt-1 text-xs font-bold text-lawn-muted">{entries.length} saved snippet{entries.length === 1 ? '' : 's'}</p>
+              <p className="mt-0.5 text-xs font-bold text-lawn-muted">{entries.length} saved snippet{entries.length === 1 ? '' : 's'}</p>
             </div>
           </div>
-          <div className="h-full overflow-y-auto p-2 custom-scrollbar">
+          <div className="h-full overflow-y-auto p-1.5 custom-scrollbar">
             <div className="space-y-2">
               {entries.map((entry) => (
-                <article key={entry.id} className="flex min-w-0 items-center justify-between gap-2 border-2 border-lawn-border bg-lawn-bg p-2">
+                <article key={entry.id} className="flex min-w-0 items-center justify-between gap-2 border-2 border-lawn-border bg-lawn-bg p-2 transition-all duration-200 hover:border-lawn-accent/50 hover:-translate-y-0.5 hover:shadow-brutal-sm">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-lawn-border break-all">{entry.trigger} → {entry.expansion}</p>
-                    <p className="text-[11px] font-bold text-lawn-muted">{entry.scope} · {entry.usage_count} {text.usesSuffix}</p>
+                    <p className="text-sm font-black text-lawn-border break-all truncate">{entry.trigger} → {entry.expansion}</p>
+                    <p className="text-[11px] font-bold text-lawn-muted truncate">{entry.scope} · {entry.usage_count} {text.usesSuffix}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void deleteEntry(entry.id)}
-                    className="border-2 border-lawn-border bg-lawn-panel px-2 py-1 text-xs font-black uppercase tracking-[0.1em] text-lawn-border shrink-0"
+                    className="border-2 border-lawn-border bg-lawn-panel px-2 py-1 text-xs font-black uppercase tracking-[0.1em] text-lawn-border shrink-0 hover:bg-lawn-accent hover:text-lawn-bg"
                   >
                     {text.deleteButton}
                   </button>

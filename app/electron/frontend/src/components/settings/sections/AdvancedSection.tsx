@@ -19,7 +19,6 @@ export function AdvancedSection({
   saveError,
 }: AdvancedSectionProps) {
   const text = RENDERER_STRINGS.settings.advanced;
-  const common = RENDERER_STRINGS.settings.common;
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -105,16 +104,6 @@ export function AdvancedSection({
             {text.experimentalTitle}
           </h4>
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {[text.enhancedStemTitle, text.gpuAccelerationTitle].map((label) => (
-                <span
-                  key={label}
-                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
-                >
-                  {label} · {common.comingSoon}
-                </span>
-              ))}
-            </div>
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-bold block">{text.metricsTitle}</span>

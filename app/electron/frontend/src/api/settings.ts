@@ -846,8 +846,7 @@ export function createSettingsPatch(
     const updatedValue = updated[key];
 
     if (JSON.stringify(originalValue) !== JSON.stringify(updatedValue)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      patch[key] = updatedValue as any;
+      (patch as Record<string, unknown>)[key] = updatedValue;
     }
   });
 
