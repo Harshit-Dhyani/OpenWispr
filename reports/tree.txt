@@ -1,17 +1,12 @@
-# Transcripta Tree
+# OpenWispr Tree
 
-Generated: 2026-03-07T00:22:14.050Z
-Files: 414
+Generated: 2026-03-09T03:42:53.793Z
+Files: 479
 
 .
-├── .codex
-│   └── environments
-│       └── environment.toml
 ├── .github
 │   └── workflows
 │       └── docs.yml
-├── .transcripta
-│   └── history.db
 ├── app
 │   ├── api
 │   │   ├── routes
@@ -26,12 +21,21 @@ Files: 414
 │   │   │   └── system.py
 │   │   ├── services
 │   │   │   ├── __init__.py
+│   │   │   ├── backend_service.py
+│   │   │   ├── coach_service.py
 │   │   │   ├── dictionary_service.py
+│   │   │   ├── model_service.py
+│   │   │   ├── refinement_queue.py
+│   │   │   ├── refiner_service.py
 │   │   │   ├── snippet_service.py
+│   │   │   ├── streaming_metrics.py
 │   │   │   ├── style_service.py
 │   │   │   └── transcript_history_service.py
 │   │   ├── strings
 │   │   │   └── en.py
+│   │   ├── transport
+│   │   │   ├── __init__.py
+│   │   │   └── settings_sync.py
 │   │   ├── __init__.py
 │   │   ├── coach_cache.py
 │   │   ├── coach_service.py
@@ -74,6 +78,12 @@ Files: 414
 │   │   ├── settings.py
 │   │   └── text.py
 │   ├── core
+│   │   ├── settings
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   ├── manager.py
+│   │   │   ├── migrations.py
+│   │   │   └── validator.py
 │   │   ├── tests
 │   │   │   └── test_metrics.py
 │   │   ├── __init__.py
@@ -105,6 +115,8 @@ Files: 414
 │   │   │   │   └── workflows
 │   │   │   │       └── tests.yml
 │   │   │   ├── src
+│   │   │   │   ├── api
+│   │   │   │   │   └── settings.ts
 │   │   │   │   ├── assets
 │   │   │   │   │   └── openwispr-logo.svg
 │   │   │   │   ├── components
@@ -123,8 +135,7 @@ Files: 414
 │   │   │   │   │   │   ├── DictionaryPage.tsx
 │   │   │   │   │   │   ├── FeaturePageShell.tsx
 │   │   │   │   │   │   ├── HomePage.tsx
-│   │   │   │   │   │   ├── SnippetsPage.tsx
-│   │   │   │   │   │   └── StylePage.tsx
+│   │   │   │   │   │   └── SnippetsPage.tsx
 │   │   │   │   │   ├── settings
 │   │   │   │   │   │   ├── __tests__
 │   │   │   │   │   │   │   ├── HotkeyRecorder.test.tsx
@@ -149,14 +160,18 @@ Files: 414
 │   │   │   │   │   │   │   ├── SnippetsSection.tsx
 │   │   │   │   │   │   │   ├── StyleSection.tsx
 │   │   │   │   │   │   │   └── TranscriptionSection.tsx
+│   │   │   │   │   │   ├── AdvancedSettings.tsx
 │   │   │   │   │   │   ├── categories.ts
 │   │   │   │   │   │   ├── HardwareProfileDisplay.tsx
 │   │   │   │   │   │   ├── HotkeyRecorder.tsx
+│   │   │   │   │   │   ├── HotkeySettings.test.tsx
+│   │   │   │   │   │   ├── HotkeySettings.tsx
 │   │   │   │   │   │   ├── index.ts
 │   │   │   │   │   │   ├── ModelComponents.tsx
 │   │   │   │   │   │   ├── presets.ts
 │   │   │   │   │   │   ├── SectionHeader.tsx
 │   │   │   │   │   │   ├── SettingCard.tsx
+│   │   │   │   │   │   ├── SettingsPanel.tsx
 │   │   │   │   │   │   ├── types.ts
 │   │   │   │   │   │   └── utils.ts
 │   │   │   │   │   ├── ActivityFeed.tsx
@@ -188,6 +203,8 @@ Files: 414
 │   │   │   │   │   │   └── text.ts
 │   │   │   │   │   ├── index.ts
 │   │   │   │   │   ├── settings.ts
+│   │   │   │   │   ├── settingsMigration.ts
+│   │   │   │   │   ├── settingsSchema.ts
 │   │   │   │   │   └── text.ts
 │   │   │   │   ├── context
 │   │   │   │   │   └── SettingsContext.tsx
@@ -221,6 +238,13 @@ Files: 414
 │   │   │   │   │   ├── settingsMigration.test.ts
 │   │   │   │   │   ├── settingsMigration.ts
 │   │   │   │   │   └── settingsSchema.ts
+│   │   │   │   ├── pages
+│   │   │   │   │   ├── __tests__
+│   │   │   │   │   │   └── HomePage.test.tsx
+│   │   │   │   │   ├── DictionaryPage.tsx
+│   │   │   │   │   ├── FeaturePageShell.tsx
+│   │   │   │   │   ├── HomePage.tsx
+│   │   │   │   │   └── SnippetsPage.tsx
 │   │   │   │   ├── services
 │   │   │   │   │   └── healthService.ts
 │   │   │   │   ├── strings
@@ -261,10 +285,17 @@ Files: 414
 │   │   │   │   ├── hotkeyHandlers.js
 │   │   │   │   ├── hotkeyStopPolicy.js
 │   │   │   │   └── hotkeyStopPolicy.test.js
+│   │   │   ├── preload
+│   │   │   │   ├── floating.js
+│   │   │   │   ├── floating.test.js
+│   │   │   │   ├── main.js
+│   │   │   │   └── quickSettings.js
 │   │   │   ├── services
 │   │   │   │   ├── backendSpawn.js
 │   │   │   │   ├── holdModeHotkeys.js
 │   │   │   │   ├── holdModeHotkeys.test.js
+│   │   │   │   ├── modelDownloadManager.js
+│   │   │   │   ├── modelDownloadManager.test.js
 │   │   │   │   └── textInjector.js
 │   │   │   ├── shared
 │   │   │   │   ├── generated
@@ -280,14 +311,15 @@ Files: 414
 │   │   │   │   ├── floatingWindowState.js
 │   │   │   │   ├── floatingWindowState.test.js
 │   │   │   │   ├── mainWindow.js
+│   │   │   │   ├── mainWindow.test.js
 │   │   │   │   ├── quickSettingsWindow.js
 │   │   │   │   ├── tray.js
+│   │   │   │   ├── tray.test.js
 │   │   │   │   └── trayUtils.js
 │   │   │   ├── config.js
 │   │   │   ├── index.js
 │   │   │   ├── main.js
 │   │   │   ├── model-download-manager.js
-│   │   │   ├── model-download-manager.test.js
 │   │   │   ├── preload-floating.js
 │   │   │   ├── preload-floating.test.js
 │   │   │   ├── preload-quick-settings.js
@@ -339,6 +371,7 @@ Files: 414
 │   │   └── README.md
 │   ├── __init__.py
 │   ├── api_main.py
+│   ├── coach_cache.json
 │   └── main.py
 ├── docs
 │   ├── api
@@ -359,15 +392,20 @@ Files: 414
 │   │   ├── dictation-pipeline.md
 │   │   ├── english-coach.md
 │   │   ├── events-streaming.md
+│   │   ├── folder-ownership.md
 │   │   ├── latency-playbook.md
 │   │   ├── model-runtime.md
 │   │   ├── performance.md
+│   │   ├── restructure-audit.md
+│   │   ├── restructure-discovery.md
 │   │   ├── security.md
+│   │   ├── settings-source-of-truth.md
 │   │   ├── settings.md
 │   │   └── testing.md
 │   ├── operations
 │   │   └── OPERATIONS.md
 │   ├── project
+│   │   ├── folder-ownership.md
 │   │   └── project-structure.md
 │   ├── reference
 │   │   ├── config.md
@@ -383,30 +421,73 @@ Files: 414
 │   ├── test_models_flow.py
 │   └── test_system_mode.py
 ├── prompts
-│   └── PROMPT_DOCS_AUTO_UPDATE.md
+│   ├── PROMPT_DOCS_AUTO_UPDATE.md
+│   └── REPORTS_FILES_CREATE.md
 ├── reports
 │   ├── archive
 │   │   ├── 2026-03-01-performance-audit.md
 │   │   ├── 2026-03-02-security-audit.md
 │   │   └── 2026-03-04-optimization-roadmap.md
+│   ├── architecture-structure-audit-2026-03-08.md
 │   ├── changes-since-last-commit.md
+│   ├── docs-source-of-truth-audit-2026-03-08.md
 │   ├── docs-update-2026-03-04.md
+│   ├── master-improvement-roadmap-2026-03-08.md
+│   ├── performance-optimization-2026-03-08.md
+│   ├── release-readiness-audit-2026-03-08.md
+│   ├── security-audit-2026-03-08.md
+│   ├── settings-config-audit-2026-03-08.md
+│   ├── testing-gap-analysis-2026-03-08.md
 │   └── tree.txt
 ├── scripts
 │   ├── build.py
 │   ├── dev.cjs
+│   ├── dev.test.cjs
+│   ├── export-code-for-chatgpt.cjs
+│   ├── export-code-for-chatgpt.test.cjs
 │   ├── generate_brand_assets.py
 │   ├── generate-changes-since-last-commit.cjs
 │   ├── generate-tree.cjs
+│   ├── package-scripts.test.cjs
 │   ├── run-backend-dev.cjs
+│   ├── test_generate_brand_assets.py
+│   ├── test_settings_download_root.py
+│   ├── test_verified_report_fixes.py
 │   └── validate.py
 ├── skills
-│   └── transcripta-maintainer
-│       ├── agents
-│       │   └── openai.yaml
-│       └── SKILL.md
-├── test-results
-│   └── junit.xml
+│   ├── openwispr-agents-memory
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-maintainer
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-release-validation
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-repo-discovery
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-runtime-debug
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-safe-refactor
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-settings-wiring-check
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   ├── openwispr-ui-fix
+│   │   ├── agents
+│   │   │   └── openai.yaml
+│   │   └── SKILL.md
+│   └── README.md
 ├── tests
 │   ├── integration
 │   │   ├── __init__.py

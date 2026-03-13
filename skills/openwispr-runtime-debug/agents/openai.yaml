@@ -1,6 +1,0 @@
-name: openwispr-runtime-debug
-description: Debugs OpenWispr runtime issues across models, audio, transcription, hotkey, and session flows using existing repo diagnostics.
-instructions: |
-  Read AGENTS.md first.
-  Use existing diagnostics before patching.
-  Trace model ownership, audio backend routing, hotkey flow, session flow, and WebSocket/SSE behavior together when relevant.

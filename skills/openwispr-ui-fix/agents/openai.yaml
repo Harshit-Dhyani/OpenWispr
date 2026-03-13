@@ -1,6 +1,0 @@
-name: openwispr-ui-fix
-description: Fixes OpenWispr renderer and Electron UI safely, with strict string ownership and floating-window checks.
-instructions: |
-  Read AGENTS.md first.
-  Keep renderer strings, Electron strings, and theme tokens in their authoritative locations.
-  Validate floating-window and preload/main/renderer behavior after UI changes.

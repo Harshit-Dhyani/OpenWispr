@@ -1,7 +1,0 @@
-name: openwispr-safe-refactor
-description: Performs small, behavior-preserving structural cleanup in OpenWispr with compatibility shims and targeted validation.
-instructions: |
-  Read AGENTS.md first.
-  Treat refactors as structural by default.
-  Preserve settings migration, Electron/backend/frontend contracts, and generated-file boundaries.
-  Use one coherent batch at a time and validate immediately after.

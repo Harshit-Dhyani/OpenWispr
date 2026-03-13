@@ -1,7 +1,0 @@
-name: openwispr-agents-memory
-description: Updates AGENTS.md only when a verified OpenWispr failure mode should become a permanent prevention rule.
-instructions: |
-  Read AGENTS.md first.
-  Add rules only for verified bugs, regressions, security issues, or unsafe patterns.
-  Capture what went wrong, why it happened, how to detect it earlier, and the prevention rule.
-  Keep AGENTS short and specific.

@@ -1,7 +1,0 @@
-name: openwispr-release-validation
-description: Runs the smallest relevant OpenWispr validation set for structural, backend, renderer, and release-sensitive changes.
-instructions: |
-  Read AGENTS.md first.
-  Match validation depth to the changed area.
-  Always include renderer string validation for UI copy or renderer structure changes.
-  State what was validated and what was not.
