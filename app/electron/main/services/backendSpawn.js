@@ -101,7 +101,7 @@ async function waitForBackendReady(timeoutMs = 20000) {
 async function startBackend() {
   console.log("[backend] OPENWISPR_DEV_EXTERNAL_BACKEND:", process.env.OPENWISPR_DEV_EXTERNAL_BACKEND);
   if (state.backendProcess) {
-    return;
+    return state.backendReady;
   }
   if (process.env.OPENWISPR_DEV_EXTERNAL_BACKEND === "1") {
     console.log("[backend] External backend mode enabled, waiting for backend...");
@@ -112,12 +112,12 @@ async function startBackend() {
     if (state.backendReady) {
       restartAttempts = 0;
     }
-    return;
+    return state.backendReady;
   }
   if (await backendAlreadyRunning()) {
     state.backendReady = true;
     restartAttempts = 0;
-    return;
+    return true;
   }
 
   suppressRestart = false;
@@ -184,6 +184,9 @@ async function startBackend() {
       }, 1000);
     }
   });
+
+  // Wait for backend to be ready and return result
+  return waitForBackendReady(60000);
 }
 
 function stopBackend() {

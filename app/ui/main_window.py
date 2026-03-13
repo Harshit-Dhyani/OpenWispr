@@ -21,9 +21,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.settings.config import AppSettings
 from app.core.models import AudioDeviceInfo, SessionHealth, SessionState, TranscriptSegment
 from app.core.session_manager import SessionManager
+from app.core.settings.config import AppSettings
 
 
 class MainWindow(QMainWindow):

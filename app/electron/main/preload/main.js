@@ -151,6 +151,9 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
     removeRegistrationFailedListener: (callback) => ipcRenderer.removeListener("hotkey-registration-failed", callback)
   },
 
+  // Apply hotkey config after settings save
+  applyHotkeyConfig: (hotkeyConfig) => ipcRenderer.invoke("settings:apply-hotkey", hotkeyConfig),
+
   // Text injection API
   text: {
     inject: (text) => ipcRenderer.invoke("text:inject", text)

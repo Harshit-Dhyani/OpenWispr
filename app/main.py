@@ -4,7 +4,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 from app.ui.main_window import MainWindow
 
 

@@ -15,6 +15,7 @@ from app.config.constants import (
     AudioConstants,
     ModelConstants,
     PerformanceConstants,
+    ProviderConstants,
     RefinerConstants,
     SessionConstants,
     UIConstants,
@@ -440,6 +441,22 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Engine Preference",
         description="Preferred LLM inference engine",
         options=["llamacpp", "ollama"],
+    ),
+    "refiner_provider_base_url": SettingDefinition(
+        name="refiner_provider_base_url",
+        category="refiner",
+        type="string",
+        default=ProviderConstants.DEFAULT_OLLAMA_URL,
+        label="Provider Base URL",
+        description="Base URL for local LLM provider (Ollama: http://localhost:11434, LM Studio: http://localhost:1234)",
+    ),
+    "coach_provider_base_url": SettingDefinition(
+        name="coach_provider_base_url",
+        category="coach",
+        type="string",
+        default=ProviderConstants.DEFAULT_OLLAMA_URL,
+        label="Provider Base URL",
+        description="Base URL for local LLM provider (Ollama: http://localhost:11434, LM Studio: http://localhost:1234)",
     ),
     # ============================================
     # Audio Settings

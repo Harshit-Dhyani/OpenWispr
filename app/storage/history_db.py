@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -8,34 +9,49 @@ from typing import Any
 
 from app.storage.migrations import run_migrations
 
+logger = logging.getLogger(__name__)
+
 
 class HistoryDatabase:
     """Thread-safe SQLite wrapper for history, dictionary, snippets, and styles."""
 
+    def _cleanup_stale_wal_files(self) -> None:
+        wal_path = self.db_path.with_suffix(".db-wal")
+        shm_path = self.db_path.with_suffix(".db-shm")
+        for path in (wal_path, shm_path):
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
     def __init__(self, db_path: Path) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._cleanup_stale_wal_files()
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(
             str(self.db_path),
             check_same_thread=False,
-            isolation_level=None,
+            timeout=30.0,  # Wait up to 30 seconds for locks
         )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA foreign_keys=ON;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
+        self._conn.execute("PRAGMA busy_timeout=30000;")  # Wait 30 seconds for locks
         run_migrations(self._conn)
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> contextmanager[sqlite3.Connection]:
         with self._lock:
             self._conn.execute("BEGIN")
             try:
                 yield self._conn
                 self._conn.commit()
-            except Exception:
+            except Exception as e:
                 self._conn.rollback()
+                logger.warning(f"Transaction failed: {e}")
                 raise
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> sqlite3.Cursor:

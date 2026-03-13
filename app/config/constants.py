@@ -353,6 +353,16 @@ class AutoOptimizationConstants:
 
 
 # ============================================
+# Provider Constants
+# ============================================
+class ProviderConstants:
+    """Local LLM provider URL constants."""
+
+    DEFAULT_OLLAMA_URL = "http://localhost:11434"
+    DEFAULT_LM_STUDIO_URL = "http://localhost:1234"
+
+
+# ============================================
 # Refiner Constants
 # ============================================
 class RefinerConstants:
