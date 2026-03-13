@@ -339,11 +339,11 @@ class ElectronAppController:
 
         # Setup environment
         env = os.environ.copy()
-        env["TRANSCRIPTA_E2E_TEST"] = "1"
-        env["TRANSCRIPTA_API_PORT"] = str(self.api_port)
-        env["TRANSCRIPTA_MOCK_AUDIO"] = "1" if self.config.mock_audio else "0"
-        env["TRANSCRIPTA_MOCK_STT"] = "1" if self.config.mock_stt else "0"
-        env["TRANSCRIPTA_HEADLESS"] = "1" if self.config.headless else "0"
+        env["OPENWISPR_E2E_TEST"] = "1"
+        env["OPENWISPR_API_PORT"] = str(self.api_port)
+        env["OPENWISPR_MOCK_AUDIO"] = "1" if self.config.mock_audio else "0"
+        env["OPENWISPR_MOCK_STT"] = "1" if self.config.mock_stt else "0"
+        env["OPENWISPR_HEADLESS"] = "1" if self.config.headless else "0"
 
         # Setup log file
         self._log_file = self.temp_dir / "electron.log"
@@ -893,7 +893,7 @@ def isolate_tests(temp_test_dir: Path) -> Generator[None, None, None]:
     # Override home directory for test isolation
     os.environ["HOME"] = str(temp_test_dir)
     os.environ["USERPROFILE"] = str(temp_test_dir)
-    os.environ["TRANSCRIPTA_DATA_DIR"] = str(temp_test_dir / ".transcripta")
+    os.environ["OPENWISPR_DATA_DIR"] = str(temp_test_dir / ".transcripta")
 
     yield
 
@@ -903,8 +903,8 @@ def isolate_tests(temp_test_dir: Path) -> Generator[None, None, None]:
     if old_userprofile:
         os.environ["USERPROFILE"] = old_userprofile
 
-    if "TRANSCRIPTA_DATA_DIR" in os.environ:
-        del os.environ["TRANSCRIPTA_DATA_DIR"]
+    if "OPENWISPR_DATA_DIR" in os.environ:
+        del os.environ["OPENWISPR_DATA_DIR"]
 
 
 # =============================================================================

@@ -30,7 +30,7 @@ Production operations guide for running and maintaining the OpenWispr desktop tr
 
 > **Note:** The codebase currently uses legacy naming in some places:
 > - Data directory: `.transcripta` (instead of `.openwispr`)
-> - Environment variables: `TRANSCRIPTA_*` prefix
+> - Environment variables: `OPENWISPR_*` prefix
 > - Logger name: `transcripta`
 > 
 > This is a known migration issue. Future releases will align to `OpenWispr` naming. Currently, operations should use the `.transcripta` path for data storage.
@@ -73,23 +73,23 @@ Configure before starting:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TRANSCRIPTA_DEVICE` | Execution device | `cuda` or `cpu` |
-| `TRANSCRIPTA_COMPUTE_TYPE` | GPU compute precision | `float16` or `int8` |
-| `TRANSCRIPTA_DEFAULT_MODEL` | Default ASR model | `small` |
-| `TRANSCRIPTA_LOG_LEVEL` | Logging verbosity | `INFO` |
-| `TRANSCRIPTA_API_HOST` | API bind address | `127.0.0.1` |
-| `TRANSCRIPTA_API_PORT` | API port | `8765` |
+| `OPENWISPR_DEVICE` | Execution device | `cuda` or `cpu` |
+| `OPENWISPR_COMPUTE_TYPE` | GPU compute precision | `float16` or `int8` |
+| `OPENWISPR_DEFAULT_MODEL` | Default ASR model | `small` |
+| `OPENWISPR_LOG_LEVEL` | Logging verbosity | `INFO` |
+| `OPENWISPR_API_HOST` | API bind address | `127.0.0.1` |
+| `OPENWISPR_API_PORT` | API port | `8765` |
 
 ```powershell
 # GPU/CPU configuration
-$env:TRANSCRIPTA_DEVICE="cuda"          # or "cpu"
-$env:TRANSCRIPTA_COMPUTE_TYPE="float16" # or "int8" for CPU
+$env:OPENWISPR_DEVICE="cuda"          # or "cpu"
+$env:OPENWISPR_COMPUTE_TYPE="float16" # or "int8" for CPU
 
 # Model selection
-$env:TRANSCRIPTA_DEFAULT_MODEL="small"  # tiny, base, small, medium, large-v3
+$env:OPENWISPR_DEFAULT_MODEL="small"  # tiny, base, small, medium, large-v3
 
 # Logging
-$env:TRANSCRIPTA_LOG_LEVEL="INFO"       # DEBUG, INFO, WARNING, ERROR
+$env:OPENWISPR_LOG_LEVEL="INFO"       # DEBUG, INFO, WARNING, ERROR
 ```
 
 ### Graceful Shutdown
@@ -347,7 +347,7 @@ nvidia-smi
 **Solution:**
 - Update NVIDIA drivers to latest
 - Verify CUDA toolkit matches PyTorch expectations
-- Use CPU fallback: `$env:TRANSCRIPTA_DEVICE="cpu"`
+- Use CPU fallback: `$env:OPENWISPR_DEVICE="cpu"`
 
 ### Backend Fails to Start (Port 8765 in Use)
 
@@ -404,11 +404,11 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/devices/default/probe?duration
 
 ```powershell
 # Use smaller model
-$env:TRANSCRIPTA_DEFAULT_MODEL="base"
+$env:OPENWISPR_DEFAULT_MODEL="base"
 
 # Use CPU
-$env:TRANSCRIPTA_DEVICE="cpu"
-$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+$env:OPENWISPR_DEVICE="cpu"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # Clear model cache
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/models/cache" -Method DELETE

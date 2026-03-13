@@ -369,9 +369,9 @@ wispr_config = StreamingConfig(
 )
 
 # Environment
-TRANSCRIPTA_WISPR_MODEL="tiny"
-TRANSCRIPTA_DEVICE="cpu"
-TRANSCRIPTA_COMPUTE_TYPE="int8"
+OPENWISPR_WISPR_MODEL="tiny"
+OPENWISPR_DEVICE="cpu"
+OPENWISPR_COMPUTE_TYPE="int8"
 ```
 
 ### 6.2 For Maximum Accuracy
@@ -473,9 +473,9 @@ wispr_config = StreamingConfig(
 )
 
 # Environment variables for Speed Monster mode
-# TRANSCRIPTA_DEFAULT_MODEL=small
-# TRANSCRIPTA_COMPUTE_TYPE=int8
-# TRANSCRIPTA_DEVICE=cpu  # or cuda if available
+# OPENWISPR_DEFAULT_MODEL=small
+# OPENWISPR_COMPUTE_TYPE=int8
+# OPENWISPR_DEVICE=cpu  # or cuda if available
 ```
 
 ### 7.5 Memory Optimization Summary

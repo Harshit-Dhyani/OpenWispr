@@ -84,10 +84,10 @@ curl http://127.0.0.1:8765/api/health | jq '.health.queue_depth, .health.real_ti
 max_queue_items = 16  # Was 64
 
 # Option 2: Switch to smaller model
-$env:TRANSCRIPTA_DEFAULT_MODEL="tiny"  # Was "small"
+$env:OPENWISPR_DEFAULT_MODEL="tiny"  # Was "small"
 
 # Option 3: Use GPU if available
-$env:TRANSCRIPTA_DEVICE="cuda"
+$env:OPENWISPR_DEVICE="cuda"
 ```
 
 ### 2.3 Check UI Refresh Rate
@@ -137,15 +137,15 @@ curl http://127.0.0.1:8765/api/health | jq '.health.gpu_mode, .health.execution_
 **Remediation:**
 ```powershell
 # For CPU users - MUST use tiny
-$env:TRANSCRIPTA_DEFAULT_MODEL="tiny"
-$env:TRANSCRIPTA_DEVICE="cpu"
+$env:OPENWISPR_DEFAULT_MODEL="tiny"
+$env:OPENWISPR_DEVICE="cpu"
 
 # For GPU users (in order of speed/quality trade-off)
-$env:TRANSCRIPTA_DEFAULT_MODEL="base"  # or "small" for better quality
-$env:TRANSCRIPTA_DEVICE="cuda"
+$env:OPENWISPR_DEFAULT_MODEL="base"  # or "small" for better quality
+$env:OPENWISPR_DEVICE="cuda"
 
 # Disable language detection (saves 50-100ms per chunk)
-$env:TRANSCRIPTA_DEFAULT_LANGUAGE="en"
+$env:OPENWISPR_DEFAULT_LANGUAGE="en"
 ```
 
 ### 2.5 Check Resource Usage
@@ -209,10 +209,10 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
 
 ```powershell
 # Windows PowerShell - Set before starting OpenWispr
-$env:TRANSCRIPTA_DEFAULT_MODEL="tiny"
-$env:TRANSCRIPTA_DEVICE="cpu"
-$env:TRANSCRIPTA_DEFAULT_LANGUAGE="en"
-$env:TRANSCRIPTA_LOG_LEVEL="INFO"  # Reduce log noise
+$env:OPENWISPR_DEFAULT_MODEL="tiny"
+$env:OPENWISPR_DEVICE="cpu"
+$env:OPENWISPR_DEFAULT_LANGUAGE="en"
+$env:OPENWISPR_LOG_LEVEL="INFO"  # Reduce log noise
 
 # Then launch
 .\OpenWispr.exe
@@ -238,7 +238,7 @@ $env:TRANSCRIPTA_LOG_LEVEL="INFO"  # Reduce log noise
 Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
 
 # Or force model reload via environment
-$env:TRANSCRIPTA_FORCE_MODEL_RELOAD="1"
+$env:OPENWISPR_FORCE_MODEL_RELOAD="1"
 # Restart OpenWispr
 ```
 
@@ -295,8 +295,8 @@ scheduleNextPoll(running ? 300 : 4000);  // Was 1200ms
 ### 5.1 Enable Detailed Logging
 
 ```powershell
-$env:TRANSCRIPTA_LOG_LEVEL="DEBUG"
-$env:TRANSCRIPTA_PROFILE="1"
+$env:OPENWISPR_LOG_LEVEL="DEBUG"
+$env:OPENWISPR_PROFILE="1"
 ```
 
 ### 5.2 Latency Breakdown

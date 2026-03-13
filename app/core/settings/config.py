@@ -58,7 +58,6 @@ def is_legacy_download_root(value: Any) -> bool:
     return normalized in {"models", "./models"}
 
 
-
 class ModeConfig(BaseModel):
     """Configuration container for a single transcription mode.
 
@@ -285,7 +284,7 @@ class AppSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="TRANSCRIPTA_",
+        env_prefix="OPENWISPR_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",

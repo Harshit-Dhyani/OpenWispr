@@ -4,7 +4,7 @@ from app.api.server import _apply_runtime_log_levels, _resolve_runtime_log_level
 
 
 def test_debug_setting_is_honored_without_env(monkeypatch):
-    monkeypatch.delenv("TRANSCRIPTA_LOG_LEVEL", raising=False)
+    monkeypatch.delenv("OPENWISPR_LOG_LEVEL", raising=False)
 
     resolved = _resolve_runtime_log_level({"advanced": {"logLevel": "DEBUG"}})
 
@@ -12,7 +12,7 @@ def test_debug_setting_is_honored_without_env(monkeypatch):
 
 
 def test_env_debug_overrides_settings(monkeypatch):
-    monkeypatch.setenv("TRANSCRIPTA_LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("OPENWISPR_LOG_LEVEL", "DEBUG")
 
     resolved = _resolve_runtime_log_level({"advanced": {"logLevel": "ERROR"}})
 

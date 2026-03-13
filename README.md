@@ -13,7 +13,7 @@
 
 ---
 
-OpenWispr is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
+OpenWispr is a desktop application for real-time speech-to-text transcription. It runs on your local machine with optional cloud dependencies, keeping your audio and transcripts private by default.
 
 ## Key Features
 
@@ -150,7 +150,7 @@ OpenWispr is a production-grade desktop application for real-time speech-to-text
 - **Performance monitoring** - Latency, throughput, resource usage
 - **Health monitoring** - Real-time session health metrics
 - **Extensive logging** - JSON-structured logs per session
-- **100+ tests** - Unit, integration, and E2E coverage
+- **80+ tests** - Unit, integration, and E2E coverage
 
 ---
 
@@ -158,7 +158,7 @@ OpenWispr is a production-grade desktop application for real-time speech-to-text
 
 This project is under active development. Before using, please note:
 
-- **Known Bugs**: There are 150+ documented bugs in `reports/`
+- **Known Bugs**: See issue tracker for current issues
 - **Missing Features**: Some settings are marked as "Coming Soon"
 - **API Changes**: Settings and interfaces may change
 - **Not Production Ready**: Do not use for critical transcription jobs
@@ -260,18 +260,22 @@ Two independent hotkeys for different audio sources:
 ### Environment Variables
 
 ```powershell
+# See .env.example for full list of available variables
+
 # Force specific model
-$env:TRANSCRIPTA_DEFAULT_MODEL='medium'
+$env:OPENWISPR_DEFAULT_MODEL='medium'
 
 # Force compute type
-$env:TRANSCRIPTA_COMPUTE_TYPE='float16'  # or 'int8' for CPU
+$env:OPENWISPR_COMPUTE_TYPE='float16'  # or 'int8' for CPU
 
 # Specify capture device
-$env:TRANSCRIPTA_CAPTURE_DEVICE_ID='<device-id>'
+$env:OPENWISPR_CAPTURE_DEVICE_ID='<device-id>'
 
 # Set log level
-$env:TRANSCRIPTA_LOG_LEVEL='DEBUG'  # DEBUG, INFO, WARN, ERROR
+$env:OPENWISPR_LOG_LEVEL='DEBUG'  # DEBUG, INFO, WARN, ERROR
 ```
+
+See `.env.example` for the complete list of environment variables.
 
 ### Settings File
 
@@ -424,7 +428,7 @@ app/
 ## Privacy & Legal
 
 - **100% Local Processing** - No cloud upload, ever
-- **No Telemetry** - Optional crash reports only
+- **Local-Only Crash Reports** - Error reports stored locally in %APPDATA%\OpenWispr\reports
 - **Your Data** - You control all transcripts and models
 - **Offline Capable** - Works without internet connection
 - **Important:** Only use where you have legal right to record audio

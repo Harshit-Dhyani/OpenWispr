@@ -46,13 +46,13 @@ nvidia-smi
 **Fix:**
 ```powershell
 # 1. Use smaller model
-$env:TRANSCRIPTA_DEFAULT_MODEL="small"
+$env:OPENWISPR_DEFAULT_MODEL="small"
 
 # 2. Use int8 compute type
-$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 3. Reduce chunk size
-$env:TRANSCRIPTA_CHUNK_SECONDS="0.5"
+$env:OPENWISPR_CHUNK_SECONDS="0.5"
 
 # 4. Or apply Speed Monster preset (see docs/engineering/performance.md)
 ```
@@ -84,13 +84,13 @@ $env:TRANSCRIPTA_CHUNK_SECONDS="0.5"
 **Fix:**
 ```powershell
 # 1. Reduce chunk duration
-$env:TRANSCRIPTA_CHUNK_SECONDS="0.5"
+$env:OPENWISPR_CHUNK_SECONDS="0.5"
 
 # 2. Use smaller model for speed
-$env:TRANSCRIPTA_DEFAULT_MODEL="small"
+$env:OPENWISPR_DEFAULT_MODEL="small"
 
 # 3. Use int8 for faster inference
-$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 4. Clear model cache
 Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
@@ -241,8 +241,8 @@ Invoke-RestMethod "http://127.0.0.1:8765/api/devices/default/probe?duration=5"
 nvidia-smi
 
 # 2. Force CPU fallback if needed
-$env:TRANSCRIPTA_DEVICE="cpu"
-$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+$env:OPENWISPR_DEVICE="cpu"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 3. Or reinstall PyTorch with CUDA
 pip install torch --index-url https://download.pytorch.org/whl/cu121
@@ -270,10 +270,10 @@ Invoke-RestMethod http://127.0.0.1:8765/api/health | Select-Object -ExpandProper
 **Fix:**
 ```powershell
 # 1. Use smaller model
-$env:TRANSCRIPTA_DEFAULT_MODEL="small"  # or base, tiny
+$env:OPENWISPR_DEFAULT_MODEL="small"  # or base, tiny
 
 # 2. Reduce chunk duration
-$env:TRANSCRIPTA_CHUNK_SECONDS="1.0"
+$env:OPENWISPR_CHUNK_SECONDS="1.0"
 
 # 3. Clear model cache
 Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
@@ -351,7 +351,7 @@ icacls sessions/ /grant "$env:USERNAME:(OI)(CI)F" /T
 Get-PSDrive C | Select-Object Free
 
 # 4. Change export path if needed
-$env:TRANSCRIPTA_EXPORT_ROOT="D:\OpenWispr\Sessions"
+$env:OPENWISPR_EXPORT_ROOT="D:\OpenWispr\Sessions"
 ```
 
 **Verify:**
@@ -388,7 +388,7 @@ Stop-Process -Id <PID> -Force
 Get-Process python | Stop-Process -Force
 
 # 4. Change port
-$env:TRANSCRIPTA_API_PORT="8766"
+$env:OPENWISPR_API_PORT="8766"
 ```
 
 **Verify:**
@@ -415,11 +415,11 @@ Invoke-RestMethod http://127.0.0.1:8765/api/health
 **Fix:**
 ```powershell
 # 1. Switch to CPU
-$env:TRANSCRIPTA_DEVICE="cpu"
-$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+$env:OPENWISPR_DEVICE="cpu"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 2. Use smaller model
-$env:TRANSCRIPTA_DEFAULT_MODEL="base"
+$env:OPENWISPR_DEFAULT_MODEL="base"
 
 # 3. Clear model cache
 Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
@@ -524,7 +524,7 @@ taskkill /F /IM python.exe
 Get-NetTCPConnection -LocalPort 8765 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 
 # 4. Change port in .env
-echo "TRANSCRIPTA_PORT=8766" >> .env
+echo "OPENWISPR_PORT=8766" >> .env
 ```
 
 **Verify:**
@@ -650,7 +650,7 @@ From `AGENTS.md` - These bugs must not be reintroduced:
 | Issue | Prevention |
 |-------|------------|
 | Everything at DEBUG | `debugMode` controls diagnostics; `logLevel` controls verbosity |
-| Verbose dev logging default | Default to INFO/WARNING unless `TRANSCRIPTA_LOG_LEVEL=DEBUG` set |
+| Verbose dev logging default | Default to INFO/WARNING unless `OPENWISPR_LOG_LEVEL=DEBUG` set |
 
 ### Data Integrity Issues
 
@@ -732,8 +732,8 @@ icacls $path /grant "$env:USERNAME:(OI)(CI)F" /T
 
 ```powershell
 # Create/toggle .env
-echo "TRANSCRIPTA_DEVICE=cpu" >> .env
-echo "TRANSCRIPTA_COMPUTE_TYPE=int8" >> .env
+echo "OPENWISPR_DEVICE=cpu" >> .env
+echo "OPENWISPR_COMPUTE_TYPE=int8" >> .env
 ```
 
 ### Emergency Session Export
@@ -761,15 +761,15 @@ Write-Host "Export complete: $exportDir.zip"
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `TRANSCRIPTA_DEVICE` | auto | Compute device (auto/cpu/cuda) |
-| `TRANSCRIPTA_DEFAULT_MODEL` | medium | Model size (tiny/base/small/medium/large-v3) |
-| `TRANSCRIPTA_LOG_LEVEL` | INFO | Logging verbosity |
-| `TRANSCRIPTA_CAPTURE_DEVICE_ID` | (auto) | Audio device to capture |
-| `TRANSCRIPTA_CHUNK_SECONDS` | 3.2 | Processing chunk size |
-| `TRANSCRIPTA_MAX_QUEUE_ITEMS` | 16 | Backpressure threshold |
-| `TRANSCRIPTA_AUTO_OPTIMIZE` | true | Auto performance tuning |
-| `TRANSCRIPTA_HOST` | 127.0.0.1 | API bind address |
-| `TRANSCRIPTA_PORT` | 8765 | API port |
+| `OPENWISPR_DEVICE` | auto | Compute device (auto/cpu/cuda) |
+| `OPENWISPR_DEFAULT_MODEL` | medium | Model size (tiny/base/small/medium/large-v3) |
+| `OPENWISPR_LOG_LEVEL` | INFO | Logging verbosity |
+| `OPENWISPR_CAPTURE_DEVICE_ID` | (auto) | Audio device to capture |
+| `OPENWISPR_CHUNK_SECONDS` | 3.2 | Processing chunk size |
+| `OPENWISPR_MAX_QUEUE_ITEMS` | 16 | Backpressure threshold |
+| `OPENWISPR_AUTO_OPTIMIZE` | true | Auto performance tuning |
+| `OPENWISPR_HOST` | 127.0.0.1 | API bind address |
+| `OPENWISPR_PORT` | 8765 | API port |
 
 ---
 

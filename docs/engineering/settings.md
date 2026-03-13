@@ -89,7 +89,7 @@ The following 17 bugs were identified in the settings system:
 | SET-013 | Mode-specific settings override validation not enforced | Mode switching logic |
 | SET-014 | Hotkey settings key_combination vs microphone_key_combination overlap | `app/config/settings.py` hotkey section |
 | SET-015 | Coach prompt overrides structure complex/misleading | CoachSettings dataclass |
-| SET-016 | Environment variable prefix inconsistency: some use `TRANSCRIPTA_`, others implied | `app/config/constants.py` |
+| SET-016 | Environment variable prefix inconsistency: some use `OPENWISPR_`, others implied | `app/config/constants.py` |
 | SET-017 | Settings version migration not atomic | `app/core/settings_manager.py:391` |
 
 ## Settings Architecture

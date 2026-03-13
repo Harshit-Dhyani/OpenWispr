@@ -208,94 +208,94 @@ Style settings.
 
 ## Environment Variables
 
-All environment variables use the `TRANSCRIPTA_` prefix. These can be set in a `.env` file or directly in your system environment.
+All environment variables use the `OPENWISPR_` prefix. These can be set in a `.env` file or directly in your system environment.
 
 ### Core Application
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_DEVICE` | string | `auto` | Execution device: `cuda`, `cpu`, or `auto` |
-| `TRANSCRIPTA_COMPUTE_TYPE` | string | `float16` | Precision mode: `float16`, `int8`, or `int8_float16` |
-| `TRANSCRIPTA_DEFAULT_MODEL` | string | `medium` | Whisper model size: `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo` |
-| `TRANSCRIPTA_DEFAULT_LANGUAGE` | string | `auto` | Default language code (e.g., `en`, `hi`, `auto`) |
-| `TRANSCRIPTA_LOG_LEVEL` | string | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `TRANSCRIPTA_API_HOST` | string | `127.0.0.1` | API server host address |
-| `TRANSCRIPTA_API_PORT` | int | `8765` | API server port |
-| `TRANSCRIPTA_EXPORT_ROOT` | path | `./sessions` | Root directory for session exports |
-| `TRANSCRIPTA_DOWNLOAD_ROOT` | path | `./models` | Model download/cache directory |
+| `OPENWISPR_DEVICE` | string | `auto` | Execution device: `cuda`, `cpu`, or `auto` |
+| `OPENWISPR_COMPUTE_TYPE` | string | `float16` | Precision mode: `float16`, `int8`, or `int8_float16` |
+| `OPENWISPR_DEFAULT_MODEL` | string | `medium` | Whisper model size: `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo` |
+| `OPENWISPR_DEFAULT_LANGUAGE` | string | `auto` | Default language code (e.g., `en`, `hi`, `auto`) |
+| `OPENWISPR_LOG_LEVEL` | string | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `OPENWISPR_API_HOST` | string | `127.0.0.1` | API server host address |
+| `OPENWISPR_API_PORT` | int | `8765` | API server port |
+| `OPENWISPR_EXPORT_ROOT` | path | `./sessions` | Root directory for session exports |
+| `OPENWISPR_DOWNLOAD_ROOT` | path | `./models` | Model download/cache directory |
 
 ### Audio Configuration
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_SAMPLE_RATE` | int | `16000` | Audio sample rate in Hz |
-| `TRANSCRIPTA_CHANNELS` | int | `1` | Audio channels (1=mono, 2=stereo) |
-| `TRANSCRIPTA_CHUNK_SECONDS` | float | `1.6` | Audio chunk duration in seconds |
-| `TRANSCRIPTA_OVERLAP_SECONDS` | float | `0.32` | Overlap between chunks in seconds |
-| `TRANSCRIPTA_CAPTURE_BLOCK_SECONDS` | float | `0.02` | Capture block size in seconds |
-| `TRANSCRIPTA_METER_DECAY` | float | `0.85` | VU meter decay factor (0.0-1.0) |
-| `TRANSCRIPTA_CAPTURE_DEVICE_ID` | string | *(empty)* | Audio capture device ID |
+| `OPENWISPR_SAMPLE_RATE` | int | `16000` | Audio sample rate in Hz |
+| `OPENWISPR_CHANNELS` | int | `1` | Audio channels (1=mono, 2=stereo) |
+| `OPENWISPR_CHUNK_SECONDS` | float | `1.6` | Audio chunk duration in seconds |
+| `OPENWISPR_OVERLAP_SECONDS` | float | `0.32` | Overlap between chunks in seconds |
+| `OPENWISPR_CAPTURE_BLOCK_SECONDS` | float | `0.02` | Capture block size in seconds |
+| `OPENWISPR_METER_DECAY` | float | `0.85` | VU meter decay factor (0.0-1.0) |
+| `OPENWISPR_CAPTURE_DEVICE_ID` | string | *(empty)* | Audio capture device ID |
 
 ### VAD (Voice Activity Detection)
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_VAD_FILTER` | bool | `true` | Enable VAD filtering |
-| `TRANSCRIPTA_VAD_THRESHOLD` | float | `0.5` | VAD threshold (0.0-1.0) |
-| `TRANSCRIPTA_VAD_MIN_SILENCE_MS` | int | `200` | Minimum silence duration in ms |
-| `TRANSCRIPTA_VAD_SPEECH_PAD_MS` | int | `200` | Padding added to speech segments in ms |
+| `OPENWISPR_VAD_FILTER` | bool | `true` | Enable VAD filtering |
+| `OPENWISPR_VAD_THRESHOLD` | float | `0.5` | VAD threshold (0.0-1.0) |
+| `OPENWISPR_VAD_MIN_SILENCE_MS` | int | `200` | Minimum silence duration in ms |
+| `OPENWISPR_VAD_SPEECH_PAD_MS` | int | `200` | Padding added to speech segments in ms |
 
 ### Transcription Settings
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_BEAM_SIZE` | int | `5` | Beam search width (1-20) |
-| `TRANSCRIPTA_BEST_OF` | int | `5` | Number of candidates to consider (1-20) |
-| `TRANSCRIPTA_TEMPERATURE` | float | `0.0` | Sampling temperature (0.0-1.0) |
-| `TRANSCRIPTA_DEFAULT_LIVE_MODE` | string | `balanced` | Live mode profile |
-| `TRANSCRIPTA_DEFAULT_EXECUTION_MODE` | string | `auto` | Execution mode: `auto`, `gpu_only`, `cpu_only` |
+| `OPENWISPR_BEAM_SIZE` | int | `5` | Beam search width (1-20) |
+| `OPENWISPR_BEST_OF` | int | `5` | Number of candidates to consider (1-20) |
+| `OPENWISPR_TEMPERATURE` | float | `0.0` | Sampling temperature (0.0-1.0) |
+| `OPENWISPR_DEFAULT_LIVE_MODE` | string | `balanced` | Live mode profile |
+| `OPENWISPR_DEFAULT_EXECUTION_MODE` | string | `auto` | Execution mode: `auto`, `gpu_only`, `cpu_only` |
 
 ### Performance
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_MAX_QUEUE_ITEMS` | int | `16` | Maximum STT queue items |
-| `TRANSCRIPTA_OUTPUT_REFRESH_SECONDS` | float | `0.5` | Output refresh interval |
-| `TRANSCRIPTA_AUTO_OPTIMIZE` | bool | `true` | Enable auto-optimization |
-| `TRANSCRIPTA_OPTIMIZATION_MODE` | string | `balanced` | Optimization mode: `maximum`, `balanced`, `speed`, `low_memory` |
+| `OPENWISPR_MAX_QUEUE_ITEMS` | int | `16` | Maximum STT queue items |
+| `OPENWISPR_OUTPUT_REFRESH_SECONDS` | float | `0.5` | Output refresh interval |
+| `OPENWISPR_AUTO_OPTIMIZE` | bool | `true` | Enable auto-optimization |
+| `OPENWISPR_OPTIMIZATION_MODE` | string | `balanced` | Optimization mode: `maximum`, `balanced`, `speed`, `low_memory` |
 
 ### Advanced
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPTA_CONDITION_ON_PREVIOUS_TEXT` | bool | `true` | Condition on previous text for context |
-| `TRANSCRIPTA_COMPRESSION_RATIO_THRESHOLD` | float | *null* | Compression ratio threshold for quality control |
-| `TRANSCRIPTA_NUM_CUDA_STREAMS` | int | `2` | Number of CUDA streams |
+| `OPENWISPR_CONDITION_ON_PREVIOUS_TEXT` | bool | `true` | Condition on previous text for context |
+| `OPENWISPR_COMPRESSION_RATIO_THRESHOLD` | float | *null* | Compression ratio threshold for quality control |
+| `OPENWISPR_NUM_CUDA_STREAMS` | int | `2` | Number of CUDA streams |
 
 ### Setting Environment Variables (PowerShell)
 
 ```powershell
 # Set for current session
-$env:TRANSCRIPTA_DEVICE = "cuda"
-$env:TRANSCRIPTA_COMPUTE_TYPE = "float16"
-$env:TRANSCRIPTA_DEFAULT_MODEL = "medium"
-$env:TRANSCRIPTA_LOG_LEVEL = "DEBUG"
+$env:OPENWISPR_DEVICE = "cuda"
+$env:OPENWISPR_COMPUTE_TYPE = "float16"
+$env:OPENWISPR_DEFAULT_MODEL = "medium"
+$env:OPENWISPR_LOG_LEVEL = "DEBUG"
 
 # Set permanently (requires restart)
-[Environment]::SetEnvironmentVariable("TRANSCRIPTA_DEVICE", "cuda", "User")
-[Environment]::SetEnvironmentVariable("TRANSCRIPTA_COMPUTE_TYPE", "float16", "User")
+[Environment]::SetEnvironmentVariable("OPENWISPR_DEVICE", "cuda", "User")
+[Environment]::SetEnvironmentVariable("OPENWISPR_COMPUTE_TYPE", "float16", "User")
 ```
 
 ### Setting Environment Variables (Command Prompt)
 
 ```cmd
 # Set for current session
-set TRANSCRIPTA_DEVICE=cuda
-set TRANSCRIPTA_COMPUTE_TYPE=float16
+set OPENWISPR_DEVICE=cuda
+set OPENWISPR_COMPUTE_TYPE=float16
 
 # Set permanently
-setx TRANSCRIPTA_DEVICE cuda
-setx TRANSCRIPTA_COMPUTE_TYPE float16
+setx OPENWISPR_DEVICE cuda
+setx OPENWISPR_COMPUTE_TYPE float16
 ```
 
 ---
@@ -647,7 +647,7 @@ Live mode profiles adjust chunk sizing for different latency/accuracy trade-offs
 Set via environment variable:
 
 ```powershell
-$env:TRANSCRIPTA_DEFAULT_LIVE_MODE = "realtime"
+$env:OPENWISPR_DEFAULT_LIVE_MODE = "realtime"
 ```
 
 Or in settings file:
@@ -668,55 +668,55 @@ Or in settings file:
 
 ```env
 # Essential settings only
-TRANSCRIPTA_DEVICE=cuda
-TRANSCRIPTA_DEFAULT_MODEL=small
-TRANSCRIPTA_LOG_LEVEL=INFO
+OPENWISPR_DEVICE=cuda
+OPENWISPR_DEFAULT_MODEL=small
+OPENWISPR_LOG_LEVEL=INFO
 ```
 
 ### High-Performance GPU Configuration
 
 ```env
 # Maximum quality on high-end GPU
-TRANSCRIPTA_DEVICE=cuda
-TRANSCRIPTA_COMPUTE_TYPE=float16
-TRANSCRIPTA_DEFAULT_MODEL=large-v3
-TRANSCRIPTA_BEAM_SIZE=10
-TRANSCRIPTA_BEST_OF=10
-TRANSCRIPTA_DEFAULT_LIVE_MODE=high_accuracy
-TRANSCRIPTA_NUM_CUDA_STREAMS=4
+OPENWISPR_DEVICE=cuda
+OPENWISPR_COMPUTE_TYPE=float16
+OPENWISPR_DEFAULT_MODEL=large-v3
+OPENWISPR_BEAM_SIZE=10
+OPENWISPR_BEST_OF=10
+OPENWISPR_DEFAULT_LIVE_MODE=high_accuracy
+OPENWISPR_NUM_CUDA_STREAMS=4
 ```
 
 ### CPU-Only Configuration
 
 ```env
 # Optimized for CPU execution
-TRANSCRIPTA_DEVICE=cpu
-TRANSCRIPTA_COMPUTE_TYPE=int8
-TRANSCRIPTA_DEFAULT_MODEL=small
-TRANSCRIPTA_BEAM_SIZE=3
-TRANSCRIPTA_DEFAULT_LIVE_MODE=balanced
-TRANSCRIPTA_MAX_QUEUE_ITEMS=8
+OPENWISPR_DEVICE=cpu
+OPENWISPR_COMPUTE_TYPE=int8
+OPENWISPR_DEFAULT_MODEL=small
+OPENWISPR_BEAM_SIZE=3
+OPENWISPR_DEFAULT_LIVE_MODE=balanced
+OPENWISPR_MAX_QUEUE_ITEMS=8
 ```
 
 ### Low-Latency Dictation
 
 ```env
 # Fast response for dictation
-TRANSCRIPTA_DEVICE=cuda
-TRANSCRIPTA_COMPUTE_TYPE=int8
-TRANSCRIPTA_DEFAULT_MODEL=tiny
-TRANSCRIPTA_BEAM_SIZE=1
-TRANSCRIPTA_DEFAULT_LIVE_MODE=realtime
-TRANSCRIPTA_VAD_MIN_SILENCE_MS=200
+OPENWISPR_DEVICE=cuda
+OPENWISPR_COMPUTE_TYPE=int8
+OPENWISPR_DEFAULT_MODEL=tiny
+OPENWISPR_BEAM_SIZE=1
+OPENWISPR_DEFAULT_LIVE_MODE=realtime
+OPENWISPR_VAD_MIN_SILENCE_MS=200
 ```
 
 ### Development/Debug Configuration
 
 ```env
 # Verbose logging for troubleshooting
-TRANSCRIPTA_LOG_LEVEL=DEBUG
-TRANSCRIPTA_DEBUG=true
-TRANSCRIPTA_ENABLE_METRICS=true
+OPENWISPR_LOG_LEVEL=DEBUG
+OPENWISPR_DEBUG=true
+OPENWISPR_ENABLE_METRICS=true
 ```
 
 ### Complete User Settings (user_settings.json)

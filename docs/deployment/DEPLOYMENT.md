@@ -145,10 +145,10 @@ python -c "from faster_whisper import WhisperModel; m = WhisperModel('small', de
 ```powershell
 # Create .env file for GPU mode
 @"
-TRANSCRIPTA_DEVICE=cuda
-TRANSCRIPTA_COMPUTE_TYPE=float16
-TRANSCRIPTA_DEFAULT_MODEL=medium
-TRANSCRIPTA_LOG_LEVEL=INFO
+OPENWISPR_DEVICE=cuda
+OPENWISPR_COMPUTE_TYPE=float16
+OPENWISPR_DEFAULT_MODEL=medium
+OPENWISPR_LOG_LEVEL=INFO
 "@ | Set-Content -Path .env -Encoding UTF8
 ```
 
@@ -172,10 +172,10 @@ python -c "from faster_whisper import WhisperModel; m = WhisperModel('small', de
 ```powershell
 # Create .env file for CPU mode
 @"
-TRANSCRIPTA_DEVICE=cpu
-TRANSCRIPTA_COMPUTE_TYPE=int8
-TRANSCRIPTA_DEFAULT_MODEL=small
-TRANSCRIPTA_LOG_LEVEL=INFO
+OPENWISPR_DEVICE=cpu
+OPENWISPR_COMPUTE_TYPE=int8
+OPENWISPR_DEFAULT_MODEL=small
+OPENWISPR_LOG_LEVEL=INFO
 "@ | Set-Content -Path .env -Encoding UTF8
 ```
 
@@ -201,56 +201,56 @@ Default model: `medium`
 
 ## Environment Configuration
 
-Create a `.env` file in the project root. All settings use `TRANSCRIPTA_` prefix:
+Create a `.env` file in the project root. All settings use `OPENWISPR_` prefix:
 
 ### Available Environment Variables (from config.py)
 
 ```powershell
 # Core application settings
-TRANSCRIPTA_APP_NAME=OpenWispr
-TRANSCRIPTA_HOST=127.0.0.1
-TRANSCRIPTA_PORT=8765
-TRANSCRIPTA_LOG_LEVEL=INFO
+OPENWISPR_APP_NAME=OpenWispr
+OPENWISPR_HOST=127.0.0.1
+OPENWISPR_PORT=8765
+OPENWISPR_LOG_LEVEL=INFO
 
 # Audio settings
-TRANSCRIPTA_SAMPLE_RATE=16000
-TRANSCRIPTA_CHANNELS=1
-TRANSCRIPTA_CHUNK_SECONDS=1.6
-TRANSCRIPTA_OVERLAP_SECONDS=0.32
-TRANSCRIPTA_CAPTURE_BLOCK_SECONDS=0.02
-TRANSCRIPTA_METER_DECAY=0.85
-TRANSCRIPTA_AUDIO_BACKEND=auto
+OPENWISPR_SAMPLE_RATE=16000
+OPENWISPR_CHANNELS=1
+OPENWISPR_CHUNK_SECONDS=1.6
+OPENWISPR_OVERLAP_SECONDS=0.32
+OPENWISPR_CAPTURE_BLOCK_SECONDS=0.02
+OPENWISPR_METER_DECAY=0.85
+OPENWISPR_AUDIO_BACKEND=auto
 
 # Model settings
-TRANSCRIPTA_DEFAULT_MODEL=medium
-TRANSCRIPTA_DEVICE=auto
-TRANSCRIPTA_COMPUTE_TYPE=float16
-TRANSCRIPTA_DEFAULT_LANGUAGE=auto
-TRANSCRIPTA_BEAM_SIZE=5
-TRANSCRIPTA_BEST_OF=5
-TRANSCRIPTA_TEMPERATURE=0.0
-TRANSCRIPTA_CONFIDENCE_THRESHOLD=0.6
+OPENWISPR_DEFAULT_MODEL=medium
+OPENWISPR_DEVICE=auto
+OPENWISPR_COMPUTE_TYPE=float16
+OPENWISPR_DEFAULT_LANGUAGE=auto
+OPENWISPR_BEAM_SIZE=5
+OPENWISPR_BEST_OF=5
+OPENWISPR_TEMPERATURE=0.0
+OPENWISPR_CONFIDENCE_THRESHOLD=0.6
 
 # VAD (Voice Activity Detection)
-TRANSCRIPTA_VAD_FILTER=true
-TRANSCRIPTA_VAD_THRESHOLD_DB=-40.0
-TRANSCRIPTA_VAD_MIN_SILENCE_MS=300
-TRANSCRIPTA_VAD_SPEECH_PAD_MS=200
+OPENWISPR_VAD_FILTER=true
+OPENWISPR_VAD_THRESHOLD_DB=-40.0
+OPENWISPR_VAD_MIN_SILENCE_MS=300
+OPENWISPR_VAD_SPEECH_PAD_MS=200
 
 # Paths
-TRANSCRIPTA_EXPORT_ROOT=./sessions
-TRANSCRIPTA_DOWNLOAD_ROOT=./models
+OPENWISPR_EXPORT_ROOT=./sessions
+OPENWISPR_DOWNLOAD_ROOT=./models
 
 # Performance
-TRANSCRIPTA_DEFAULT_LIVE_MODE=balanced
-TRANSCRIPTA_DEFAULT_EXECUTION_MODE=auto
-TRANSCRIPTA_AUTO_OPTIMIZE=true
-TRANSCRIPTA_OPTIMIZATION_MODE=balanced
+OPENWISPR_DEFAULT_LIVE_MODE=balanced
+OPENWISPR_DEFAULT_EXECUTION_MODE=auto
+OPENWISPR_AUTO_OPTIMIZE=true
+OPENWISPR_OPTIMIZATION_MODE=balanced
 
 # Advanced quality
-TRANSCRIPTA_ENABLE_FILLER_FILTER=true
-TRANSCRIPTA_ENABLE_HALLUCINATION_FILTER=true
-TRANSCRIPTA_MIN_SEGMENT_LENGTH=0.5
+OPENWISPR_ENABLE_FILLER_FILTER=true
+OPENWISPR_ENABLE_HALLUCINATION_FILTER=true
+OPENWISPR_MIN_SEGMENT_LENGTH=0.5
 ```
 
 ### Per-Environment Presets
@@ -258,38 +258,38 @@ TRANSCRIPTA_MIN_SEGMENT_LENGTH=0.5
 **Development:**
 ```powershell
 @"
-TRANSCRIPTA_DEVICE=cpu
-TRANSCRIPTA_COMPUTE_TYPE=int8
-TRANSCRIPTA_DEFAULT_MODEL=tiny
-TRANSCRIPTA_LOG_LEVEL=DEBUG
-TRANSCRIPTA_VAD_FILTER=true
-TRANSCRIPTA_AUTO_OPTIMIZE=true
+OPENWISPR_DEVICE=cpu
+OPENWISPR_COMPUTE_TYPE=int8
+OPENWISPR_DEFAULT_MODEL=tiny
+OPENWISPR_LOG_LEVEL=DEBUG
+OPENWISPR_VAD_FILTER=true
+OPENWISPR_AUTO_OPTIMIZE=true
 "@ | Set-Content -Path .env -Encoding UTF8
 ```
 
 **Production GPU:**
 ```powershell
 @"
-TRANSCRIPTA_DEVICE=cuda
-TRANSCRIPTA_COMPUTE_TYPE=float16
-TRANSCRIPTA_DEFAULT_MODEL=medium
-TRANSCRIPTA_LOG_LEVEL=INFO
-TRANSCRIPTA_VAD_FILTER=true
-TRANSCRIPTA_AUTO_OPTIMIZE=true
-TRANSCRIPTA_OPTIMIZATION_MODE=balanced
+OPENWISPR_DEVICE=cuda
+OPENWISPR_COMPUTE_TYPE=float16
+OPENWISPR_DEFAULT_MODEL=medium
+OPENWISPR_LOG_LEVEL=INFO
+OPENWISPR_VAD_FILTER=true
+OPENWISPR_AUTO_OPTIMIZE=true
+OPENWISPR_OPTIMIZATION_MODE=balanced
 "@ | Set-Content -Path .env -Encoding UTF8
 ```
 
 **Production CPU:**
 ```powershell
 @"
-TRANSCRIPTA_DEVICE=cpu
-TRANSCRIPTA_COMPUTE_TYPE=int8
-TRANSCRIPTA_DEFAULT_MODEL=small
-TRANSCRIPTA_LOG_LEVEL=INFO
-TRANSCRIPTA_VAD_FILTER=true
-TRANSCRIPTA_AUTO_OPTIMIZE=true
-TRANSCRIPTA_OPTIMIZATION_MODE=low_memory
+OPENWISPR_DEVICE=cpu
+OPENWISPR_COMPUTE_TYPE=int8
+OPENWISPR_DEFAULT_MODEL=small
+OPENWISPR_LOG_LEVEL=INFO
+OPENWISPR_VAD_FILTER=true
+OPENWISPR_AUTO_OPTIMIZE=true
+OPENWISPR_OPTIMIZATION_MODE=low_memory
 "@ | Set-Content -Path .env -Encoding UTF8
 ```
 
@@ -471,7 +471,7 @@ netstat -ano | findstr :8765
 Get-NetTCPConnection -LocalPort 8765 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 
 # Or use alternative port
-$env:TRANSCRIPTA_PORT=8766
+$env:OPENWISPR_PORT=8766
 python -m app.api_main
 ```
 
@@ -491,8 +491,8 @@ python -c "import torch; print(f'CUDA version: {torch.version.cuda}')"
 
 # Force CPU fallback in .env
 @"
-TRANSCRIPTA_DEVICE=cpu
-TRANSCRIPTA_COMPUTE_TYPE=int8
+OPENWISPR_DEVICE=cpu
+OPENWISPR_COMPUTE_TYPE=int8
 "@ | Set-Content -Path .env -Encoding UTF8
 
 # Common GPU fallback triggers (from constants.py)
@@ -509,7 +509,7 @@ TRANSCRIPTA_COMPUTE_TYPE=int8
 python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu')"
 
 # Set custom download root
-$env:TRANSCRIPTA_DOWNLOAD_ROOT="C:\OpenWispr\Models"
+$env:OPENWISPR_DOWNLOAD_ROOT="C:\OpenWispr\Models"
 
 # Check HuggingFace connectivity
 python -c "import requests; r = requests.get('https://huggingface.co'); print(f'HuggingFace status: {r.status_code}')"
@@ -572,8 +572,8 @@ npm run dist
 |-------|----------|
 | CPU bottleneck | Switch to GPU or reduce model size |
 | Large model | Use `small` instead of `medium` |
-| High VAD threshold | Lower `TRANSCRIPTA_VAD_THRESHOLD_DB=-50.0` |
-| Chunk too large | Reduce `TRANSCRIPTA_CHUNK_SECONDS=1.0` |
+| High VAD threshold | Lower `OPENWISPR_VAD_THRESHOLD_DB=-50.0` |
+| Chunk too large | Reduce `OPENWISPR_CHUNK_SECONDS=1.0` |
 | Background apps | Close GPU-intensive applications |
 
 ### Application Crashes on Startup
@@ -583,7 +583,7 @@ npm run dist
 Get-EventLog -LogName Application -Source "Application Error" -Newest 10
 
 # Run with debug logging
-$env:TRANSCRIPTA_LOG_LEVEL="DEBUG"
+$env:OPENWISPR_LOG_LEVEL="DEBUG"
 npm run dev
 
 # Check backend logs

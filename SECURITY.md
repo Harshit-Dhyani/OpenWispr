@@ -6,8 +6,8 @@ The following versions of OpenWispr are currently supported with security update
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| 0.x.x   | :x:                |
+| 0.1.x   | :white_check_mark: |
+| 0.0.x   | :x:                |
 
 ## Reporting a Vulnerability
 

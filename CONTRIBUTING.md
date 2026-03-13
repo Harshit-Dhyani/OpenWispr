@@ -260,7 +260,7 @@ npm run test
 
 ```powershell
 # Enable debug logging
-$env:TRANSCRIPTA_DEBUG=1
+$env:OPENWISPR_DEBUG=1
 python -m app.api_main
 
 # Or use Python debugger
