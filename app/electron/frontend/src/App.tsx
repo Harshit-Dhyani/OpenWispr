@@ -586,7 +586,14 @@ function App() {
       // Apply hotkey config to Electron main process
       const hotkeyApi = window.openwisprDesktop.hotkey;
       if (hotkeyApi) {
-        const hotkeyResult = await hotkeyApi.updateConfig(persistedSettings.hotkey as Partial<HotkeySettings>);
+        // Include ASR model settings from transcription category
+        const hotkeyConfig = {
+          ...persistedSettings.hotkey,
+          default_asr_model_id: persistedSettings.transcription.default_asr_model_id,
+          microphone_asr_model_id: persistedSettings.transcription.microphone_asr_model_id,
+          system_asr_model_id: persistedSettings.transcription.system_asr_model_id,
+        };
+        const hotkeyResult = await hotkeyApi.updateConfig(hotkeyConfig as Partial<HotkeySettings>);
         if (!hotkeyResult?.success) {
           throw new Error(hotkeyResult?.error || 'Unable to apply hotkey settings.');
         }

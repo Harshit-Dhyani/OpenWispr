@@ -1,4 +1,4 @@
-import { Volume2, Filter, Layers } from 'lucide-react';
+import { Volume2, Filter } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
 import { Toggle, Slider, Select } from '../controls';
@@ -151,32 +151,6 @@ export function AudioSection({
                 />
               </SettingCard>
             )}
-          </div>
-        </div>
-
-        <div className="border-2 border-lawn-border bg-lawn-panel p-4">
-          <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-lawn-accent" />
-            {text.processing_group_title}
-          </h4>
-          <div className="space-y-3">
-            <p className="text-xs text-stone-500">
-              Advanced audio post-processing is hidden by default until it has verified runtime support.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                text.noise_filtering_title,
-                text.echo_cancellation_title,
-                text.auto_gain_control_title,
-              ].map((label) => (
-                <span
-                  key={label}
-                  className="border border-lawn-border bg-lawn-bg px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500"
-                >
-                  {label} · {text.coming_soon}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
       </div>
