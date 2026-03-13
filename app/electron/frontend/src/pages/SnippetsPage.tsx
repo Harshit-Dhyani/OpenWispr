@@ -185,18 +185,18 @@ export function SnippetsPage({ request, enabled }: SnippetsPageProps) {
               <p className="mt-1 text-xs font-bold text-lawn-muted">{entries.length} saved snippet{entries.length === 1 ? '' : 's'}</p>
             </div>
           </div>
-          <div className="h-full overflow-y-auto p-3 custom-scrollbar">
+          <div className="h-full overflow-y-auto p-2 custom-scrollbar">
             <div className="space-y-2">
               {entries.map((entry) => (
-                <article key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-2 border-lawn-border bg-lawn-bg p-3">
-                  <div>
-                    <p className="text-sm font-black text-lawn-border">{entry.trigger} → {entry.expansion}</p>
+                <article key={entry.id} className="flex min-w-0 items-center justify-between gap-2 border-2 border-lawn-border bg-lawn-bg p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-lawn-border break-all">{entry.trigger} → {entry.expansion}</p>
                     <p className="text-[11px] font-bold text-lawn-muted">{entry.scope} · {entry.usage_count} {text.usesSuffix}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void deleteEntry(entry.id)}
-                    className="border-2 border-lawn-border bg-lawn-panel px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-lawn-border"
+                    className="border-2 border-lawn-border bg-lawn-panel px-2 py-1 text-xs font-black uppercase tracking-[0.1em] text-lawn-border shrink-0"
                   >
                     {text.deleteButton}
                   </button>

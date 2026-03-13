@@ -260,12 +260,12 @@ export function MainContent({
       <div
         className={
           scope === 'dictation'
-            ? 'grid min-h-0 flex-1 gap-4 overflow-hidden'
+            ? 'grid min-h-0 flex-1 gap-2 overflow-hidden'
             : 'grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]'
         }
       >
         <section className="flex min-h-0 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal">
-          <div className="flex items-center justify-between border-b-2 border-lawn-border bg-lawn-bg p-3">
+          <div className="flex items-center justify-between border-b-2 border-lawn-border bg-lawn-bg px-2 py-1.5">
             <div className="flex items-center gap-2">
               <FileText size={14} className="text-lawn-accent" />
               <span className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-border">
@@ -277,7 +277,7 @@ export function MainContent({
             </span>
           </div>
 
-          <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 custom-scrollbar">
+          <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2 custom-scrollbar">
             {scope === 'dictation' ? <CombinedTimelineCard combinedText={combinedTranscriptText} /> : null}
             {liveTranscript.length === 0 ? (
               <EmptyState
@@ -586,16 +586,16 @@ function ReviewPanel({ segments }: { segments: Segment[] }) {
   return (
     <div className="space-y-2">
       {segments.slice(-16).reverse().map((segment) => (
-        <article key={segment.id} className="border-2 border-theme-warning bg-theme-warning/10 p-3">
+        <article key={segment.id} className="border-2 border-theme-warning bg-theme-warning/10 p-2">
           <div className="mb-1 flex items-center gap-2 text-theme-warning">
             <AlertCircle size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">
               {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
             </span>
           </div>
-          <p className="text-sm font-bold text-lawn-border">{segment.display_text || segment.text}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{segment.display_text || segment.text}</p>
           {segment.review_reasons.length > 0 && (
-            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-theme-warning">
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-theme-warning break-words">
               {segment.review_reasons.join(' · ')}
             </p>
           )}
@@ -618,17 +618,17 @@ function FormulasPanel({ formulas }: { formulas: Formula[] }) {
   return (
     <div className="space-y-2">
       {formulas.slice(-16).reverse().map((formula, index) => (
-        <article key={`${formula.expression}-${index}`} className="border-2 border-lawn-border bg-lawn-dark p-3 text-lawn-bg">
+        <article key={`${formula.expression}-${index}`} className="border-2 border-lawn-border bg-lawn-dark p-2 text-lawn-bg">
           <div className="mb-1 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Sigma size={12} className="text-lawn-accent" />
-              <code className="font-mono text-sm font-bold">{formula.expression}</code>
+            <div className="flex items-center gap-2 min-w-0">
+              <Sigma size={12} className="text-lawn-accent shrink-0" />
+              <code className="font-mono text-sm font-bold break-all truncate">{formula.expression}</code>
             </div>
-            <span className="text-[9px] font-black uppercase tracking-wider opacity-70">
+            <span className="text-[9px] font-black uppercase tracking-wider opacity-70 shrink-0">
               {formula.timestamp_start.toFixed(1)}s
             </span>
           </div>
-          <p className="text-[11px] leading-5 opacity-80">{formula.context || 'Context unavailable.'}</p>
+          <p className="text-[11px] leading-5 opacity-80 break-words">{formula.context || 'Context unavailable.'}</p>
         </article>
       ))}
     </div>
@@ -648,16 +648,16 @@ function SuppressedPanel({ segments }: { segments: Segment[] }) {
   return (
     <div className="space-y-2">
       {segments.slice(-16).reverse().map((segment) => (
-        <article key={segment.id} className="border-2 border-lawn-soft bg-lawn-soft p-3">
+        <article key={segment.id} className="border-2 border-lawn-soft bg-lawn-soft p-2">
           <div className="mb-1 flex items-center gap-2 text-lawn-muted">
             <Filter size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">
               {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
             </span>
           </div>
-          <p className="text-xs font-bold text-lawn-muted-strong">{segment.display_text || segment.text}</p>
+          <p className="text-xs font-bold text-lawn-muted-strong break-words">{segment.display_text || segment.text}</p>
           {segment.suppression_reasons.length > 0 && (
-            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-lawn-muted">
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-lawn-muted break-words">
               {segment.suppression_reasons.join(' · ')}
             </p>
           )}
@@ -680,21 +680,21 @@ function ErrorsPanel({ error, warning }: { error: string | null; warning: string
   return (
     <div className="space-y-2">
       {warning && (
-        <article className="border-2 border-theme-warning bg-theme-warning/10 p-3">
+        <article className="border-2 border-theme-warning bg-theme-warning/10 p-2">
           <div className="mb-1 flex items-center gap-2 text-theme-warning">
             <TriangleAlert size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">Warning</span>
           </div>
-          <p className="text-sm font-bold text-lawn-border">{warning}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{warning}</p>
         </article>
       )}
       {error && (
-        <article className="border-2 border-theme-error bg-theme-error/10 p-3">
+        <article className="border-2 border-theme-error bg-theme-error/10 p-2">
           <div className="mb-1 flex items-center gap-2 text-theme-error">
             <AlertCircle size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">Error</span>
           </div>
-          <p className="text-sm font-bold text-lawn-border">{error}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{error}</p>
         </article>
       )}
     </div>

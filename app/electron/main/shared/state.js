@@ -86,7 +86,7 @@ let hotkeyConfigState = {
   finish_mode_default: "finish_and_paste",
   enable_refiner_on_stop: false,
   save_debug_wav: false,
-  mute_transcripta_audio_during_dictation: false,
+  mute_openwispr_audio_during_dictation: false,
   show_floating_window: true,
   show_floating_coach_result: true,
   floating_window_position: "bottom-right",

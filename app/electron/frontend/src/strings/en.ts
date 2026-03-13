@@ -228,7 +228,7 @@ export const RENDERER_STRINGS = {
       recordingDeviceSuffix: ' [rec]',
       muteOpenWisprAudioDuringDictationTitle: 'Mute app audio during transcription',
       muteOpenWisprAudioDuringDictationDescription:
-        SETTING_DESCRIPTIONS.mute_transcripta_audio_during_dictation + ' Disabled by default.',
+                SETTING_DESCRIPTIONS.mute_openwispr_audio_during_dictation + ' Disabled by default.',
     },
     advanced: {
       title: 'Advanced Settings',

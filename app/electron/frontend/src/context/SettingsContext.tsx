@@ -221,7 +221,7 @@ export function SettingsProvider({
       onError?.(error);
 
       // Try to load from localStorage as fallback
-      const cached = localStorage.getItem('transcripta:settings:cache');
+      const cached = localStorage.getItem('openwispr:settings:cache');
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
@@ -290,7 +290,7 @@ export function SettingsProvider({
           setSyncStatus('synced');
 
           // Cache successful settings
-          localStorage.setItem('transcripta:settings:cache', JSON.stringify(newSettings));
+          localStorage.setItem('openwispr:settings:cache', JSON.stringify(newSettings));
         } else if (response.errors) {
           // Validation errors
           throw new Error(response.message || 'Settings validation failed');

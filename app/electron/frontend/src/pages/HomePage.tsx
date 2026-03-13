@@ -127,7 +127,7 @@ export function HomePage({
   }
 
   return (
-    <div className={variant === 'compact' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'flex h-full min-h-0 flex-col overflow-hidden p-4'}>
+    <div className={variant === 'compact' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'flex h-full min-h-0 flex-col overflow-hidden p-6'}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-3xl uppercase tracking-tight text-lawn-border">
@@ -159,15 +159,15 @@ export function HomePage({
       </div>
 
       <div className="mb-4 grid gap-3 md:grid-cols-4">
-        <Metric label={text.metrics.daysUsed} value={String(analytics?.summary.days_used ?? 0)} />
+        <Metric label={text.metrics.daysUsed} value={String(analytics?.summary.days_used ?? 0)} accent />
         <Metric label={text.metrics.totalWords} value={String(analytics?.summary.total_words ?? 0)} />
-        <Metric label={text.metrics.avgWpm} value={String(analytics?.summary.avg_wpm ?? 0)} />
+        <Metric label={text.metrics.avgWpm} value={String(analytics?.summary.avg_wpm ?? 0)} accent />
         <Metric label={text.metrics.peakHour} value={fmtHour(analytics?.summary.peak_usage_hour ?? null)} />
       </div>
 
       {variant === 'full' ? (
         <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-          <section className="border-2 border-lawn-border bg-lawn-panel p-3">
+          <section className="border-2 border-lawn-border bg-lawn-panel p-3 shadow-brutal-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">{text.dailyUsage}</h3>
             <div className="mt-3 space-y-2">
               {(analytics?.daily ?? []).map((item) => (
@@ -185,7 +185,7 @@ export function HomePage({
               {!analytics?.daily?.length ? <p className="text-xs font-bold text-lawn-muted">{text.noData}</p> : null}
             </div>
           </section>
-          <section className="border-2 border-lawn-border bg-lawn-panel p-3">
+          <section className="border-2 border-lawn-border bg-lawn-panel p-3 shadow-brutal-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">{text.hourHeat}</h3>
             <div className="mt-3 grid grid-cols-6 gap-2">
               {(analytics?.hourly ?? []).map((item) => (
@@ -203,7 +203,7 @@ export function HomePage({
         </div>
       ) : null}
 
-      <section className="min-h-0 flex-1 overflow-hidden border-2 border-lawn-border bg-lawn-panel">
+      <section className="min-h-0 flex-1 overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal-sm">
         <div className="border-b-2 border-lawn-border bg-lawn-bg px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-lawn-muted">
           {text.sessionsTitle}
         </div>
@@ -216,7 +216,7 @@ export function HomePage({
               const canRetry = allowRetry && session.audio_available;
               const canDownloadAudio = persistAudio && session.audio_available;
               return (
-                <article key={session.session_id} className="border-2 border-lawn-border bg-lawn-bg p-3">
+                <article key={session.session_id} className="border-2 border-lawn-border bg-lawn-bg p-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-brutal-sm">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.08em] text-lawn-border">
@@ -228,7 +228,7 @@ export function HomePage({
                     </div>
                     <div className="text-xs font-black text-lawn-border">{session.word_count} {text.wordsSuffix}</div>
                   </div>
-                  <p className="mb-3 line-clamp-3 text-sm font-bold leading-6 text-lawn-border">{session.active_text || '-'}</p>
+                  <p className="mb-2 line-clamp-3 text-sm font-bold leading-6 text-lawn-border">{session.active_text || '-'}</p>
                   <div className="flex flex-wrap gap-2">
                     <ActionButton disabled={busy} onClick={() => void handleCopy(session)} label={text.actions.copy} primary />
                     <ActionButton
@@ -267,9 +267,9 @@ export function HomePage({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="border-2 border-lawn-border bg-lawn-panel p-3">
+    <div className={`border-2 border-lawn-border bg-lawn-panel p-3 shadow-brutal-sm ${accent ? 'bg-lawn-accent/10' : ''}`}>
       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-lawn-muted">{label}</p>
       <p className="mt-2 text-2xl font-black text-lawn-border">{value}</p>
     </div>

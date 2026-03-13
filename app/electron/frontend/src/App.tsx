@@ -472,8 +472,8 @@ function App() {
           finish_mode_default: migrated.hotkey.finish_mode_default,
           enable_refiner_on_stop: migrated.hotkey.enable_refiner_on_stop,
           save_debug_wav: migrated.hotkey.save_debug_wav,
-          mute_transcripta_audio_during_dictation:
-            migrated.audio.mute_transcripta_audio_during_dictation,
+          mute_openwispr_audio_during_dictation:
+            migrated.audio.mute_openwispr_audio_during_dictation,
           show_floating_window: migrated.hotkey.show_floating_window,
           show_floating_coach_result: migrated.coach.show_floating_coach_result,
           floating_window_position: migrated.hotkey.floating_window_position,
@@ -631,8 +631,8 @@ function App() {
           finish_mode_default: persistedSettings.hotkey.finish_mode_default,
           enable_refiner_on_stop: persistedSettings.hotkey.enable_refiner_on_stop,
           save_debug_wav: persistedSettings.hotkey.save_debug_wav,
-          mute_transcripta_audio_during_dictation:
-            persistedSettings.audio.mute_transcripta_audio_during_dictation,
+          mute_openwispr_audio_during_dictation:
+            persistedSettings.audio.mute_openwispr_audio_during_dictation,
           show_floating_window: persistedSettings.hotkey.show_floating_window,
           show_floating_coach_result: persistedSettings.coach.show_floating_coach_result,
           floating_window_position: persistedSettings.hotkey.floating_window_position,

@@ -109,12 +109,12 @@ export function AudioSection({
         <SettingCard
           title={audioText.muteOpenWisprAudioDuringDictationTitle}
           description={audioText.muteOpenWisprAudioDuringDictationDescription}
-          changed={isChanged('audio', 'mute_transcripta_audio_during_dictation')}
-          onReset={() => resetSetting('audio', 'mute_transcripta_audio_during_dictation')}
+          changed={isChanged('audio', 'mute_openwispr_audio_during_dictation')}
+          onReset={() => resetSetting('audio', 'mute_openwispr_audio_during_dictation')}
         >
           <Toggle
-            checked={Boolean(settings.audio.mute_transcripta_audio_during_dictation)}
-            onChange={(value) => updateSetting('audio', 'mute_transcripta_audio_during_dictation', value)}
+            checked={Boolean(settings.audio.mute_openwispr_audio_during_dictation)}
+            onChange={(value) => updateSetting('audio', 'mute_openwispr_audio_during_dictation', value)}
           />
         </SettingCard>
 
