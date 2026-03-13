@@ -11,7 +11,7 @@ The following versions of OpenWispr are currently supported with security update
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability within OpenWispr, please send an email to [security contact].
+If you discover a security vulnerability within OpenWispr, please send an email to openwispr-security@proton.me
 
 **Please do NOT report security vulnerabilities through public GitHub issues.**
 

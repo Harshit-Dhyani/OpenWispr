@@ -65,6 +65,7 @@ nul
 logs/
 pr-body.md
 app/electron/frontend/test-results/
+e2e/metrics/
 
 # Local agent/tool artifacts
 .codex/
