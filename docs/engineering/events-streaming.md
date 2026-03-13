@@ -308,7 +308,7 @@ The SSE hook adds a polling fallback after max reconnection attempts:
 
 ## WebSocket Manager (app/api/websocket_server.py)
 
-Server-side connection management with production-grade features.
+Server-side connection management with robust features.
 
 ### ConnectionConfig (lines 78-92)
 
