@@ -107,7 +107,7 @@ SETTING_LABELS: Dict[str, str] = {
     "noiseFiltering": "Noise Filtering",
     "echoCancellation": "Echo Cancellation",
     "autoGainControl": "Auto Gain Control",
-    "mute_transcripta_audio_during_dictation": "Mute App Audio During Dictation",
+    "mute_openwispr_audio_during_dictation": "Mute App Audio During Dictation",
     # Hotkey
     "enabled": "Enable Global Hotkey",
     "key_combination": "Key Combination",
@@ -178,7 +178,7 @@ SETTING_DESCRIPTIONS: Dict[str, str] = {
     "noiseFiltering": "Reduce background noise",
     "echoCancellation": "Remove echo from speakers",
     "autoGainControl": "Automatically adjust input volume",
-    "mute_transcripta_audio_during_dictation": "Mute OpenWispr renderer audio while microphone dictation is active",
+    "mute_openwispr_audio_during_dictation": "Mute OpenWispr renderer audio while microphone dictation is active",
     # Hotkey
     "enabled": "Activate transcription from anywhere using a hotkey",
     "key_combination": "Press the button to record a new hotkey",

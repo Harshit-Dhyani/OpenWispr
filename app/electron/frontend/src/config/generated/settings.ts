@@ -643,8 +643,8 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     isFake: false,
     isAdvanced: false,
   },
-  mute_transcripta_audio_during_dictation: {
-    name: "mute_transcripta_audio_during_dictation",
+  mute_openwispr_audio_during_dictation: {
+    name: "mute_openwispr_audio_during_dictation",
     category: "audio",
     type: "boolean",
     default: false,

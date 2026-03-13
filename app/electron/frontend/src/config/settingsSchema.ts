@@ -167,7 +167,7 @@ export const audioSettingsSchema = z.object({
   noiseFiltering: z.boolean().default(true),
   echoCancellation: z.boolean().default(true),
   autoGainControl: z.boolean().default(true),
-  mute_transcripta_audio_during_dictation: z.boolean().default(false),
+  mute_openwispr_audio_during_dictation: z.boolean().default(false),
 });
 
 export type AudioSettings = z.infer<typeof audioSettingsSchema>;
@@ -378,7 +378,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
     noiseFiltering: true,
     echoCancellation: true,
     autoGainControl: true,
-    mute_transcripta_audio_during_dictation: false,
+    mute_openwispr_audio_during_dictation: false,
   },
   hotkey: {
     enabled: false,
@@ -586,7 +586,7 @@ export const SETTING_FIELDS_META: SettingFieldMeta[] = [
   { key: 'noiseFiltering', type: 'boolean', label: SETTING_LABELS.noiseFiltering, description: SETTING_DESCRIPTIONS.noiseFiltering, category: 'audio', isFake: true },
   { key: 'echoCancellation', type: 'boolean', label: SETTING_LABELS.echoCancellation, description: SETTING_DESCRIPTIONS.echoCancellation, category: 'audio', isFake: true },
   { key: 'autoGainControl', type: 'boolean', label: SETTING_LABELS.autoGainControl, description: SETTING_DESCRIPTIONS.autoGainControl, category: 'audio', isFake: true },
-  { key: 'mute_transcripta_audio_during_dictation', type: 'boolean', label: 'Mute App Audio During Dictation', description: SETTING_DESCRIPTIONS.mute_transcripta_audio_during_dictation, category: 'audio' },
+  { key: 'mute_openwispr_audio_during_dictation', type: 'boolean', label: 'Mute App Audio During Dictation', description: SETTING_DESCRIPTIONS.mute_openwispr_audio_during_dictation, category: 'audio' },
 
   // Hotkey
   { key: 'enabled', type: 'boolean', label: SETTING_LABELS.enabled, description: SETTING_DESCRIPTIONS.enabled, category: 'hotkey' },

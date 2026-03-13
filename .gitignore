@@ -71,6 +71,13 @@ app/electron/frontend/test-results/
 .transcripta/
 test-results/
 
+# OpenWispr local data
+.openwispr/
+
+# Generated reports
+prompts/REPORTS.md
+scripts/reports/
+
 
 code/
 

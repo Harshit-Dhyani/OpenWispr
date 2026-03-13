@@ -206,7 +206,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default="dictation",
         label="Transcription Mode",
         description="Choose between natural dictation cleanup and literal technical token handling",
-        options=["dictation", "literal"],
+        options=["dictation", "literal", "session_paragraph"],
     ),
     "compute_type": SettingDefinition(
         name="compute_type",
@@ -544,8 +544,8 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         description="Automatically adjust input volume",
         is_fake=True,
     ),
-    "mute_transcripta_audio_during_dictation": SettingDefinition(
-        name="mute_transcripta_audio_during_dictation",
+    "mute_openwispr_audio_during_dictation": SettingDefinition(
+        name="mute_openwispr_audio_during_dictation",
         category="audio",
         type="boolean",
         default=False,
@@ -1141,4 +1141,3 @@ CURRENT_SETTINGS_VERSION = UIConstants.SETTINGS_VERSION
 def get_settings_version() -> int:
     """Get the current settings version."""
     return CURRENT_SETTINGS_VERSION
-

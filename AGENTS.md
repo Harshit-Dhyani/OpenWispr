@@ -210,6 +210,30 @@ Keep this file short enough to stay enforceable. Add only concrete rules that pr
 - Detect earlier: for every WebSocket auth change, test one loopback client, one non-loopback unauthenticated client, and one token-authenticated client against the same connection class.
 - Prevention rule: desktop-local WebSocket fallbacks may skip explicit auth only for verified loopback clients; any non-local access must require a real configured token, never a hardcoded placeholder.
 
+### Settings name drift between backend and frontend
+- What went wrong: the frontend used `mute_transcripta_audio_during_dictation` while backend used `mute_openwispr_audio_during_dictation`, causing setting changes to have no effect.
+- Why it happened: legacy "Transcripta" naming wasn't updated consistently when renamed to "OpenWispr".
+- Detect earlier: run tests/test_settings_wiring.py which validates backend/frontend setting name consistency.
+- Prevention rule: any setting rename must update all layers (backend registry, frontend schema, frontend components, migrations) in the same change; run settings wiring tests before merging.
+
+### Settings options drift between backend and API
+- What went wrong: backend settings definition had `transcription_mode` options ["dictation", "literal"] but API accepted "session_paragraph", creating validation mismatch.
+- Why it happened: settings definition not synchronized with API schema.
+- Detect earlier: compare SettingDefinition.options with Literal types in API route handlers.
+- Prevention rule: backend settings options must match API Literal types exactly; add wiring test to catch drift.
+
+### Package.json main entry mismatch
+- What went wrong: package.json specified main: "app/electron/main/index.js" but actual file was "app/electron/main/main.js", causing startup failure.
+- Why it happened: copy-paste error from template.
+- Detect earlier: electron startup will fail immediately; verify file exists before packaging.
+- Prevention rule: main entry in package.json must point to existing file; validate on build.
+
+### Module size violation
+- What went wrong: app/electron/main/main.js exceeded 1900 lines, violating the 300-500 line module guideline.
+- Why it happened: organic growth without module splitting.
+- Detect earlier: measure module line count during lint.
+- Prevention rule: split modules exceeding 500 lines; use clear subdirectory structure (windows/, tray/, hotkey/, etc.).
+
 ## Required Rules For New Work
 
 - If a UI control is visible, it must change real behavior; remove or hide placebo controls.

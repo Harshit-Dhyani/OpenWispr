@@ -24,6 +24,7 @@ class AudioConstants:
     """Audio processing constants."""
 
     DEFAULT_SAMPLE_RATE = 16000
+    SAMPLE_RATES = [8000, 16000, 22050, 44100, 48000]
     DEFAULT_CHANNELS = 1
     DEFAULT_CHUNK_SECONDS = 1.6
     DEFAULT_OVERLAP_SECONDS = 0.32  # 20% of chunk
@@ -392,6 +393,3 @@ GPU_FALLBACK_KEYWORDS = [
     "no kernel image",
     "nvidia",
 ]
-
-
-

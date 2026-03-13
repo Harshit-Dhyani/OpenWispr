@@ -171,8 +171,8 @@ const migrations: Record<number, (data: unknown) => unknown> = {
         noiseFiltering: (old.audio as Record<string, unknown>)?.noiseFiltering ?? true,
         echoCancellation: (old.audio as Record<string, unknown>)?.echoCancellation ?? true,
         autoGainControl: (old.audio as Record<string, unknown>)?.autoGainControl ?? true,
-        mute_transcripta_audio_during_dictation:
-          (old.audio as Record<string, unknown>)?.mute_transcripta_audio_during_dictation ?? false,
+        mute_openwispr_audio_during_dictation:
+          (old.audio as Record<string, unknown>)?.mute_openwispr_audio_during_dictation ?? false,
       },
       hotkey: {
         enabled: (old.hotkey as Record<string, unknown>)?.enabled ?? false,
@@ -226,8 +226,8 @@ const migrations: Record<number, (data: unknown) => unknown> = {
         noiseFiltering: oldAudio?.noiseFiltering ?? true,
         echoCancellation: oldAudio?.echoCancellation ?? true,
         autoGainControl: oldAudio?.autoGainControl ?? true,
-        mute_transcripta_audio_during_dictation:
-          oldAudio?.mute_transcripta_audio_during_dictation ?? false,
+        mute_openwispr_audio_during_dictation:
+          oldAudio?.mute_openwispr_audio_during_dictation ?? false,
       },
       version: 4,
     };
