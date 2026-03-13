@@ -126,6 +126,9 @@ declare global {
       dismissResult?: () => void;
       platform: string;
       debugEnabled?: boolean;
+      settings?: {
+        showFloatingCoachResult?: boolean;
+      };
       strings?: {
         status?: Record<string, string>;
         waitingForSpeech?: string;

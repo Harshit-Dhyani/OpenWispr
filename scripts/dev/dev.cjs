@@ -1,5 +1,4 @@
 const { spawn } = require("child_process");
-const http = require("http");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
