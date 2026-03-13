@@ -19,6 +19,7 @@ from typing import Any, Literal, Protocol
 import numpy as np
 
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
+from app.core.settings.manager import get_settings_manager
 from app.stt.chunker import AudioChunk
 from app.stt.fast_whisper_backend import FastWhisperBackend, WhisperModel
 from app.stt.model_pool import ModelPool, ModelSlot
@@ -883,7 +884,8 @@ class DualModeTranscriptionEngine:
         self._current_engine.push_audio(chunk.samples, chunk.started_at)
 
         # Process and emit results
-        language = "hi"  # Default to Hindi, can be made configurable
+        settings = get_settings_manager().get_settings()
+        language = getattr(settings.hotkey, "language", "en") or "en"
 
         for result in self._current_engine.process_stream(language=language):
             await self._handle_result(result, chunk)
@@ -929,10 +931,12 @@ class DualModeTranscriptionEngine:
         chunk: AudioChunk | None,
     ) -> TranscriptSegment:
         """Convert partial result to transcript segment."""
+        settings = get_settings_manager().get_settings()
+        language_mode = getattr(settings.hotkey, "language", "en") or "en"
         quality = assess_segment_quality(
             result.text,
             confidence=result.confidence,
-            language_mode="hi",
+            language_mode=language_mode,
             detected_language=result.language,
         )
 

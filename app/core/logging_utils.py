@@ -50,7 +50,7 @@ class JsonFormatter(logging.Formatter):
 
 def configure_logging(log_dir: Path, level: str) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("transcripta")
+    logger = logging.getLogger("openwispr")
     logger.setLevel(level.upper())
     logger.handlers.clear()
 

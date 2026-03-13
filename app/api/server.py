@@ -454,6 +454,7 @@ class HotkeyTranscriptionService:
                         )
                     )
                 if hasattr(session.transcriber, "add_status_callback"):
+
                     def _publish_hotkey_loading_status(message: str) -> None:
                         lowered = (message or "").lower()
                         if "loaded" in lowered:
@@ -2152,7 +2153,7 @@ async def lifespan(_: FastAPI):
         logger.debug("Lifespan startup: initializing service")
         api_deps.service = BackendService(settings)
         api_deps.hotkey_service = HotkeyTranscriptionService(settings)
-        history_db_path = Path.cwd() / ".transcripta" / "history.db"
+        history_db_path = Path.cwd() / ".openwispr" / "history.db"
         api_deps.history_db = HistoryDatabase(history_db_path)
         api_deps.dictionary_service = DictionaryService(api_deps.history_db)
         api_deps.snippet_service = SnippetService(api_deps.history_db)
@@ -3157,9 +3158,3 @@ async def stop_health_broadcast():
         _ws_manager = None
 
     _settings_sync = None
-
-
-
-
-
-

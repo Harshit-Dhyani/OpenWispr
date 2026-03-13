@@ -128,7 +128,7 @@ class HotkeySessionConfig:
 
     def __post_init__(self):
         if self.output_dir is None:
-            self.output_dir = Path.home() / ".transcripta" / "hotkey_sessions"
+            self.output_dir = Path.home() / ".openwispr" / "hotkey_sessions"
 
 
 class TextInjector(Protocol):

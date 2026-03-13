@@ -239,8 +239,8 @@ class AudioSettings:
     noiseFiltering: bool = field(default_factory=lambda: get_setting("noiseFiltering").default)
     echoCancellation: bool = field(default_factory=lambda: get_setting("echoCancellation").default)
     autoGainControl: bool = field(default_factory=lambda: get_setting("autoGainControl").default)
-    mute_transcripta_audio_during_dictation: bool = field(
-        default_factory=lambda: get_setting("mute_transcripta_audio_during_dictation").default
+    mute_openwispr_audio_during_dictation: bool = field(
+        default_factory=lambda: get_setting("mute_openwispr_audio_during_dictation").default
     )
 
 
@@ -976,5 +976,3 @@ def reset_settings_manager() -> None:
     global _settings_manager
     with _settings_lock:
         _settings_manager = None
-
-

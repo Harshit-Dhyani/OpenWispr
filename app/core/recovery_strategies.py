@@ -486,7 +486,7 @@ class ModelDownloadStrategy(RecoveryStrategy):
 
     def __init__(self, model_cache_dir: Optional[Path] = None):
         super().__init__("model_auto_download", priority=10)
-        self.model_cache_dir = model_cache_dir or Path.home() / ".transcripta" / "models"
+        self.model_cache_dir = model_cache_dir or Path.home() / ".openwispr" / "models"
         self._download_progress: dict[str, float] = {}
 
     def can_handle(self, error: OpenWisprError) -> bool:
@@ -757,8 +757,8 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
 
         # Check temp directories
         temp_paths = [
-            Path.home() / ".transcripta" / "temp",
-            Path.home() / ".transcripta" / "cache",
+            Path.home() / ".openwispr" / "temp",
+            Path.home() / ".openwispr" / "cache",
             Path("/tmp") if not hasattr(Path, "is_dir") or Path("/tmp").exists() else None,
         ]
 
