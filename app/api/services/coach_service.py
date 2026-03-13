@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from app.api.coach_cache import CoachCache
 from app.config.coach_prompts import (
@@ -150,7 +150,9 @@ class CoachService:
                 stop=["```", "\n\nOriginal transcript:"],
             )
             candidate = (
-                response.get("choices", [{}])[0].get("text", "") if isinstance(response, dict) else ""
+                response.get("choices", [{}])[0].get("text", "")
+                if isinstance(response, dict)
+                else ""
             )
             result = self._parse_candidate(
                 candidate,
@@ -213,8 +215,12 @@ class CoachService:
             cleaned = cleaned.strip("`").strip()
             if cleaned.lower().startswith("json"):
                 cleaned = cleaned[4:].strip()
-        payload = json.loads(cleaned)
-        result = CoachResult.model_validate(payload)
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse coach response as JSON: {e}")
+            return None
+        result = CoachResult.model_validate(parsed)
         if not result.original.strip():
             result.original = original
         if not result.polished.strip():

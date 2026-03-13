@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import logging
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable
-
-import logging
-import time
+from typing import Any
 
 from app.api.services.model_service import ModelService
 from app.api.services.refinement_queue import RefinementQueue
 from app.api.services.streaming_metrics import StreamingMetrics
 from app.audio.capture import LoopbackAudioSource
-from app.core.settings.config import AppSettings
 from app.core.language_profiles import available_language_codes
 from app.core.model_catalog import MODEL_CATALOG, get_model_catalog_entry, runtime_name_for_model
 from app.core.models import (
@@ -24,6 +23,7 @@ from app.core.models import (
     TranscriptSegment,
 )
 from app.core.session_manager import SessionManager
+from app.core.settings.config import AppSettings
 from app.core.settings.manager import get_settings_manager
 from app.stt.stability import PartialStabilizer, build_stream_payload
 
@@ -128,7 +128,13 @@ class BackendService:
                     and entry.runtime_model_name
                 ],
                 available_languages=available_language_codes(),
-                available_live_modes=["ultra", "realtime", "low_latency", "balanced", "high_accuracy"],
+                available_live_modes=[
+                    "ultra",
+                    "realtime",
+                    "low_latency",
+                    "balanced",
+                    "high_accuracy",
+                ],
                 available_execution_modes=["auto", "gpu_only", "cpu_only"],
                 runtime_revision=self._revision,
                 loading=self._loading,
@@ -205,7 +211,6 @@ class BackendService:
         self._preload_cancelled.clear()
 
         def _load():
-            import time
 
             def emit_progress(progress: float, message: str, stage: str):
                 self._publish_event(
@@ -251,24 +256,14 @@ class BackendService:
                         compute_type = "int8"
                         gpu_mode = "cpu/int8"
 
-                # Phase 1: Downloading (0-30%)
-                emit_progress(0.0, f"Preparing {runtime_model_name} model...", "downloading")
-                for i in range(5):
-                    if self._preload_cancelled.is_set():
-                        return
-                    time.sleep(0.4)
-                    progress = 0.05 * (i + 1)
-                    emit_progress(
-                        progress, f"Preparing {runtime_model_name} model...", "downloading"
-                    )
+                # Phase 1: Preparing model
+                emit_progress(0.0, f"Preparing {runtime_model_name} model...", "preparing")
 
                 if self._preload_cancelled.is_set():
                     return
 
-                emit_progress(0.30, f"Loading {runtime_model_name} into memory...", "loading")
-
-                # Phase 2: Loading (30-70%)
-                # Start model loading in background while emitting progress
+                # Phase 2: Loading model into memory
+                # Start model loading in background
                 model_future = None
                 executor = None
                 try:
@@ -306,17 +301,7 @@ class BackendService:
 
                     model_future = executor.submit(load_model_with_retry)
 
-                    # Emit progress while loading
-                    for i in range(8):
-                        if self._preload_cancelled.is_set():
-                            executor.shutdown(wait=False)
-                            return
-                        time.sleep(0.3)
-                        progress = 0.30 + 0.05 * (i + 1)
-                        emit_progress(
-                            progress, f"Loading {runtime_model_name} into memory...", "loading"
-                        )
-
+                    # Wait for model to load (real progress happens in background thread)
                     model = model_future.result(timeout=30)
                 except Exception as load_exc:
                     emit_progress(0.0, f"Failed to load {runtime_model_name}: {load_exc}", "error")
@@ -329,21 +314,17 @@ class BackendService:
                     del model
                     return
 
-                # Phase 3: Warming (70-100%)
-                emit_progress(0.70, "Warming up model...", "warming")
+                # Phase 3: Warming up model
+                emit_progress(0.8, "Warming up model...", "warming")
 
-                # Warm-up with progress
                 import numpy as np
 
                 dummy_audio = np.zeros(16000, dtype=np.float32)
 
-                for i in range(5):
-                    if self._preload_cancelled.is_set():
-                        del model
-                        return
-                    time.sleep(0.2)
-                    progress = 0.70 + 0.06 * (i + 1)
-                    emit_progress(progress, "Warming up model...", "warming")
+                # Run warmup transcription
+                if self._preload_cancelled.is_set():
+                    del model
+                    return
 
                 segments, _ = model.transcribe(dummy_audio, language="en", beam_size=1)
                 list(segments)
@@ -544,7 +525,9 @@ class BackendService:
                 session_id=session_id,
                 segment=serialized,
                 refinement_mode=user_settings.transcription.refinement_mode,
-                refinement_profile=getattr(user_settings.transcription, "refinement_profile", "raw"),
+                refinement_profile=getattr(
+                    user_settings.transcription, "refinement_profile", "raw"
+                ),
                 model_id=user_settings.refiner.selected_model_id,
                 runtime_enabled=user_settings.refiner.runtime_enabled,
                 language_hint=serialized["language"] or "auto",
@@ -670,7 +653,3 @@ def serialize_session(state: SessionState) -> dict[str, Any]:
     payload["needs_review"] = [serialize_segment(segment) for segment in state.needs_review]
     payload["health"] = serialize_health(state.health)
     return payload
-
-
-
-

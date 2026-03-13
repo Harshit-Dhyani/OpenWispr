@@ -152,19 +152,33 @@ class TranscriptHistoryService:
             raise RuntimeError("failed to persist transcript session")
         return session
 
-    def ingest_hotkey_result(self, result: Any, *, settings_snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    def ingest_hotkey_result(
+        self, result: Any, *, settings_snapshot: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         session_id = getattr(result, "session_id", None) or ""
-        composed_text = getattr(result, "composed_text", None) or getattr(result, "final_transcription", "")
+        composed_text = getattr(result, "composed_text", None) or getattr(
+            result, "final_transcription", ""
+        )
         active_text = getattr(result, "paste_text", None) or composed_text or ""
         coach_result = getattr(result, "coach_result", None)
         if isinstance(coach_result, dict):
             coach_polished = coach_result.get("polished")
         else:
             coach_polished = getattr(coach_result, "polished", None)
+
+        # Get capture_source from settings snapshot, defaulting to microphone
+        capture_source = "microphone"
+        if settings_snapshot:
+            capture_source = settings_snapshot.get("hotkey", {}).get("capture_source", "microphone")
+            if capture_source not in ("microphone", "system"):
+                capture_source = settings_snapshot.get("audio", {}).get(
+                    "default_capture_source", "microphone"
+                )
+
         payload = {
             "session_id": session_id,
             "source_workflow": "dictation",
-            "capture_source": "microphone",
+            "capture_source": capture_source,
             "title": "Dictation",
             "transcription_mode": getattr(result, "transcription_mode", "dictation"),
             "started_at": _utc_now_iso(),
@@ -176,7 +190,8 @@ class TranscriptHistoryService:
             "device_id": None,
             "status": "completed",
             "raw_text": getattr(result, "raw_transcription", None) or composed_text,
-            "aggregated_clean_text": getattr(result, "aggregated_clean_text", None) or composed_text,
+            "aggregated_clean_text": getattr(result, "aggregated_clean_text", None)
+            or composed_text,
             "postprocessed_text": getattr(result, "postprocessed_text", None) or composed_text,
             "coach_polished_text": coach_polished,
             "active_text": active_text,
@@ -298,7 +313,9 @@ class TranscriptHistoryService:
         return payload
 
     def analytics(self, *, range_days: int | None = None, tz: str = "UTC") -> dict[str, Any]:
-        sessions = self.list_sessions(range_days=range_days, include_deleted=False, limit=5000, offset=0)
+        sessions = self.list_sessions(
+            range_days=range_days, include_deleted=False, limit=5000, offset=0
+        )
         if not sessions:
             return {
                 "range_days": range_days or "all",
@@ -339,10 +356,7 @@ class TranscriptHistoryService:
             {"day": day, "count": count}
             for day, count in sorted(day_counter.items(), key=lambda item: item[0])
         ]
-        hourly = [
-            {"hour": hour, "count": hour_counter.get(hour, 0)}
-            for hour in range(24)
-        ]
+        hourly = [{"hour": hour, "count": hour_counter.get(hour, 0)} for hour in range(24)]
 
         return {
             "range_days": range_days or "all",

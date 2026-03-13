@@ -8,7 +8,6 @@ from typing import Any
 
 from app.storage.history_db import HistoryDatabase
 
-
 STYLE_CONTEXTS = ("personal", "work", "email", "other")
 
 
