@@ -1,7 +1,7 @@
 ---
 title: Electron-Backend Contract
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/electron/main/preload/main.js
   - app/api/websocket_server.py
@@ -31,7 +31,7 @@ This document defines the contract between the Electron main process and the Pyt
 **Returns**: `string | null` - Selected directory path or null if cancelled
 
 ```javascript
-const path = await window.transcriptaDesktop.chooseDirectory();
+const path = await window.openwisprDesktop.chooseDirectory();
 ```
 
 #### `choose-pdf`
@@ -39,7 +39,7 @@ const path = await window.transcriptaDesktop.chooseDirectory();
 **Returns**: `string | null` - Selected PDF file path or null if cancelled
 
 ```javascript
-const path = await window.transcriptaDesktop.choosePdf();
+const path = await window.openwisprDesktop.choosePdf();
 ```
 
 ### Hotkey Control
@@ -52,7 +52,7 @@ const path = await window.transcriptaDesktop.choosePdf();
 Valid accelerators: `CommandOrControl+Shift+T`, `Alt+Space`, `F12`, etc.
 
 ```javascript
-const result = await window.transcriptaDesktop.hotkey.register("CommandOrControl+Shift+T");
+const result = await window.openwisprDesktop.hotkey.register("CommandOrControl+Shift+T");
 ```
 
 #### `hotkey:unregister`
@@ -134,7 +134,7 @@ Config properties:
 **Returns**: `{ success: boolean, error?: string, method?: string }`
 
 ```javascript
-const result = await window.transcriptaDesktop.text.inject("Hello world");
+const result = await window.openwisprDesktop.text.inject("Hello world");
 ```
 
 ### Tray
@@ -170,7 +170,7 @@ const result = await window.transcriptaDesktop.text.inject("Hello world");
 **Payload**: `{ event: string, payload: any }`
 
 ```javascript
-const unsubscribe = window.transcriptaDesktop.models.onDownloadEvent((data) => {
+const unsubscribe = window.openwisprDesktop.models.onDownloadEvent((data) => {
   console.log(data.event, data.payload);
 });
 ```
@@ -186,7 +186,7 @@ const unsubscribe = window.transcriptaDesktop.models.onDownloadEvent((data) => {
 
 ### Quick Settings
 
-**Note**: Quick Settings APIs are exposed via a separate preload script (`preload-quick-settings.js`) under `window.transcriptaQuickSettings`, not `window.transcriptaDesktop`.
+**Note**: Quick Settings APIs are exposed via a separate preload script (`preload-quick-settings.js`) under `window.transcriptaQuickSettings`, not `window.openwisprDesktop`.
 
 #### `quick-settings:get-data`
 **Direction**: Renderer → Main (invoke)  
@@ -241,7 +241,7 @@ await window.transcriptaQuickSettings.close();
 Called when Python backend process exits unexpectedly.
 
 ```javascript
-const unsubscribe = window.transcriptaDesktop.onBackendExit((event) => {
+const unsubscribe = window.openwisprDesktop.onBackendExit((event) => {
   console.log("Backend exited");
 });
 ```
@@ -251,7 +251,7 @@ const unsubscribe = window.transcriptaDesktop.onBackendExit((event) => {
 Triggered by global shortcut (Ctrl+,) or tray menu.
 
 ```javascript
-const unsubscribe = window.transcriptaDesktop.onOpenSettings((event) => {
+const unsubscribe = window.openwisprDesktop.onOpenSettings((event) => {
   // Navigate to settings page
 });
 ```

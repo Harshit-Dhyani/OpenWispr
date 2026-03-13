@@ -1,7 +1,7 @@
 ---
 title: Model Runtime and Routing
 audience: developers
-last_verified: 2026-03-05
+last_verified: 2026-03-08
 source_of_truth:
   - app/core/model_catalog.py
   - app/api/model_service.py

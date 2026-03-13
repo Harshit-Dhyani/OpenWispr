@@ -1,7 +1,7 @@
 ---
 title: Operations Guide
 audience: operators
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/api/server.py
   - app/api/routes/system.py
@@ -23,6 +23,17 @@ Production operations guide for running and maintaining the OpenWispr desktop tr
 5. [Backup and Recovery](#5-backup-and-recovery)
 6. [Health Check Endpoints](#6-health-check-endpoints)
 7. [Emergency Procedures](#7-emergency-procedures)
+
+---
+
+## Legacy Naming Note
+
+> **Note:** The codebase currently uses legacy naming in some places:
+> - Data directory: `.transcripta` (instead of `.openwispr`)
+> - Environment variables: `TRANSCRIPTA_*` prefix
+> - Logger name: `transcripta`
+> 
+> This is a known migration issue. Future releases will align to `OpenWispr` naming. Currently, operations should use the `.transcripta` path for data storage.
 
 ---
 
@@ -114,7 +125,6 @@ Get-Process | Where-Object {$_.ProcessName -in @("python","electron","OpenWispr"
 |----------|-------------|
 | `sessions/<session-slug>/logs/app.log` | Per-session structured logs (JSON Lines format) |
 | `sessions/<session-slug>/logs/app.log.1` ... `app.log.5` | Rotated log files (1MB per file, 5 backups) |
-| `~/.transcripta/app.log` | Legacy global log location |
 | Console | Real-time backend API output |
 
 Log rotation is configured in `app/core/logging_utils.py`:
@@ -445,8 +455,8 @@ Settings are stored in `user_settings.json`:
 
 | Location | Description |
 |----------|-------------|
-| `%APPDATA%/OpenWispr/settings.json` | Windows app data directory |
-| `user_settings.json` | Application root directory (fallback) |
+| `user_settings.json` | Application root directory (default) |
+| `<custom>/user_settings.json` | Custom settings directory (if specified) |
 
 ### Session Storage Paths
 

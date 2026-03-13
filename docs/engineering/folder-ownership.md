@@ -2,13 +2,18 @@
 title: Folder Ownership
 owner: docs/ux
 audience: developers
-last_verified: 2026-03-07
+last_verified: 2026-03-08
 review_cadence: quarterly
 source_of_truth:
   - app/
   - docs/
 critical: false
 ---
+
+**⚠️ DEPRECATED:** This document duplicates content from `docs/project/folder-ownership.md`. 
+The authoritative version is now maintained there. This file will be removed in a future release.
+
+**Please use:** [Folder Ownership](../project/folder-ownership.md)
 
 # Folder Ownership
 

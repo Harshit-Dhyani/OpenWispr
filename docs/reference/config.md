@@ -1,7 +1,7 @@
 ---
 title: Configuration Reference
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/core/settings_manager.py
   - app/config/settings.py
@@ -31,14 +31,14 @@ Complete reference for all OpenWispr configuration options, including environmen
 <!-- GENERATED: settings-schema -->
 ## General Settings
 
-General application settings.
+General settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `defaultSessionTitle` | string | 'New Session' | |
 | `defaultLanguage` | string | 'auto' | |
 | `exportDirectory` | string | '' | |
-| `autoSaveInterval` | integer | 30 | |
+| `autoSaveInterval` | number | 30 | |
 | `showNotifications` | boolean | True | |
 | `minimizeToTray` | boolean | True | |
 | `startupWithSystem` | boolean | False | |
@@ -46,7 +46,7 @@ General application settings.
 
 ## Transcription Settings
 
-Transcription-related settings.
+Transcription settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -55,31 +55,31 @@ Transcription-related settings.
 | `microphone_asr_model_id` | string | 'whisper-medium' | |
 | `system_asr_model_id` | string | 'whisper-medium' | |
 | `refinement_mode` | string | 'off' | |
-| `refinement_profile` | string | 'raw' | |
+| `refinement_profile` | string | 'clean_dictation' | |
 | `transcription_mode` | string | 'dictation' | |
 | `compute_type` | string | 'float16' | |
-| `chunk_duration` | float | 1.6 | |
-| `overlap_ratio` | float | 0.2 | |
+| `chunk_duration` | number | 1.6 | |
+| `overlap_ratio` | number | 0.2 | |
 | `vad_enabled` | boolean | True | |
-| `vad_threshold_db` | float | -40.0 | |
-| `vad_min_silence_ms` | integer | 200 | |
-| `vad_speech_pad_ms` | integer | 200 | |
-| `confidence_threshold` | float | 0.6 | |
+| `vad_threshold_db` | number | -40.0 | |
+| `vad_min_silence_ms` | number | 200 | |
+| `vad_speech_pad_ms` | number | 200 | |
+| `confidence_threshold` | number | 0.6 | |
 | `enable_filler_filter` | boolean | True | |
 | `enable_hallucination_filter` | boolean | True | |
-| `min_segment_length` | float | 0.5 | |
-| `max_workers` | integer | 4 | |
+| `min_segment_length` | number | 0.5 | |
+| `max_workers` | number | 4 | |
 | `use_parallel_processing` | boolean | True | |
 | `preload_model` | boolean | True | |
 | `hotkey_optimized` | boolean | False | |
-| `beam_size` | integer | 5 | |
-| `best_of` | integer | 5 | |
-| `patience` | float | 1.0 | |
-| `temperature` | float | 0.0 | |
+| `beam_size` | number | 5 | |
+| `best_of` | number | 5 | |
+| `patience` | number | 1.0 | |
+| `temperature` | number | 0.0 | |
 
 ## Audio Settings
 
-Audio capture settings.
+Audio settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -88,16 +88,17 @@ Audio capture settings.
 | `defaultDeviceId` | string | 'default' | |
 | `backend` | string | 'auto' | |
 | `audio_backend` | string | 'auto' | |
-| `sampleRate` | integer | 16000 | |
+| `sampleRate` | string | 16000 | |
 | `vadEnabled` | boolean | True | |
-| `vadThresholdDb` | float | -40.0 | |
+| `vadThresholdDb` | number | -40.0 | |
 | `noiseFiltering` | boolean | True | |
 | `echoCancellation` | boolean | True | |
 | `autoGainControl` | boolean | True | |
+| `mute_openwispr_audio_during_dictation` | boolean | False | |
 
 ## Refiner Settings
 
-LLM refiner settings.
+Refiner settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -108,7 +109,7 @@ LLM refiner settings.
 
 ## Hotkey Settings
 
-Global hotkey settings.
+Hotkey settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -132,7 +133,7 @@ Global hotkey settings.
 
 ## Coach Settings
 
-English Coach settings.
+Coach settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -145,10 +146,10 @@ English Coach settings.
 | `coach_template_id_system` | string | 'default_english_coach' | |
 | `coach_prompt_custom_enabled` | boolean | False | |
 | `coach_prompt_custom_text` | string | '' | |
-| `coach_overrides` | CoachPromptOverrides | '<computed>' | |
+| `coach_overrides` | object | *computed* | |
 | `privacy_mode` | string | 'local_only' | |
 | `show_floating_coach_result` | boolean | True | |
-| `coach_prompt_templates` | array | '<computed>' | |
+| `coach_prompt_templates` | array | *computed* | |
 
 ## Advanced Settings
 
@@ -159,9 +160,46 @@ Advanced settings.
 | `debugMode` | boolean | False | |
 | `logLevel` | string | 'INFO' | |
 | `enableMetrics` | boolean | True | |
-| `maxLogFiles` | integer | 10 | |
+| `maxLogFiles` | number | 10 | |
 | `experimentalStem` | boolean | False | |
 | `experimentalGpuAccel` | boolean | True | |
+
+## history Settings
+
+History settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retention_days` | number | 30 | |
+| `persist_audio` | boolean | True | |
+| `allow_retry` | boolean | True | |
+| `default_analytics_range_days` | string | 7 | |
+
+## dictionary Settings
+
+Dictionary settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `dictionary_enabled` | boolean | True | |
+
+## snippets Settings
+
+Snippets settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `snippets_enabled` | boolean | True | |
+| `snippets_quick_insert` | boolean | False | |
+
+## style Settings
+
+Style settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `style_default_profile` | string | '' | |
+| `style_apply_enabled` | boolean | True | |
 <!-- END GENERATED -->
 
 ---
@@ -856,6 +894,63 @@ Settings are automatically migrated when the app starts. Current version: **5**
 | 3 | Added hotkey settings, moved VAD settings to transcription category |
 | 4 | Renamed `backend` to `audio_backend`, removed duplicate VAD from audio |
 | 5 | Added `coach` category with English Coach settings and prompt templates |
+
+---
+
+## Known Issues and Bugs
+
+> **Audit Date: 2026-03-08** - This section documents known mismatches between documented defaults and actual runtime behavior.
+
+### Critical Issues
+
+| Issue | Description | Impact |
+|-------|-------------|--------|
+| Duplicate backend | Both `backend` and `audio_backend` in AudioSettings | Confusion, potential runtime mismatch |
+| Deprecated VAD in audio | `vadEnabled`, `vadThresholdDb` in AudioSettings (lines 499-518) | Dead settings exposed in UI |
+
+### Default Mismatches
+
+| Setting | Documented Default | Actual Default | Location |
+|---------|-------------------|-----------------|----------|
+| `refinement_profile` | `clean_dictation` | `raw` (post-migration) | `app/config/settings.py` |
+| `style_default_profile` | `''` (empty) | Computed default | `app/config/settings.py:888` |
+
+### Performance-Affecting Settings
+
+The following settings have significant performance impact. **Recommended values for different use cases:**
+
+#### For Low RAM Usage (saves ~3-4GB)
+
+| Setting | Default | Recommended | Impact |
+|---------|---------|--------------|--------|
+| `model_name` | `medium` | `small` | ~3GB RAM savings |
+| `preload_model` | `true` | `false` | Frees RAM when idle |
+| `compute_type` | `float16` | `int8` | ~40% faster on CPU |
+
+#### For Fastest Response (low latency)
+
+| Setting | Default | Recommended | Impact |
+|---------|---------|--------------|--------|
+| `chunk_duration` | `1.6` | `0.5` | ~3x faster response |
+| `compute_type` | `float16` | `int8` | ~40% faster |
+| `model_name` | `medium` | `tiny` | ~10x faster |
+| `beam_size` | `5` | `1` | Faster decoding |
+| `best_of` | `5` | `1` | Faster decoding |
+
+#### Model Cleanup (Memory Management)
+
+| Setting | Default | Recommended | Location |
+|---------|---------|--------------|----------|
+| `MODEL_TTL_SECONDS` | `1800` (30 min) | `300` (5 min) | `app/config/constants.py` |
+
+> **Note:** The TTL setting controls how long unused models stay loaded in memory. Lower values free RAM faster but may cause reload delays on next use.
+
+### Fake/Non-Functional Settings
+
+The following settings appear in the UI but have no runtime effect:
+
+- Settings marked with `is_fake: true` in the registry
+- Deprecated audio VAD settings (`vadEnabled`, `vadThresholdDb` in audio category)
 
 ---
 

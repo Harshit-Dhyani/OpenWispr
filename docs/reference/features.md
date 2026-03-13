@@ -1,7 +1,7 @@
 ---
 title: Features Documentation
 audience: all
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/audio/capture.py
   - app/api/service.py

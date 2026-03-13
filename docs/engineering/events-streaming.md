@@ -1,7 +1,7 @@
 ---
 title: Events and Streaming
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/api/websocket_server.py
   - app/electron/frontend/src/hooks/useEventSource.ts

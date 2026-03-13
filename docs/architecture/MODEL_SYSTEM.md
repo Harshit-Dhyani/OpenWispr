@@ -1,12 +1,17 @@
 ---
 title: Model System Architecture
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/core/model_catalog.py
   - app/api/model_service.py
   - app/audio/transcription.py
 ---
+
+> **⚠️ DEPRECATED:** This document duplicates content from `docs/engineering/model-runtime.md`. 
+> The content here is now maintained there. This file is kept for backwards compatibility but will be removed in a future release.
+> 
+> **Please use:** [Model Runtime and Routing](../engineering/model-runtime.md)
 
 # Model System
 

@@ -1,7 +1,7 @@
 ---
 title: Testing Guide
 audience: developers
-last_verified: 2026-03-04  # Verified by Sub-Agent 16
+last_verified: 2026-03-08  # Verified by Sub-Agent 16
 source_of_truth:
   - tests/conftest.py
   - tests/unit/

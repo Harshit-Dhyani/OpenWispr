@@ -1,12 +1,17 @@
 # OpenWispr
 
+> ⚠️ **Work in Progress** - This is an active development project. Not all features are implemented, there are known bugs, and the API may change.
+>
+> **Last Updated:** March 13, 2026
+
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
 [![Windows 11](https://img.shields.io/badge/windows-11-0078D6.svg)](https://www.microsoft.com/windows/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **Privacy-first, local desktop transcription for Windows 11**
 
-> **Last Updated:** March 5, 2026
+---
 
 OpenWispr is a production-grade desktop application for real-time speech-to-text transcription. It runs entirely on your local machine with no cloud dependencies, keeping your audio and transcripts private.
 
@@ -147,14 +152,33 @@ OpenWispr is a production-grade desktop application for real-time speech-to-text
 - **Extensive logging** - JSON-structured logs per session
 - **100+ tests** - Unit, integration, and E2E coverage
 
+---
+
+## Known Issues
+
+This project is under active development. Before using, please note:
+
+- **Known Bugs**: There are 150+ documented bugs in `reports/`
+- **Missing Features**: Some settings are marked as "Coming Soon"
+- **API Changes**: Settings and interfaces may change
+- **Not Production Ready**: Do not use for critical transcription jobs
+
+See [reports/](reports/) for detailed audit findings.
+
+---
+
 ## System Requirements
 
-- **OS**: Windows 11
-- **Python**: 3.11+
-- **Node.js**: 20.x+ (for development)
-- **GPU**: NVIDIA with 2GB+ VRAM (recommended) or CPU
-- **RAM**: 8GB minimum, 16GB recommended
-- **Storage**: 2GB for app + model space
+| Component | Requirement |
+|-----------|-------------|
+| OS | Windows 11 |
+| Python | 3.11+ |
+| Node.js | 20.x+ (for development) |
+| GPU | NVIDIA with 2GB+ VRAM (recommended) or CPU |
+| RAM | 8GB minimum, 16GB recommended |
+| Storage | 2GB for app + model space |
+
+---
 
 ## Quick Start
 

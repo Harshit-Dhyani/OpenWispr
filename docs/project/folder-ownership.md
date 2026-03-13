@@ -2,7 +2,7 @@
 title: Folder Ownership (Working Guide)
 owner: docs/ux
 audience: developers
-last_verified: 2026-03-07
+last_verified: 2026-03-08
 review_cadence: quarterly
 critical: false
 source_of_truth:

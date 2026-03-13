@@ -1,7 +1,7 @@
 ---
 title: Deployment Guide
 audience: operators
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - tools/setup/
   - package.json
@@ -48,8 +48,8 @@ nvidia-smi
 
 ```powershell
 # Clone the repository
-git clone <repository-url> transcripta
-cd transcripta
+git clone <repository-url> OpenWispr
+cd OpenWispr
 
 # Create Python virtual environment
 python -m venv .venv
@@ -431,7 +431,7 @@ The root `package.json` controls packaging:
 ```json
 {
   "build": {
-    "appId": "com.transcripta.desktop",
+    "appId": "com.openwispr.desktop",
     "productName": "OpenWispr",
     "directories": {
       "output": "release"

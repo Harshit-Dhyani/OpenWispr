@@ -1,7 +1,7 @@
 ---
 title: Contributing to Documentation
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - docs/_style.md
   - tools/ci/verify-docs.py
@@ -35,7 +35,7 @@ Every documentation file must include YAML frontmatter at the top:
 ---
 title: "Document Title"
 audience: developers|operators|security|all
-last_verified: "2026-03-04"
+last_verified: "2026-03-08"
 source_of_truth:
   - path/to/file.py
   - path/to/other.py:10-50
@@ -163,7 +163,7 @@ When adding to `docs/_inventory.yml`:
   title: Human Readable Title
   owner: docs/ux
   audience: developers|operators|security|all
-  last_verified: 2026-03-04
+  last_verified: 2026-03-08
   review_cadence: monthly|quarterly
   source_of_truth:
     - path/to/source.py

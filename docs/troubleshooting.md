@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting Guide
 audience: operators
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/core/error_handler.py
   - app/core/recovery_strategies.py
@@ -28,6 +28,165 @@ Get-Content sessions\<session>\logs\app.log -Tail 30
 # Check GPU
 nvidia-smi
 ```
+
+---
+
+## Performance Optimization Issues
+
+### High Memory Usage (5GB+)
+
+**Symptom:** Application uses excessive RAM, system becomes sluggish.
+
+**Causes:**
+- Default model size too large (medium)
+- Compute type set to float16 instead of int8
+- Model cache TTL too long (30 minutes)
+- Chunk size too large (1.6 seconds)
+
+**Fix:**
+```powershell
+# 1. Use smaller model
+$env:TRANSCRIPTA_DEFAULT_MODEL="small"
+
+# 2. Use int8 compute type
+$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+
+# 3. Reduce chunk size
+$env:TRANSCRIPTA_CHUNK_SECONDS="0.5"
+
+# 4. Or apply Speed Monster preset (see docs/engineering/performance.md)
+```
+
+**Files to modify for permanent fix:**
+- `app/config/constants.py` lines 70-71, 28
+- `app/stt/model_pool.py` line 179
+
+**Verify:**
+```powershell
+# Check memory usage
+(Invoke-RestMethod http://127.0.0.1:8765/api/health).health.memory_mb
+
+# Should be 1-2GB instead of 5GB+
+```
+
+---
+
+### High Latency (500-2000ms)
+
+**Symptom:** Slow transcription, noticeable delay between speech and text.
+
+**Causes:**
+- Default chunk size too large (1.6 seconds)
+- Model TTL too long (30 minutes) causing cache bloat
+- StreamingConfig not optimized for low latency
+- Beam size too large
+
+**Fix:**
+```powershell
+# 1. Reduce chunk duration
+$env:TRANSCRIPTA_CHUNK_SECONDS="0.5"
+
+# 2. Use smaller model for speed
+$env:TRANSCRIPTA_DEFAULT_MODEL="small"
+
+# 3. Use int8 for faster inference
+$env:TRANSCRIPTA_COMPUTE_TYPE="int8"
+
+# 4. Clear model cache
+Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
+```
+
+**Files to modify for permanent fix:**
+- `app/config/constants.py` - DEFAULT_CHUNK_SECONDS
+- `app/stt/streaming_engine.py` - WISPR mode StreamingConfig
+
+**Verify:**
+```powershell
+# Check latency
+$health = Invoke-RestMethod http://127.0.0.1:
+$health.health8765/api/health.avg_inter_word_latency_ms
+
+# Should be 300-800ms instead of 500-2000ms
+```
+
+---
+
+## Settings Bugs Found
+
+### Settings Ownership Drift
+
+**Symptom:** Frontend settings defaults don't match backend settings.
+
+**Causes:**
+- Frontend schema/defaults maintained separately from `app/config/settings.py`
+- Generated outputs not synchronized
+
+**Fix:**
+```powershell
+# Always use backend settings as source of truth
+# Compare: backend registry, generated frontend settings, and renderer consumers
+
+# Check current settings
+Invoke-RestMethod http://127.0.0.1:8765/api/settings
+```
+
+**Prevention:** Backend registry is authoritative; frontend settings schema/defaults must be generated from it.
+
+---
+
+### Model Install State Mismatch
+
+**Symptom:** Models UI shows `completed` downloads but marks same model as `Not Installed`.
+
+**Causes:**
+- Electron wrote model files under roaming app-data models directory
+- Backend install-state checks defaulted to separate repo-local `./models` path
+
+**Fix:**
+```powershell
+# Ensure backend and Electron share one canonical models root
+# Check download target path matches /api/models/catalog install paths
+Invoke-RestMethod http://127.0.0.1:8765/api/models/catalog
+
+# Compare against Electron user-data path
+```
+
+**Prevention:** Backend model install-state, runtime loading, and Electron download management must share one canonical models root.
+
+---
+
+### Typecheck Wrapper False Green
+
+**Symptom:** Root `typecheck` passes but package-level validation is missing.
+
+**Causes:**
+- Wrapper script allows echo/fallback behavior instead of enforcing real validation
+
+**Fix:**
+```powershell
+# Run package-level typecheck directly
+cd app/electron && npm run typecheck
+```
+
+**Prevention:** Never ship required validation wrappers that silently downgrade to fallback behavior.
+
+---
+
+### Icon Asset Transparent Margin Regression
+
+**Symptom:** Windows taskbar icon appears smaller than other desktop apps.
+
+**Causes:**
+- Brand asset generator preserved transparent margins from source art
+- Thumbnail-style resize never upscaled trimmed artwork
+
+**Fix:**
+```powershell
+# Rebuild icons with trimmed margins
+npm run build:icons
+```
+
+**Prevention:** Packaging icons must trim transparent outer margins before resizing.
 
 ---
 

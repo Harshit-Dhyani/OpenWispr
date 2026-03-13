@@ -10,7 +10,7 @@ Every documentation file must include this YAML frontmatter at the top:
 ---
 title: "Document Title"
 audience: developers|operators|security|all
-last_verified: "2026-03-04"
+last_verified: "2026-03-08"
 source_of_truth:
   - path/to/file.py
   - path/to/other.py:10-50

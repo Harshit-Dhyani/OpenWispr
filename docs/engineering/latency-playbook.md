@@ -1,7 +1,7 @@
 ---
 title: Latency Playbook
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/api/routes/session.py
   - app/api/routes/system.py

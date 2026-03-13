@@ -3,14 +3,14 @@
 # Each entry includes ownership, audience, verification status, and source of truth.
 
 schema_version: 1
-last_updated: 2026-03-07
+last_updated: 2026-03-08
 
 docs:
   - path: README.md
     title: Documentation Home
     owner: docs/ux
     audience: all
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - docs/
@@ -21,7 +21,7 @@ docs:
     title: Troubleshooting Guide
     owner: docs/ux
     audience: operators
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/recovery_strategies.py
@@ -35,7 +35,7 @@ docs:
     title: Folder Ownership
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/
@@ -46,7 +46,7 @@ docs:
     title: Project Structure
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/
@@ -60,7 +60,7 @@ docs:
     title: Operations Guide
     owner: docs/ux
     audience: operators
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/api/server.py
@@ -72,7 +72,7 @@ docs:
     title: Deployment Guide
     owner: docs/ux
     audience: operators
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - tools/setup/
@@ -86,7 +86,7 @@ docs:
     title: Model System Architecture
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/model_catalog.py
@@ -98,7 +98,7 @@ docs:
     title: API Endpoints Reference
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/api/server.py
@@ -109,7 +109,7 @@ docs:
     title: Configuration Reference
     owner: docs/ux
     audience: operators
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/config/settings.py
@@ -121,7 +121,7 @@ docs:
     title: Features Documentation
     owner: docs/ux
     audience: all
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/audio/capture.py
@@ -137,7 +137,7 @@ docs:
     title: Brand Asset Pipeline
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - scripts/generate_brand_assets.py
@@ -150,7 +150,7 @@ docs:
     title: Contributing to Documentation
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - docs/_style.md
@@ -161,7 +161,7 @@ docs:
     title: Electron-Backend Contract
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/electron/main/preload/main.js
@@ -174,7 +174,7 @@ docs:
     title: Architecture Overview
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/electron/main/index.js
@@ -185,7 +185,7 @@ docs:
     title: Latency Playbook
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/metrics.py
@@ -197,7 +197,7 @@ docs:
     title: Model Runtime and Routing
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/model_catalog.py
@@ -211,7 +211,7 @@ docs:
     title: Performance Documentation
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/metrics.py
@@ -223,7 +223,7 @@ docs:
     title: Security Documentation
     owner: docs/ux
     audience: security
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/api/server.py
@@ -235,7 +235,7 @@ docs:
     title: Testing Guide
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - tests/conftest.py
@@ -249,7 +249,7 @@ docs:
     title: Audio Capture System
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/audio/capture.py
@@ -261,7 +261,7 @@ docs:
     title: Events and Streaming
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/api/websocket_server.py
@@ -274,7 +274,7 @@ docs:
     title: Dictation Pipeline
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/stt/dictation_cleanup.py
@@ -286,7 +286,7 @@ docs:
     title: English Coach System
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/api/coach_service.py
@@ -297,7 +297,7 @@ docs:
     title: Settings System
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-04
+    last_verified: 2026-03-08
     review_cadence: monthly
     source_of_truth:
       - app/core/settings_manager.py
@@ -305,22 +305,11 @@ docs:
       - app/config/settings.py
     critical: true
 
-  - path: debug/floating-window-regression.md
-    title: Floating Window Regression Report
-    owner: docs/ux
-    audience: developers
-    last_verified: 2026-03-04
-    review_cadence: monthly
-    source_of_truth:
-      - app/electron/main/windows/floatingWindow.js
-      - app/electron/main/ipc/hotkeyHandlers.js
-    critical: false
-
   - path: engineering/folder-ownership.md
     title: Folder Ownership
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/
@@ -331,7 +320,7 @@ docs:
     title: Restructure Audit
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/
@@ -341,7 +330,7 @@ docs:
     title: Restructure Discovery
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/
@@ -351,7 +340,7 @@ docs:
     title: Settings Source of Truth
     owner: docs/ux
     audience: developers
-    last_verified: 2026-03-07
+    last_verified: 2026-03-08
     review_cadence: quarterly
     source_of_truth:
       - app/config/settings.py

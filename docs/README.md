@@ -1,17 +1,27 @@
 ---
+
 title: Documentation Home
 audience: all
-last_verified: 2026-03-05
+last_verified: 2026-03-13
 source_of_truth:
   - docs/
   - README.md
 ---
 
+> ⚠️ **Work in Progress** - This project is not finished. See main [README](../README.md) for status.
+>
+> **Last Updated:** March 13, 2026
+
 # OpenWispr Documentation Hub
 
 > Complete documentation for the OpenWispr desktop transcription application.  
-> **Last Updated:** March 5, 2026  
-> **Version:** 1.0.0
+> **Version:** 0.1.0
+
+---
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
 
@@ -19,17 +29,20 @@ source_of_truth:
 
 Choose your path based on your role:
 
-### New Users
+### 👤 New Users
+
 📖 [Main README](../README.md) → 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
 **Start here if you're new to OpenWispr.** Learn what the app does, install it, and resolve common issues.
 
-### Developers
+### 👨‍💻 Developers
+
 🏗️ [Architecture Overview](./engineering/architecture-overview.md) → 🔌 [API Reference](./api/endpoints.md) → 🤝 [Contributing Guidelines](../CONTRIBUTING.md)
 
 **For contributors and developers.** Understand the codebase, extend functionality, and submit improvements.
 
-### Operators
+### ⚙️ Operators
+
 🚀 [Deployment Guide](./deployment/DEPLOYMENT.md) → ⚙️ [Operations Guide](./operations/OPERATIONS.md) → 🔧 [Troubleshooting](./troubleshooting.md)
 
 **For system administrators.** Deploy, monitor, and maintain OpenWispr in production.
@@ -113,19 +126,23 @@ Choose your path based on your role:
 ## Quick Search by Topic
 
 ### 🔧 Configuration & Setup
+
 - [Deployment Guide](./deployment/DEPLOYMENT.md) - Installation
 - [Configuration Reference](./reference/config.md) - Settings
 - [Project Structure](./project/project-structure.md) - Organization
 
 ### ⚡ Performance
+
 - [Performance Guide](./engineering/performance.md) - Tuning
 - [Latency Playbook](./engineering/latency-playbook.md) - Diagnostics
 - [Model Runtime](./engineering/model-runtime.md) - Model routing
 
 ### 🔒 Security
+
 - [Security Documentation](./engineering/security.md) - Security review
 
 ### 🏗️ Architecture & Design
+
 - [Architecture Overview](./engineering/architecture-overview.md) - System design
 - [Model System](./architecture/MODEL_SYSTEM.md) - Models
 - [Electron-Backend Contract](./engineering/architecture-electron-backend-contract.md) - IPC contract
@@ -134,6 +151,7 @@ Choose your path based on your role:
 - [Events & Streaming](./engineering/events-streaming.md) - Realtime events
 
 ### 🤝 Contributing
+
 - [Contributing](../CONTRIBUTING.md) - Guidelines
 - [Contributing to Docs](./engineering/contributing-docs.md) - Documentation
 - [Testing Guide](./engineering/testing.md) - Testing
@@ -141,11 +159,13 @@ Choose your path based on your role:
 
 ---
 
-## Need Help?
+## ❓ Need Help?
 
-- 🐛 **Found a bug?** Check [Troubleshooting](./troubleshooting.md) first
-- 💡 **Have an idea?** See [Contributing](../CONTRIBUTING.md) for how to propose features
-- 📝 **Docs issue?** Review [Contributing to Docs](./engineering/contributing-docs.md)
+| Issue | Action |
+|-------|--------|
+| 🐛 **Found a bug?** | Check [Troubleshooting](./troubleshooting.md) first |
+| 💡 **Have an idea?** | See [Contributing](../CONTRIBUTING.md) for how to propose features |
+| 📝 **Docs issue?** | Review [Contributing to Docs](./engineering/contributing-docs.md) |
 
 ---
 

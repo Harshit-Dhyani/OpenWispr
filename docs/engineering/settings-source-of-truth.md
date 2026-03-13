@@ -2,13 +2,14 @@
 title: Settings Source of Truth
 owner: docs/ux
 audience: developers
-last_verified: 2026-03-07
+last_verified: 2026-03-08
 review_cadence: quarterly
 source_of_truth:
   - app/config/settings.py
   - app/config/text.py
   - app/core/settings_manager.py
 critical: false
+status: transitional
 ---
 
 # Settings Source Of Truth

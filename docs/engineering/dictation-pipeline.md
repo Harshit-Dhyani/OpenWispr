@@ -2,7 +2,7 @@
 title: Dictation Pipeline
 description: Speech-to-Text pipeline flow and streaming transcription architecture
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/stt/streaming_engine.py
   - app/stt/utterance_aggregator.py

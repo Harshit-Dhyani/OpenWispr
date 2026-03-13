@@ -1,12 +1,12 @@
 ---
 title: Settings System
 description: Persistent settings management with sync and migration support
-description: Persistent settings management with sync and migration support
 audience: developers
-last_verified: 2026-03-05
+last_verified: 2026-03-08
 source_of_truth:
   - app/core/settings_manager.py
   - app/api/settings_sync.py
+  - app/config/settings.py
 ---
 
 # Settings System
@@ -50,9 +50,49 @@ Two primary components manage settings:
 │  │      user_settings.json (disk)          │                    │
 │  └─────────────────────────────────────────┘                    │
 └─────────────────────────────────────────────────────────────────┘
-```
 
-## Settings Schema
+## Known Issues (Audit 2026-03-08)
+
+The following 17 bugs were identified in the settings system:
+
+### CRITICAL (2)
+
+| Bug ID | Description | Location |
+|--------|-------------|----------|
+| SET-001 | Duplicate backend setting: both `backend` and `audio_backend` exist in AudioSettings, causing confusion about which takes precedence | `app/config/settings.py:472-489` |
+| SET-002 | Deprecated VAD settings in AudioSettings: `vadEnabled` and `vadThresholdDb` duplicate transcription settings but are not used by runtime | `app/config/settings.py:499-518` |
+
+### HIGH (2)
+
+| Bug ID | Description | Location |
+|--------|-------------|----------|
+| SET-003 | `style_default_profile` default mismatch: empty string in style settings vs. computed default in backend | `app/config/settings.py:888` |
+| SET-004 | `refinement_profile` migration default mismatch: schema shows `clean_dictation` but migration may produce `raw` | `app/config/settings.py` + migration logic |
+
+### MEDIUM (5)
+
+| Bug ID | Description | Location |
+|--------|-------------|----------|
+| SET-005 | `transcription_mode` option mismatch: schema at `app/config/settings.py:209` includes `dictation` and `literal` but valid options may differ | Schema vs. runtime validation |
+| SET-006 | Fake/not-working settings exposed in UI: certain settings marked as functional but have no runtime effect | Frontend components |
+| SET-007 | Frontend settings defaults drift from backend registry | Generated settings vs. `app/config/settings.py` |
+| SET-008 | Model routing inconsistency: source-specific model IDs (`microphone_asr_model_id`, `system_asr_model_id`) not always respected | STT module routing |
+| SET-009 | Duplicate VAD config locations: audio category has VAD, transcription has VAD, mode-specific has VAD | Multiple dataclasses |
+
+### LOW (8)
+
+| Bug ID | Description | Location |
+|--------|-------------|----------|
+| SET-010 | Settings sync delta calculation may miss nested object changes | `app/api/settings_sync.py:234` |
+| SET-011 | Batch update interval may cause stale reads | `app/api/settings_sync.py:448` |
+| SET-012 | Import validation allows unknown categories silently | `app/core/settings_manager.py:474` |
+| SET-013 | Mode-specific settings override validation not enforced | Mode switching logic |
+| SET-014 | Hotkey settings key_combination vs microphone_key_combination overlap | `app/config/settings.py` hotkey section |
+| SET-015 | Coach prompt overrides structure complex/misleading | CoachSettings dataclass |
+| SET-016 | Environment variable prefix inconsistency: some use `TRANSCRIPTA_`, others implied | `app/config/constants.py` |
+| SET-017 | Settings version migration not atomic | `app/core/settings_manager.py:391` |
+
+## Settings Architecture
 
 ### SettingsState (`app/core/settings_manager.py:413`)
 

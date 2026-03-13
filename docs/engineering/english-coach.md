@@ -3,7 +3,7 @@ title: English Coach Service
 description: LLM-powered writing coach for dictation transcript refinement
 description: LLM-powered writing coach for dictation transcript refinement
 audience: developers
-last_verified: 2026-03-04
+last_verified: 2026-03-08
 source_of_truth:
   - app/api/coach_service.py
   - app/api/coach_cache.py

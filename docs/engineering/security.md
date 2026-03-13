@@ -1,7 +1,7 @@
 ---
 title: Security Documentation
 audience: security
-last_verified: 2026-03-05
+last_verified: 2026-03-08
 source_of_truth:
   - app/api/server.py
   - app/electron/main/preload/main.js
@@ -92,7 +92,7 @@ The preload script (`app/electron/main/preload/main.js`) uses `contextBridge` to
 
 ```javascript
 // Exposed API surface (from preload.js:3-181)
-contextBridge.exposeInMainWorld("transcriptaDesktop", {
+contextBridge.exposeInMainWorld("openwisprDesktop", {
   chooseDirectory: () => ipcRenderer.invoke("choose-directory"),
   choosePdf: () => ipcRenderer.invoke("choose-pdf"),
   onBackendExit: (callback) => { /* event listener */ },
@@ -223,7 +223,7 @@ OpenWispr is a fully local application with no cloud services requiring:
 | 1 | STEM formula parse check always False | `app/stem/formula_extractor.py:49` | 🔴 Open | `all(isinstance(node, ALLOWED_AST_NODES))` bug |
 | 2 | PyAudio instance not cleaned up | `app/audio/backends/pyaudio_wasapi.py:99,159-163` | 🔴 Open | Resource leak on startup failure |
 | 3 | UI thread safety violations | `app/ui/main_window.py:191-219` | 🔴 Open | Background thread → Qt widget access |
-| 4 | Unbounded SSE queue memory leak | `app/api/server.py:2381` | 🔴 Open | `asyncio.Queue()` without maxsize |
+| 4 | Unbounded SSE queue memory leak | `app/api/server.py:2626` | 🔴 Open | `asyncio.Queue()` without maxsize |
 | 5 | Contradiction detection logic broken | `app/stem/postprocess.py:151` | 🔴 Open | Float in dict keys (strings) check |
 | 6 | Wrong attribute name | `app/audio/capture.py:208` | 🔴 Open | `backend_name` vs `backend` |
 | 7 | log_level None check missing | `app/api_main.py:12` | 🟢 Fixed | Safe fallback with `or "INFO"` |
