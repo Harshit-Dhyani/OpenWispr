@@ -13,9 +13,9 @@ sys.modules.setdefault(
     ),
 )
 
-from app.api.service import BackendService
-from app.core.config import AppSettings
+from app.api.services.backend_service import BackendService
 from app.core.models import TranscriptSegment
+from app.core.settings.config import AppSettings
 from app.stt.stability import PartialStabilizer
 
 

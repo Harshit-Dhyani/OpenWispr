@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.api.refiner_service import RefinerService
+from app.api.services.refiner_service import RefinerService
 
 
 def test_refiner_service_uses_installed_gguf_path(tmp_path: Path) -> None:

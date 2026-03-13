@@ -10,22 +10,18 @@ Tests cover:
 
 from __future__ import annotations
 
-import threading
-import time
-from queue import Full, Queue
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 
-from app.stt.engine import (
-    WhisperTranscriber,
-    SubmitStatus,
-    confidence_proxy,
-    _should_fallback_to_cpu,
-)
 from app.stt.chunker import AudioChunk
-from app.core.error_handler import ErrorCategory, ErrorSeverity, ModelError
+from app.stt.engine import (
+    SubmitStatus,
+    WhisperTranscriber,
+    _should_fallback_to_cpu,
+    confidence_proxy,
+)
 
 
 class TestSubmitStatus:

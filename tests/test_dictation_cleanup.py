@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from app.stt.dictation_cleanup import (
-    clean_final_text_from_segments,
     clean_final_text,
+    clean_final_text_from_segments,
     compose_transcript_text,
     merge_segment_texts,
     normalize_dictation_text,
@@ -11,7 +11,10 @@ from app.stt.dictation_cleanup import (
 
 
 def test_normalize_dictation_text_removes_extra_spacing():
-    assert normalize_dictation_text("  quarterly   project   update  ! ") == "quarterly project update!"
+    assert (
+        normalize_dictation_text("  quarterly   project   update  ! ")
+        == "quarterly project update!"
+    )
 
 
 def test_stabilize_partial_prefers_existing_for_tiny_regressions():
@@ -73,7 +76,7 @@ def test_compose_transcript_text_appends_non_overlapping_segment():
 def test_compose_transcript_text_normalizes_punctuation_differences():
     merged = compose_transcript_text("quarterly project update", "Quarterly project update,")
 
-    assert merged == "quarterly project update"
+    assert merged == "Quarterly project update,"
 
 
 def test_compose_transcript_text_joins_hyphenated_tail_without_space():

@@ -14,7 +14,6 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List
 
 import numpy as np
 import pytest
@@ -61,6 +60,7 @@ class TestThreadSafety:
     def test_session_manager_thread_safety(self) -> None:
         """Test SessionManager callback thread-safety."""
         from unittest.mock import MagicMock
+
         from app.core.session_manager import SessionManager
 
         settings = MagicMock()
@@ -145,8 +145,9 @@ class TestLockContention:
 
     def test_low_lock_contention_settings(self) -> None:
         """Test settings manager has low lock contention."""
-        from app.core.settings_manager import SettingsManager
         import tempfile
+
+        from app.core.settings_manager import SettingsManager
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = temp_dir
@@ -220,6 +221,7 @@ class TestParallelProcessing:
     def test_parallel_serialization(self) -> None:
         """Test parallel serialization."""
         import json
+
         from app.core.models import TranscriptSegment
 
         segments = [

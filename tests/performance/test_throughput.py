@@ -10,10 +10,8 @@ Tests cover:
 from __future__ import annotations
 
 import asyncio
-import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable
 
 import numpy as np
 import pytest
@@ -76,7 +74,6 @@ class TestAudioThroughput:
 
     def test_audio_buffer_throughput(self, benchmark_config: dict) -> None:
         """Benchmark audio buffer write/read throughput."""
-        import asyncio
         from app.audio.system_pipeline import RingBuffer
 
         async def benchmark():
@@ -173,6 +170,7 @@ class TestAPIThroughput:
     def test_health_endpoint_throughput(self, benchmark_config: dict) -> None:
         """Benchmark health endpoint throughput."""
         from unittest.mock import MagicMock
+
         from app.api.server import health
 
         mock_service = MagicMock()
@@ -197,6 +195,7 @@ class TestAPIThroughput:
     def test_device_list_throughput(self, benchmark_config: dict) -> None:
         """Benchmark device list endpoint throughput."""
         from unittest.mock import MagicMock
+
         from app.api.server import devices
 
         mock_service = MagicMock()
@@ -245,6 +244,7 @@ class TestSerializationThroughput:
     def test_segment_serialization_throughput(self, benchmark_config: dict) -> None:
         """Benchmark segment serialization throughput."""
         import json
+
         from app.core.models import TranscriptSegment
 
         segment = TranscriptSegment(
@@ -282,6 +282,7 @@ class TestConcurrentThroughput:
     def test_concurrent_health_checks(self, benchmark_config: dict) -> None:
         """Test concurrent health check throughput."""
         from unittest.mock import MagicMock
+
         from app.api.server import health
 
         mock_service = MagicMock()

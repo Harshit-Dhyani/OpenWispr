@@ -4,7 +4,6 @@ import sys
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 sys.modules.setdefault("faster_whisper", SimpleNamespace(WhisperModel=object))
 

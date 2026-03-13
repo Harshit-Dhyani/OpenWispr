@@ -19,17 +19,14 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 import wave
 from collections.abc import AsyncGenerator, Callable, Generator
-from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
-from unittest.mock import MagicMock, patch
+from typing import Any
 
 import numpy as np
 import pytest
@@ -383,7 +380,7 @@ class ElectronAppController:
             logger.info(f"Electron application launched (PID: {self.process.pid})")
             return True
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to launch Electron application")
             return False
 
@@ -430,8 +427,8 @@ class ElectronAppController:
                 with urllib.request.urlopen(req, timeout=1.0) as response:
                     if response.status == 200:
                         return True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Health check failed: {e}")
 
             time.sleep(0.5)
 
@@ -763,6 +760,26 @@ class APIClient:
             "hotkey": await self.get_hotkey_status(),
         }
 
+    async def get_settings(self) -> dict[str, Any]:
+        """Get all settings."""
+        return await self.get("/api/settings")
+
+    async def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Save settings."""
+        return await self.post("/api/settings", json=settings)
+
+    async def reset_settings(self) -> dict[str, Any]:
+        """Reset settings to defaults."""
+        return await self.post("/api/settings/reset")
+
+    async def get_model_catalog(self) -> dict[str, Any]:
+        """Get model catalog."""
+        return await self.get("/api/models/catalog")
+
+    async def get_model_state(self) -> dict[str, Any]:
+        """Get model installation state."""
+        return await self.get("/api/models/state")
+
     async def switch_mode(self, mode: str) -> dict[str, Any]:
         """Compatibility shim for selecting active capture source."""
         return {"mode": mode}
@@ -808,7 +825,6 @@ def simulate_hotkey_press(key_combination: str = "ctrl+shift+r") -> None:
     try:
         if system == "windows":
             import ctypes
-            from ctypes import wintypes
 
             # Parse key combination
             keys = key_combination.split("+")
@@ -847,9 +863,9 @@ def simulate_hotkey_press(key_combination: str = "ctrl+shift+r") -> None:
         elif system == "darwin":
             import subprocess
 
-            script = f"""
+            script = """
                 tell application "System Events"
-                    keystroke "r" using {{control down, shift down}}
+                    keystroke "r" using {control down, shift down}
                 end tell
             """
             subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
@@ -897,22 +913,11 @@ def isolate_tests(temp_test_dir: Path) -> Generator[None, None, None]:
 
 
 def pytest_configure(config):
-    """Configure pytest for E2E tests."""
-    config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
-    config.addinivalue_line("markers", "hotkey: mark test as hotkey mode test")
-    config.addinivalue_line("markers", "system: mark test as system mode test")
+    """Configure pytest with custom markers."""
+    config.addinivalue_line("markers", "e2e: end-to-end tests")
+    config.addinivalue_line("markers", "hotkey: hotkey-related tests")
+    config.addinivalue_line("markers", "settings: settings-related tests")
+    config.addinivalue_line("markers", "models: model-related tests")
+    config.addinivalue_line("markers", "system: system-session tests")
     config.addinivalue_line("markers", "slow: mark test as slow running")
     config.addinivalue_line("markers", "flaky: mark test as potentially flaky")
-
-
-def pytest_collection_modifyitems(config, items):
-    """Modify test collection to add markers."""
-    for item in items:
-        # Add e2e marker to all tests in e2e directory
-        if "e2e" in str(item.fspath):
-            item.add_marker(pytest.mark.e2e)
-
-
-def pytest_html_report_title(report):
-    """Set HTML report title."""
-    report.title = "OpenWispr E2E Test Report"

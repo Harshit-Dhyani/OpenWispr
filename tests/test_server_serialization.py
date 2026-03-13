@@ -4,7 +4,7 @@ import json
 import random
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -47,7 +47,7 @@ class _SerializableSample:
 
 def test_make_json_safe_handles_dataclasses_datetime_and_path() -> None:
     sample = _SerializableSample(
-        when=datetime(2026, 3, 3, 12, 0, tzinfo=timezone.utc),
+        when=datetime(2026, 3, 3, 12, 0, tzinfo=UTC),
         path=Path("models/refiner.gguf"),
     )
 
@@ -67,7 +67,7 @@ def test_make_json_safe_randomized_payloads_can_be_json_encoded() -> None:
             lambda: np.float32(rng.random()),
             lambda: np.array([rng.random(), rng.random()], dtype=np.float32),
             lambda: Path(f"logs/sample-{rng.randint(1, 5)}.txt"),
-            lambda: datetime(2026, 3, 4, 1, rng.randint(0, 59), tzinfo=timezone.utc),
+            lambda: datetime(2026, 3, 4, 1, rng.randint(0, 59), tzinfo=UTC),
             lambda: {"flag": bool(rng.randint(0, 1))},
         ]
         if depth >= 2:

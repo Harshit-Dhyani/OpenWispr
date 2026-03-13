@@ -14,7 +14,7 @@ import asyncio
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
@@ -24,7 +24,7 @@ sys.modules["soundcard"] = MagicMock()
 sys.modules["pyaudio"] = MagicMock()
 
 # Import pipeline components
-from app.audio.pipeline_base import (
+from app.audio.pipelines.pipeline_base import (
     AudioPipeline,
     PipelineConfig,
     PipelineHealth,
@@ -48,7 +48,6 @@ from app.audio.wispr_pipeline import (
     WisprPipeline,
     WisprPipelineConfig,
 )
-
 
 # ============================================================================
 # Fixtures

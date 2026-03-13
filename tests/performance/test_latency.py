@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import statistics
 import time
-from typing import Callable
 
 import numpy as np
 import pytest
@@ -173,6 +172,7 @@ class TestAPILatency:
     def test_health_endpoint_latency(self, benchmark_config: dict) -> None:
         """Benchmark health check endpoint latency."""
         from unittest.mock import MagicMock
+
         from app.api.server import health
 
         mock_service = MagicMock()
@@ -198,6 +198,7 @@ class TestAPILatency:
     def test_device_list_latency(self, benchmark_config: dict) -> None:
         """Benchmark device listing latency."""
         from unittest.mock import MagicMock
+
         from app.api.server import devices
 
         mock_service = MagicMock()
@@ -248,6 +249,7 @@ class TestSerializationLatency:
     def test_segment_serialization_latency(self, benchmark_config: dict) -> None:
         """Benchmark segment serialization latency."""
         import json
+
         from app.core.models import TranscriptSegment
 
         segment = TranscriptSegment(
@@ -300,7 +302,6 @@ class TestMemoryLatency:
 
     def test_ring_buffer_operation_latency(self, benchmark_config: dict) -> None:
         """Benchmark ring buffer operation latency."""
-        import asyncio
         from app.audio.system_pipeline import RingBuffer
 
         async def benchmark():

@@ -11,28 +11,26 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from app.core.error_handler import (
-    ErrorSeverity,
-    ErrorCategory,
     AppError,
     AudioError,
+    ErrorCategory,
+    ErrorHandler,
+    ErrorReporter,
+    ErrorSeverity,
     ModelError,
     NetworkError,
+    RetryConfig,
     SessionError,
     UserNotifier,
-    ErrorReporter,
-    RetryConfig,
-    with_retry,
-    ErrorHandler,
     get_error_handler,
     set_default_handler,
+    with_retry,
 )
 
 

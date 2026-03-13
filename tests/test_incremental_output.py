@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.core.models import FormulaFinding, TranscriptSegment
-from app.stem.postprocess import NotesBundle, StemNoteProcessor
+from app.stem.postprocess import StemNoteProcessor
 
 
 @pytest.fixture
@@ -289,11 +287,11 @@ class TestCrashSafeWrites:
         target_file.write_text(original_content)
 
         with patch.object(Path, "write_text") as mock_write:
-            mock_write.side_effect = [IOError("Disk full"), None]
+            mock_write.side_effect = [OSError("Disk full"), None]
 
             try:
                 writer._safe_write_json(target_file, {"version": 2})
-            except IOError:
+            except OSError:
                 pass
 
         content = target_file.read_text()

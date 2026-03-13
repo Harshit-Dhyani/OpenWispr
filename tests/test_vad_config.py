@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 class TestVADParamsPassthrough:
@@ -76,7 +75,9 @@ class TestVADParamsPassthrough:
             if transcriber.vad_params.get("vad_threshold") is not None:
                 vad_parameters["threshold"] = transcriber.vad_params["vad_threshold"]
             if transcriber.vad_params.get("vad_min_silence_ms") is not None:
-                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params["vad_min_silence_ms"]
+                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params[
+                    "vad_min_silence_ms"
+                ]
             if transcriber.vad_params.get("vad_speech_pad_ms") is not None:
                 vad_parameters["speech_pad_ms"] = transcriber.vad_params["vad_speech_pad_ms"]
             if vad_parameters:
@@ -114,6 +115,7 @@ class TestVADParamsPassthrough:
 
     def test_vad_params_from_session_manager(self) -> None:
         from app.core.config import AppSettings
+
         from app.core.session_manager import SessionManager
 
         settings = AppSettings()
@@ -143,8 +145,10 @@ class TestVADParamsPassthrough:
                             execution_mode="cpu_only",
                             vad_params=vad_params,
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logging.warning(
+                            f"VAD test operation failed for session 'test-session': {e}"
+                        )
 
                     call_kwargs = mock_transcriber_class.call_args[1]
                     assert call_kwargs["vad_params"] == vad_params
@@ -249,7 +253,9 @@ class TestVADDefaults:
             if transcriber.vad_params.get("vad_threshold") is not None:
                 vad_parameters["threshold"] = transcriber.vad_params["vad_threshold"]
             if transcriber.vad_params.get("vad_min_silence_ms") is not None:
-                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params["vad_min_silence_ms"]
+                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params[
+                    "vad_min_silence_ms"
+                ]
             if transcriber.vad_params.get("vad_speech_pad_ms") is not None:
                 vad_parameters["speech_pad_ms"] = transcriber.vad_params["vad_speech_pad_ms"]
             if vad_parameters:
@@ -353,7 +359,9 @@ class TestVADParamValidation:
             if transcriber.vad_params.get("vad_threshold") is not None:
                 vad_parameters["threshold"] = transcriber.vad_params["vad_threshold"]
             if transcriber.vad_params.get("vad_min_silence_ms") is not None:
-                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params["vad_min_silence_ms"]
+                vad_parameters["min_silence_duration_ms"] = transcriber.vad_params[
+                    "vad_min_silence_ms"
+                ]
             if transcriber.vad_params.get("vad_speech_pad_ms") is not None:
                 vad_parameters["speech_pad_ms"] = transcriber.vad_params["vad_speech_pad_ms"]
             if vad_parameters:

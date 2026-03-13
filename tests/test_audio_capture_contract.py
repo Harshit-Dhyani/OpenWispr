@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.audio.capture import LoopbackAudioSource
+from app.audio.backends.base import to_mono
 
 
 def test_to_mono_prefers_active_channels_over_averaging_all_channels():
@@ -13,7 +13,7 @@ def test_to_mono_prefers_active_channels_over_averaging_all_channels():
     data[:, 3] = speech
     data[:, 7] = speech
 
-    mono = LoopbackAudioSource._to_mono(data)
+    mono = to_mono(data)
 
     rms = float(np.sqrt(np.mean(np.square(mono)) + 1e-12))
     assert mono.shape == (frames,)
@@ -23,7 +23,7 @@ def test_to_mono_prefers_active_channels_over_averaging_all_channels():
 def test_to_mono_uses_single_channel_when_only_one_is_present():
     data = np.linspace(-0.5, 0.5, 32, dtype=np.float32).reshape(32, 1)
 
-    mono = LoopbackAudioSource._to_mono(data)
+    mono = to_mono(data)
 
     assert mono.shape == (32,)
     assert np.allclose(mono, data[:, 0])

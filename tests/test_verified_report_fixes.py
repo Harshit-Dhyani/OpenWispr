@@ -11,7 +11,6 @@ from app.audio.backends.pyaudio_wasapi import PyAudioWasapiBackend
 from app.core.models import FormulaFinding, TranscriptSegment
 from app.stem.postprocess import StemNoteProcessor
 
-
 if "faster_whisper" not in sys.modules:
     fake = ModuleType("faster_whisper")
     fake.WhisperModel = object

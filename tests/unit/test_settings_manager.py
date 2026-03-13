@@ -13,24 +13,20 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
 from app.core.settings_manager import (
-    GeneralSettings,
-    TranscriptionSettings,
     AudioSettings,
-    RefinerSettings,
-    HotkeySettings,
-    AdvancedSettings,
+    GeneralSettings,
     ModeSpecificSettings,
-    SettingsState,
     SettingsManager,
+    SettingsState,
+    TranscriptionSettings,
     get_settings_manager,
     reset_settings_manager,
 )
-from app.core.modes import TranscriptionMode, WisprModeDefaults, SystemModeDefaults
+
+from app.core.modes import TranscriptionMode
 
 
 class TestSettingsDataclasses:

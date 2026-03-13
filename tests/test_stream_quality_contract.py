@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from app.core.settings.config import AppSettings, resolve_live_profile
 
 import app.stt.engine as engine_module
-from app.core.config import AppSettings, resolve_live_profile
 from app.core.models import SessionState, TranscriptSegment
 from app.core.session_manager import SessionManager
 from app.stt.chunker import AudioChunk

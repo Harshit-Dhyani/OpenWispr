@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 import sys
+import time
 import wave
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,8 +22,8 @@ sys.modules.setdefault(
 sys.modules.setdefault("faster_whisper", SimpleNamespace(WhisperModel=object))
 
 from app.api.server import HotkeyTranscriptionService
-from app.api.coach_service import CoachMeta, CoachPractice, CoachResult
-from app.api.refiner_service import RefinerResult
+from app.api.services.coach_service import CoachMeta, CoachPractice, CoachResult
+from app.api.services.refiner_service import RefinerResult
 from app.stt.dictation_cleanup import TranscriptComposer
 from app.stt.utterance_aggregator import UtteranceAggregator
 
@@ -197,6 +197,7 @@ async def test_hotkey_service_stop_closes_websocket_with_normal_code(
     assert "hotkey_stop_ack" in events
     assert events.index("hotkey_stop_ack") < events.index("hotkey_stopped")
 
+
 @pytest.mark.asyncio
 async def test_hotkey_service_stop_preserves_new_websocket_registration(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -246,6 +247,7 @@ async def test_hotkey_service_stop_preserves_new_websocket_registration(
     assert stop.status == "idle"
     assert existing_websocket.closed == [(1000, "hotkey-session-stopped")]
     assert new_websocket.closed == []
+
 
 @pytest.mark.asyncio
 async def test_hotkey_cancel_discards_transcription_and_skips_finalize(
@@ -370,7 +372,9 @@ async def test_hotkey_stop_returns_deterministic_transcript_when_coach_is_disabl
 
 
 @pytest.mark.asyncio
-async def test_hotkey_stop_applies_literal_mode_postprocess(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_hotkey_stop_applies_literal_mode_postprocess(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     service = HotkeyTranscriptionService(_make_settings(tmp_path))
     fake_audio = _FakeAudioSource()
     fake_transcriber = _FakeTranscriber()
@@ -518,7 +522,10 @@ async def test_hotkey_session_paragraph_emits_only_stop_time_final_text(
     assert stop.final_transcription == "Project status update for tomorrow morning delivery."
     assert stop.coach_status == "generated"
     assert stop.coach_result is not None
-    assert stop.coach_result.polished == "Polished project status update for tomorrow morning delivery."
+    assert (
+        stop.coach_result.polished
+        == "Polished project status update for tomorrow morning delivery."
+    )
     assert stop.paste_text == "Polished project status update for tomorrow morning delivery."
     assert stop.live_paste_text == stop.final_transcription
     assert all(event_type != "hotkey_commit_final" for event_type, _payload in events)
@@ -570,7 +577,9 @@ def test_hotkey_segment_callback_emits_live_buffer_text(
     )
 
     monkeypatch.setattr("app.api.server.get_settings_manager", lambda: fake_settings_manager)
-    monkeypatch.setattr(service, "_publish_event", lambda event_type, payload: events.append((event_type, payload)))
+    monkeypatch.setattr(
+        service, "_publish_event", lambda event_type, payload: events.append((event_type, payload))
+    )
     service._session = fake_session
 
     service._on_transcription_segment(
@@ -881,7 +890,9 @@ async def test_hotkey_stop_returns_real_coach_for_microphone_when_generated(
     monkeypatch.setattr(
         service,
         "_refine_final_text",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("mic finalize should not call refiner")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("mic finalize should not call refiner")
+        ),
     )
     monkeypatch.setattr(
         service,
@@ -1172,7 +1183,9 @@ def test_hotkey_segment_callback_keeps_mic_phrase_despite_soft_suppression(tmp_p
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr("app.api.server.get_settings_manager", lambda: fake_settings_manager)
-    monkeypatch.setattr(service, "_publish_event", lambda event_type, payload: events.append((event_type, payload)))
+    monkeypatch.setattr(
+        service, "_publish_event", lambda event_type, payload: events.append((event_type, payload))
+    )
     service._session = fake_session
 
     segment = SimpleNamespace(
@@ -1197,7 +1210,9 @@ def test_hotkey_segment_callback_keeps_mic_phrase_despite_soft_suppression(tmp_p
     assert fake_session.aggregator.finalize().accepted_segments_count == 1
 
 
-def test_hotkey_segment_callback_skips_suppressed_segment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_hotkey_segment_callback_skips_suppressed_segment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     service = HotkeyTranscriptionService(_make_settings(tmp_path))
     events: list[tuple[str, dict[str, object]]] = []
     fake_settings_manager = SimpleNamespace(
@@ -1216,7 +1231,9 @@ def test_hotkey_segment_callback_skips_suppressed_segment(tmp_path: Path, monkey
     )
 
     monkeypatch.setattr("app.api.server.get_settings_manager", lambda: fake_settings_manager)
-    monkeypatch.setattr(service, "_publish_event", lambda event_type, payload: events.append((event_type, payload)))
+    monkeypatch.setattr(
+        service, "_publish_event", lambda event_type, payload: events.append((event_type, payload))
+    )
     service._session = fake_session
 
     suppressed_segment = SimpleNamespace(
@@ -1270,6 +1287,7 @@ async def test_refiner_debug_logs_input_and_output(
     assert "project status update" in caplog.text
     assert "Hotkey refiner output" in caplog.text
     assert "Project status update." in caplog.text
+
 
 @pytest.mark.asyncio
 async def test_hotkey_stop_skips_refiner_and_coach_when_no_final_text(

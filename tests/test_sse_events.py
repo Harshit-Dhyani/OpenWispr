@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Callable, Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.server import app, get_service
-from app.api.service import BackendService
-from app.core.config import AppSettings
+from app.api.services.backend_service import BackendService
 from app.core.models import SessionHealth
 
 
@@ -75,7 +73,9 @@ class TestSSEContentType:
     """Test SSE endpoint returns correct content-type."""
 
     def test_events_endpoint_returns_text_event_stream(self, client: TestClient) -> None:
-        with client.stream("GET", "/api/events", headers={"Accept": "text/event-stream"}) as response:
+        with client.stream(
+            "GET", "/api/events", headers={"Accept": "text/event-stream"}
+        ) as response:
             assert response.status_code == 200
             assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 

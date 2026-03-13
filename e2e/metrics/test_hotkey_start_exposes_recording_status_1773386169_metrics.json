@@ -1,0 +1,30 @@
+{
+  "test_name": "test_hotkey_start_exposes_recording_status",
+  "duration_seconds": 0.06666684150695801,
+  "memory_usage_mb": {
+    "min": 0,
+    "max": 0,
+    "avg": 0
+  },
+  "cpu_usage_percent": {
+    "min": 0,
+    "max": 0,
+    "avg": 0
+  },
+  "audio_latency_ms": {
+    "min": 0,
+    "max": 0,
+    "avg": 0
+  },
+  "transcription_latency_ms": {
+    "min": 0,
+    "max": 0,
+    "avg": 0
+  },
+  "fps": {
+    "min": 0,
+    "max": 0,
+    "avg": 0
+  },
+  "errors": []
+}

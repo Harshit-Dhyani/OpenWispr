@@ -20,7 +20,7 @@ sys.modules.setdefault(
 )
 sys.modules.setdefault("faster_whisper", SimpleNamespace(WhisperModel=object))
 
-import app.core.settings_manager as legacy_settings_manager
+import app.core.settings.manager as legacy_settings_manager
 
 if not hasattr(legacy_settings_manager, "_settings_manager"):
     legacy_settings_manager._settings_manager = None
@@ -53,7 +53,9 @@ def test_api_cors_disables_credentials_with_wildcard_origin() -> None:
 def test_websocket_local_loopback_client_can_auth_without_token(websocket_connection_cls) -> None:
     from app.api.websocket_server import ConnectionConfig
 
-    connection = websocket_connection_cls(DummyWebSocket(), ConnectionConfig(auth_required=False), "conn", "127.0.0.1")
+    connection = websocket_connection_cls(
+        DummyWebSocket(), ConnectionConfig(auth_required=False), "conn", "127.0.0.1"
+    )
 
     assert asyncio.run(connection.authenticate()) is True
     assert connection.is_authenticated is True
@@ -62,17 +64,23 @@ def test_websocket_local_loopback_client_can_auth_without_token(websocket_connec
 def test_websocket_non_local_client_is_rejected_without_auth(websocket_connection_cls) -> None:
     from app.api.websocket_server import ConnectionConfig
 
-    connection = websocket_connection_cls(DummyWebSocket(), ConnectionConfig(auth_required=False), "conn", "10.0.0.5")
+    connection = websocket_connection_cls(
+        DummyWebSocket(), ConnectionConfig(auth_required=False), "conn", "10.0.0.5"
+    )
 
     assert asyncio.run(connection.authenticate()) is False
     assert connection.is_authenticated is False
 
 
-def test_websocket_auth_required_uses_env_token(monkeypatch: pytest.MonkeyPatch, websocket_connection_cls) -> None:
+def test_websocket_auth_required_uses_env_token(
+    monkeypatch: pytest.MonkeyPatch, websocket_connection_cls
+) -> None:
     from app.api.websocket_server import ConnectionConfig
 
     monkeypatch.setenv("OPENWISPR_WS_TOKEN", "secret-token")
-    connection = websocket_connection_cls(DummyWebSocket(), ConnectionConfig(auth_required=True), "conn", "10.0.0.5")
+    connection = websocket_connection_cls(
+        DummyWebSocket(), ConnectionConfig(auth_required=True), "conn", "10.0.0.5"
+    )
 
     assert asyncio.run(connection.authenticate("secret-token")) is True
     assert asyncio.run(connection.authenticate("wrong-token")) is False
@@ -127,7 +135,7 @@ def test_backend_setting_is_hidden_legacy_alias() -> None:
 def test_backend_service_snapshot_includes_ultra_live_mode() -> None:
     from app.api.services.backend_service import BackendService
 
-    settings = MagicMock(download_root=Path('.'))
+    settings = MagicMock(download_root=Path("."))
     service = BackendService(settings)
     snapshot = service.get_snapshot()
 

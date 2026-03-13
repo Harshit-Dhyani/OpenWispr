@@ -12,16 +12,14 @@ from __future__ import annotations
 
 import json
 import tempfile
-import threading
 import time
-import wave
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
 from app.core.config import AppSettings
+
 from app.core.models import SessionState, TranscriptSegment, utc_now
 from app.core.system_session import (
     AudioRecordingManager,
@@ -30,8 +28,6 @@ from app.core.system_session import (
     ExportFormat,
     ExportManager,
     MarkdownFormatter,
-    SessionMetadata,
-    SessionNote,
     SrtFormatter,
     SystemSessionConfig,
     SystemSessionHandler,
@@ -39,7 +35,6 @@ from app.core.system_session import (
     load_session_from_disk,
 )
 from app.stem.postprocess import NotesBundle
-
 
 # =============================================================================
 # Fixtures

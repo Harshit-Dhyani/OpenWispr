@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tests._contracts import filtered_call, formula_text, resolve_symbol
 
-
 FORMULA_MODULES = [
     "app.core.formulas",
     "app.core.formula_extraction",

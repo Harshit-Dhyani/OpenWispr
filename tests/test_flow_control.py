@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from queue import Full, Queue
+from queue import Full
 from typing import Any
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 
 class TestBackpressureDetection:
@@ -31,8 +29,8 @@ class TestBackpressureDetection:
         assert transcriber._backpressure_state == "normal"
 
     def test_backpressure_detected_when_queue_full(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -62,8 +60,8 @@ class TestBackpressureDetection:
         assert transcriber._backpressure_state == "dropping_oldest"
 
     def test_dropped_chunks_counter_increments(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -93,8 +91,8 @@ class TestBackpressureDetection:
         assert transcriber._dropped_chunks > 0
 
     def test_submit_returns_false_when_stopped(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -121,8 +119,8 @@ class TestBackpressureDetection:
         assert result is False
 
     def test_oldest_chunk_evicted_when_full(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -160,8 +158,8 @@ class TestBackpressureDetection:
         assert remaining_samples[1] == 3.0
 
     def test_queue_depth_reported_in_health(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -218,8 +216,8 @@ class TestBacklogEstimation:
         assert estimated_backlog == 0.0
 
     def test_backlog_estimation_with_queue_depth(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -328,8 +326,8 @@ class TestBacklogEstimation:
         assert health.dropped_stt_chunks == 42
 
     def test_warning_set_on_queue_saturation(self) -> None:
-        from app.stt.engine import WhisperTranscriber
         from app.stt.chunker import AudioChunk
+        from app.stt.engine import WhisperTranscriber
 
         transcriber = WhisperTranscriber(
             model_name="tiny",
@@ -364,8 +362,9 @@ class TestFlowControlIntegration:
     """Test flow control integration with session manager."""
 
     def test_session_manager_receives_health_updates(self) -> None:
-        from app.core.session_manager import SessionManager
         from app.core.config import AppSettings
+
+        from app.core.session_manager import SessionManager
 
         settings = AppSettings()
         manager = SessionManager(settings)

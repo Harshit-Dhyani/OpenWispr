@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
-import pytest_asyncio
 
 from app.audio.pipeline_base import AudioPipeline, PipelineConfig, PipelineHealth, PipelineState
 

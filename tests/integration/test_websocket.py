@@ -10,15 +10,14 @@ Tests cover:
 
 from __future__ import annotations
 
-import asyncio
 import gzip
 import json
 import sys
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from types import SimpleNamespace
 
 sys.modules.setdefault(
     "soundcard",
@@ -142,7 +141,11 @@ class TestSettingsSynchronizer:
 
     def test_sync_config_defaults(self) -> None:
         """Test sync configuration defaults."""
-        from app.api.settings_sync import SyncConfig, SyncConflictResolution, SyncDirection
+        from app.api.transport.settings_sync import (
+            SyncConfig,
+            SyncConflictResolution,
+            SyncDirection,
+        )
 
         config = SyncConfig()
 
@@ -153,7 +156,7 @@ class TestSettingsSynchronizer:
 
     def test_sync_direction_enum(self) -> None:
         """Test sync direction enumeration."""
-        from app.api.settings_sync import SyncDirection
+        from app.api.transport.settings_sync import SyncDirection
 
         assert SyncDirection.SERVER_TO_CLIENT.value == "server_to_client"
         assert SyncDirection.CLIENT_TO_SERVER.value == "client_to_server"

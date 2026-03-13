@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from app.core.model_catalog import MODEL_CATALOG, get_default_model_id, get_model_catalog_entry, runtime_name_for_model
+from app.core.model_catalog import (
+    MODEL_CATALOG,
+    get_default_model_id,
+    get_model_catalog_entry,
+    list_model_catalog,
+    runtime_name_for_model,
+)
 
 
 def test_model_catalog_entries_have_required_runtime_fields() -> None:
@@ -55,3 +61,47 @@ def test_whisper_turbo_catalog_only_requests_existing_repo_artifacts() -> None:
         "config.json",
         "tokenizer.json",
     ]
+
+
+def test_model_catalog_loading() -> None:
+    """Test that model catalog loads correctly."""
+    assert MODEL_CATALOG is not None
+    assert len(MODEL_CATALOG) > 0
+    catalog_list = list_model_catalog()
+    assert len(catalog_list) == len(MODEL_CATALOG)
+    for entry in catalog_list:
+        assert "id" in entry
+        assert "display_name" in entry
+        assert "category" in entry
+        assert "enabled_runtime" in entry
+
+
+def test_enabled_models_filter() -> None:
+    """Test that only enabled models are returned when filtering by enabled_runtime."""
+    enabled_models = [entry for entry in MODEL_CATALOG if entry.enabled_runtime]
+    assert len(enabled_models) > 0
+    for model in enabled_models:
+        assert model.enabled_runtime is True
+
+    disabled_models = [entry for entry in MODEL_CATALOG if not entry.enabled_runtime]
+    assert len(disabled_models) > 0
+    for model in disabled_models:
+        assert model.enabled_runtime is False
+
+
+def test_model_selection_respects_enabled_runtime() -> None:
+    """Test that model selection considers enabled_runtime flag."""
+    asr_models = [entry for entry in MODEL_CATALOG if entry.category == "asr"]
+    enabled_asr = [m for m in asr_models if m.enabled_runtime]
+    disabled_asr = [m for m in asr_models if not m.enabled_runtime]
+
+    assert len(enabled_asr) > 0
+    assert len(disabled_asr) > 0
+    assert any(m.id == "whisper-turbo" for m in disabled_asr)
+    assert all(m.id != "whisper-turbo" for m in enabled_asr)
+
+    refiner_models = [entry for entry in MODEL_CATALOG if entry.category == "refiner"]
+    enabled_refiners = [m for m in refiner_models if m.enabled_runtime]
+    assert len(enabled_refiners) == 0
+    disabled_refiners = [m for m in refiner_models if not m.enabled_runtime]
+    assert len(disabled_refiners) == len(refiner_models)

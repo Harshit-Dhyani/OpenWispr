@@ -12,15 +12,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import tempfile
-import threading
 import time
 import uuid
 from collections.abc import AsyncGenerator, Callable, Generator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypeVar
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -798,8 +796,8 @@ def cleanup_temp_files(temp_dir: Path) -> Generator[None, None, None]:
 def reset_singletons() -> Generator[None, None, None]:
     """Reset singleton instances before each test."""
     # Reset any singletons that might persist between tests
-    with patch("app.core.settings_manager._settings_manager", None):
-        with patch("app.core.error_handler._default_handler", None):
+    with patch("app.core.settings.manager._settings_manager", None, create=True):
+        with patch("app.core.error_handler._default_handler", None, create=True):
             yield
 
 

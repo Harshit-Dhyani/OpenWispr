@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import time
 
-from app.api.refinement_queue import RefinementQueue
-from app.api.refiner_service import RefinerResult
-from app.api.streaming_metrics import StreamingMetrics
+from app.api.services.refinement_queue import RefinementQueue
+from app.api.services.refiner_service import RefinerResult
+from app.api.services.streaming_metrics import StreamingMetrics
 
 
 def test_refinement_queue_supersedes_stale_jobs(monkeypatch, tmp_path) -> None:

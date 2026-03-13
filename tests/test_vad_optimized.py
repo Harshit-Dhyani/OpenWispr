@@ -12,27 +12,25 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 # Import modules under test
+from app.audio.audio_processing import (
+    AudioPreprocessor,
+    HighPassFilter,
+    LowPassFilter,
+    NormalizationFilter,
+    ProcessingConfig,
+    ProcessingMode,
+    ResamplingFilter,
+    SpectralGateFilter,
+)
 from app.audio.vad_optimized import (
-    VADConfig,
-    VADMode,
-    VADState,
     NoiseProfiler,
     OptimizedVAD,
     SpeechSegmenter,
+    VADConfig,
+    VADMode,
+    VADState,
     create_vad,
     detect_speech_regions,
-)
-from app.audio.audio_processing import (
-    ProcessingConfig,
-    ProcessingMode,
-    AudioPreprocessor,
-    ResamplingFilter,
-    NormalizationFilter,
-    HighPassFilter,
-    LowPassFilter,
-    SpectralGateFilter,
-    preprocess_audio,
-    create_preprocessor,
 )
 
 

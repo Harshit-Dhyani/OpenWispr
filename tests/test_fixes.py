@@ -6,12 +6,8 @@ Run with: pytest tests/test_fixes.py -v
 from __future__ import annotations
 
 import ast
-import threading
-import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 

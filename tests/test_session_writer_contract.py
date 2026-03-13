@@ -4,7 +4,6 @@ from pathlib import Path
 
 from tests._contracts import filtered_call, first_method, instantiate, read_text, resolve_symbol
 
-
 SESSION_MODULES = [
     "app.storage.session_writer",
     "app.storage.sessions",

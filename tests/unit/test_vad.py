@@ -11,20 +11,19 @@ Tests cover:
 from __future__ import annotations
 
 import time
-from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 from app.audio.vad_optimized import (
+    NoiseProfiler,
+    OptimizedVAD,
+    SpeechSegment,
+    SpeechSegmenter,
+    VADConfig,
+    VADMetrics,
     VADMode,
     VADState,
-    VADConfig,
-    SpeechSegment,
-    VADMetrics,
-    OptimizedVAD,
-    NoiseProfiler,
-    SpeechSegmenter,
     create_vad,
     detect_speech_regions,
 )

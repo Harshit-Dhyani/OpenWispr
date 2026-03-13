@@ -11,12 +11,9 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
-import pytest
 
 
 class TestSessionSerialization:
@@ -160,7 +157,7 @@ class TestDocumentStore:
 
     def test_context_provider(self) -> None:
         """Test context provider."""
-        from app.storage.document_store import DocumentStore, ContextProvider
+        from app.storage.document_store import ContextProvider, DocumentStore
 
         store = DocumentStore()
         provider = ContextProvider(store)
@@ -173,8 +170,8 @@ class TestSessionWriter:
 
     def test_session_writer_init(self, temp_dir: Path) -> None:
         """Test session writer initialization."""
-        from app.storage.session_writer import SessionWriter
         from app.core.models import SessionState
+        from app.storage.session_writer import SessionWriter
 
         state = SessionState.create(
             title="Test",
@@ -193,8 +190,8 @@ class TestSessionWriter:
 
     def test_write_metadata(self, temp_dir: Path) -> None:
         """Test writing session metadata."""
-        from app.storage.session_writer import SessionWriter
         from app.core.models import SessionState
+        from app.storage.session_writer import SessionWriter
 
         state = SessionState.create(
             title="Test",

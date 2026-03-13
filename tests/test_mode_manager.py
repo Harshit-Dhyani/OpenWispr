@@ -17,7 +17,6 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -33,10 +32,11 @@ sys.modules["torch"].cuda = MagicMock()
 sys.modules["torch"].cuda.is_available = MagicMock(return_value=False)
 sys.modules["faster_whisper"] = MagicMock()
 
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
+from app.core.settings_manager import SettingsManager
+
 from app.core.mode_manager import (
     ModeLifecycleState,
-    ModeManager,
     ModeStatus,
     ModeTransition,
     TranscriptionMode,
@@ -44,9 +44,7 @@ from app.core.mode_manager import (
     reset_mode_manager,
 )
 from app.core.modes import ModeConfiguration, ModeSettings
-from app.core.settings_manager import SettingsManager
 from app.stt.streaming_engine import EngineState
-
 
 # ============================================
 # Fixtures

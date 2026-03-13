@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import gc
 import tracemalloc
-from typing import List
 
 import numpy as np
 import pytest
@@ -56,6 +55,7 @@ class TestAudioMemory:
     def test_ring_buffer_memory_usage(self, memory_config: dict) -> None:
         """Test ring buffer memory usage."""
         import asyncio
+
         from app.audio.system_pipeline import RingBuffer
 
         async def test():
@@ -213,6 +213,7 @@ class TestMemoryLeaks:
     def test_session_manager_no_leak(self) -> None:
         """Test session manager doesn't leak memory."""
         from unittest.mock import MagicMock
+
         from app.core.session_manager import SessionManager
 
         settings = MagicMock()
@@ -238,6 +239,7 @@ class TestGarbageCollection:
     def test_gc_during_audio_processing(self) -> None:
         """Test GC doesn't significantly impact audio processing."""
         import time
+
         from app.audio.vad_optimized import OptimizedVAD
 
         vad = OptimizedVAD()

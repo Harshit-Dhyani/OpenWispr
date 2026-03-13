@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tests._contracts import chunk_text, filtered_call, instantiate, resolve_symbol
 
-
 CHUNK_MODULES = [
     "app.audio.chunking",
     "app.audio.chunker",

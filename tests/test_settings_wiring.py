@@ -22,7 +22,7 @@ from app.config.settings import SETTINGS_REGISTRY as BACKEND_REGISTRY
 @pytest.fixture(autouse=True)
 def reset_singletons() -> Any:
     """Override the conftest's reset_singletons fixture to avoid errors."""
-    with patch("app.core.settings_manager._settings_manager", None, create=True):
+    with patch("app.core.settings.manager._settings_manager", None, create=True):
         with patch("app.core.error_handler._default_handler", None, create=True):
             yield
 
@@ -202,7 +202,7 @@ class TestSettingsWiring:
                     f"frontend.name='{frontend_def.get('name')}'"
                 )
 
-        assert not mismatches, f"Setting name mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Setting name mismatches:\n" + "\n".join(mismatches)
 
     def test_setting_categories_match(self):
         """Verify setting categories are identical between backend and frontend."""
@@ -220,7 +220,7 @@ class TestSettingsWiring:
                     f"frontend.category='{frontend_def.get('category')}'"
                 )
 
-        assert not mismatches, f"Setting category mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Setting category mismatches:\n" + "\n".join(mismatches)
 
     def test_setting_types_match(self):
         """Verify setting types are identical between backend and frontend."""
@@ -238,7 +238,7 @@ class TestSettingsWiring:
                     f"frontend.type='{frontend_def.get('type')}'"
                 )
 
-        assert not mismatches, f"Setting type mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Setting type mismatches:\n" + "\n".join(mismatches)
 
     def test_setting_defaults_match(self):
         """Verify setting default values match between backend and frontend.
@@ -270,9 +270,9 @@ class TestSettingsWiring:
                     f"frontend.default={frontend_default!r}"
                 )
 
-        assert not mismatches, f"Setting default value mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Setting default value mismatches:\n" + "\n".join(mismatches)
 
-        assert not mismatches, f"Setting default value mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Setting default value mismatches:\n" + "\n".join(mismatches)
 
 
 def _defaults_match(backend_val: Any, frontend_val: Any) -> bool:

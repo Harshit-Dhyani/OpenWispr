@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-import time
-import traceback
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -22,18 +20,14 @@ from app.core.error_handler import (
     RetryConfig,
     SessionError,
     UserNotifier,
-    get_error_handler,
-    handle_error,
     with_retry,
     with_retry_async,
 )
 from app.core.recovery_strategies import (
     AudioDeviceRecoveryStrategy,
-    AudioPermissionRecoveryStrategy,
     DiskFullRecoveryStrategy,
     FallbackChain,
     FallbackOption,
-    ModelDownloadStrategy,
     ModelFallbackStrategy,
     ModelOOMRecoveryStrategy,
     NetworkRetryStrategy,
@@ -375,7 +369,7 @@ class TestErrorHandler:
             error = ModelError(
                 message="OOM",
                 category=ErrorCategory.MODEL_OOM,
-                error_id=f"model_oom_test",  # Same ID prefix for rate limit check
+                error_id="model_oom_test",  # Same ID prefix for rate limit check
             )
             error.category = ErrorCategory.MODEL_OOM
             handler.handle(error)

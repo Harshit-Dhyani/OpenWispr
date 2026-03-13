@@ -10,13 +10,11 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 from types import SimpleNamespace
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 class TestHealthEndpoint:
@@ -330,8 +328,9 @@ class TestHotkeyService:
 
     def test_calculate_audio_level_with_signal(self, mock_settings: MagicMock) -> None:
         """Test audio level calculation with signal."""
-        from app.api.server import HotkeyTranscriptionService
         import numpy as np
+
+        from app.api.server import HotkeyTranscriptionService
 
         service = HotkeyTranscriptionService(mock_settings)
         # Create signal at -20dB

@@ -11,16 +11,14 @@ Tests cover:
 
 from __future__ import annotations
 
-import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
-import numpy as np
 import pytest
 
-from app.core.session_manager import SessionManager, slugify, _normalize_transcript_text
-from app.core.models import SessionState, TranscriptSegment, SessionHealth
+from app.core.models import SessionHealth, TranscriptSegment
+from app.core.session_manager import SessionManager, _normalize_transcript_text, slugify
 
 
 class TestSlugify:

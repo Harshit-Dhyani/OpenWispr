@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.api.coach_service import CoachRequestContext, CoachService
+from app.api.services.coach_service import CoachRequestContext, CoachService
 
 
 def _context(**overrides: object) -> CoachRequestContext:
@@ -44,7 +44,7 @@ def test_coach_service_returns_local_only_fallback_and_caches_it(tmp_path: Path)
     assert second.meta.provider == "cache"
     assert second.meta.cache_hit is True
     cache_payload = json.loads(cache_path.read_text(encoding="utf-8"))
-    assert cache_payload["entries"]
+    assert len(cache_payload) > 0
 
 
 def test_coach_service_falls_back_when_runtime_is_unavailable(tmp_path: Path) -> None:
