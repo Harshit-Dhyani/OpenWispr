@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 import app.api.deps as api_deps
 from app.api.deps import get_service
 from app.api.route_utils import log_route
-from app.api.service import BackendService
+from app.api.services.backend_service import BackendService
 from app.core.auto_optimizer import AutoOptimizer, get_recommended_settings
 from app.core.system_profiler import SystemProfiler
 

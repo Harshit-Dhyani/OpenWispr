@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_history_service, get_service
 from app.api.route_utils import log_route
 from app.api.schemas import AttachPdfRequest, StartSessionRequest
-from app.api.service import BackendService
+from app.api.services.backend_service import BackendService
 from app.api.services.transcript_history_service import TranscriptHistoryService
 from app.api.session_resolution import (
     resolve_capture_source_setting,
     resolve_input_device_for_source,
 )
 from app.core.model_catalog import runtime_name_for_model
-from app.core.settings_manager import get_settings_manager
+from app.core.settings.manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -104,9 +104,13 @@ def stop_session(
             {
                 "session_id": str(session.get("session_id") or session.get("id") or ""),
                 "source_workflow": "session",
-                "capture_source": settings_snapshot.get("audio", {}).get("default_capture_source", "microphone"),
+                "capture_source": settings_snapshot.get("audio", {}).get(
+                    "default_capture_source", "microphone"
+                ),
                 "title": session.get("title"),
-                "transcription_mode": settings_snapshot.get("transcription", {}).get("transcription_mode", "dictation"),
+                "transcription_mode": settings_snapshot.get("transcription", {}).get(
+                    "transcription_mode", "dictation"
+                ),
                 "started_at": session.get("started_at") or session.get("created_at"),
                 "ended_at": session.get("updated_at") or session.get("ended_at"),
                 "duration_ms": int(float(session.get("duration_s") or 0) * 1000),

@@ -9,11 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_service
 from app.api.route_utils import log_route
 from app.api.schemas import ModelSelectionRequest, PreloadModelRequest, RefinementModeRequest
+from app.api.services.backend_service import BackendService
+from app.api.services.refiner_service import RefinerService, is_llama_cpp_available
 from app.api.strings.en import API_STRINGS
-from app.api.refiner_service import RefinerService, is_llama_cpp_available
-from app.api.service import BackendService
-from app.core.config import AppSettings
-from app.core.settings_manager import get_settings_manager
+from app.core.settings.config import AppSettings
+from app.core.settings.manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

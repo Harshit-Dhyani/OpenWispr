@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.route_utils import apply_runtime_log_levels, log_route, resolve_runtime_log_level
 from app.api.strings.en import API_STRINGS
-from app.core.settings_manager import get_settings_manager
+from app.core.settings.manager import get_settings_manager
 
 router = APIRouter()
 
