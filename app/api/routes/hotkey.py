@@ -157,7 +157,35 @@ async def hotkey_stop(
     except Exception as exc:
         logger.warning("History ingest failed for hotkey stop: %s", exc)
 
-    return result
+    # Convert to dict for FastAPI response
+    return {
+        "session_id": result.session_id,
+        "status": result.status,
+        "transcription_mode": result.transcription_mode,
+        "composed_text": result.composed_text,
+        "final_transcription": result.final_transcription,
+        "aggregated_raw_text": result.aggregated_raw_text,
+        "aggregated_clean_text": result.aggregated_clean_text,
+        "postprocessed_text": result.postprocessed_text,
+        "paste_text": result.paste_text,
+        "live_paste_text": result.live_paste_text,
+        "final_cleanup_applied": result.final_cleanup_applied,
+        "raw_transcription": result.raw_transcription,
+        "refined_transcription": result.refined_transcription,
+        "coach_result": result.coach_result,
+        "coach_status": result.coach_status,
+        "coach_display_source": result.coach_display_source,
+        "coach_error": result.coach_error,
+        "coach_cache_hit": result.coach_cache_hit,
+        "debug_wav_path": result.debug_wav_path,
+        "duration_ms": result.duration_ms,
+        "segment_count": result.segment_count,
+        "source_backend": result.source_backend,
+        "language_used": result.language_used,
+        "refinement_mode": result.refinement_mode,
+        "refiner_model_id": result.refiner_model_id,
+        "warnings": result.warnings,
+    }
 
 
 @router.post("/api/coach/prompt-preview")

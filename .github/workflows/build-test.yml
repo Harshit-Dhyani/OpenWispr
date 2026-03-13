@@ -30,8 +30,6 @@ jobs:
 
       - name: Lint Frontend
         run: pnpm run lint:frontend
-        continue-on-error: true
-        # Linting can be unstable due to competing rules; warn but don't fail
 
       - name: TypeCheck
         run: pnpm run typecheck

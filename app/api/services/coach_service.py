@@ -11,13 +11,16 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app.api.coach_cache import CoachCache
+from app.api.providers import ProviderHealth, ProviderType, get_provider
 from app.config.coach_prompts import (
     DEFAULT_COACH_TEMPLATE,
     DEFAULT_COACH_TEMPLATE_ID,
     compile_coach_prompt,
     get_default_coach_templates,
 )
+from app.config.constants import ProviderConstants
 from app.core.model_catalog import get_model_catalog_entry
+from app.core.settings.manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +93,29 @@ class CoachService:
         self._lock = Lock()
         self._llm: Any | None = None
         self._loaded_model_id: str | None = None
+        self._engine_preference: str = "llamacpp"
+        self._provider_base_url: str = ProviderConstants.DEFAULT_OLLAMA_URL
+
+    def update_settings(
+        self, engine_preference: str | None = None, provider_base_url: str | None = None
+    ) -> None:
+        if engine_preference is not None:
+            self._engine_preference = engine_preference
+        if provider_base_url is not None:
+            self._provider_base_url = provider_base_url
+
+    def _get_settings(self) -> tuple[str, str]:
+        try:
+            settings = get_settings_manager().get_settings()
+            engine_preference = getattr(settings.refiner, "engine_preference", "llamacpp")
+            provider_base_url = (
+                settings.coach.coach_provider_base_url
+                if hasattr(settings, "coach")
+                else ProviderConstants.DEFAULT_OLLAMA_URL
+            )
+            return engine_preference, provider_base_url
+        except Exception:
+            return self._engine_preference, self._provider_base_url
 
     def generate(self, context: CoachRequestContext, *, fallback_text: str) -> CoachResult:
         template = self._resolve_template(context.template_id, context.templates)
@@ -142,17 +168,14 @@ class CoachService:
             )
 
         try:
-            llm = self._ensure_model(context.model_id)
-            response = llm.create_completion(
+            engine_preference, provider_base_url = self._get_settings()
+            candidate = self._call_llm(
+                model_id=context.model_id,
                 prompt=f"{compiled['system_prompt']}\n\n{compiled['user_prompt']}\n",
                 max_tokens=min(1400, max(384, len(context.text.split()) * 12)),
                 temperature=0.05,
-                stop=["```", "\n\nOriginal transcript:"],
-            )
-            candidate = (
-                response.get("choices", [{}])[0].get("text", "")
-                if isinstance(response, dict)
-                else ""
+                engine_preference=engine_preference,
+                provider_base_url=provider_base_url,
             )
             result = self._parse_candidate(
                 candidate,
@@ -319,3 +342,105 @@ class CoachService:
             )
             self._loaded_model_id = model_id
             return self._llm
+
+    def _call_llm(
+        self,
+        model_id: str,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        engine_preference: str,
+        provider_base_url: str,
+    ) -> str:
+        if engine_preference in ("ollama", "lm_studio"):
+            return self._call_provider(
+                model_id=model_id,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                engine_preference=engine_preference,
+                provider_base_url=provider_base_url,
+            )
+        return self._call_llama_cpp(
+            model_id=model_id,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+    def _call_provider(
+        self,
+        model_id: str,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        engine_preference: str,
+        provider_base_url: str,
+    ) -> str:
+        try:
+            provider_type: ProviderType = engine_preference  # type: ignore
+            provider = get_provider(provider_type, provider_base_url)
+            import asyncio
+
+            async def get_completion() -> str:
+                return await provider.complete(
+                    prompt=prompt,
+                    model=model_id,
+                    options={"max_tokens": max_tokens, "temperature": temperature},
+                )
+
+            return asyncio.run(get_completion())
+        except Exception as exc:
+            logger.warning(
+                "Provider %s unavailable, falling back to llama_cpp: %s", engine_preference, exc
+            )
+            return self._call_llama_cpp(
+                model_id=model_id,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+
+    def _call_llama_cpp(
+        self,
+        model_id: str,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        llm = self._ensure_model(model_id)
+        response = llm.create_completion(
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stop=["```", "\n\nOriginal transcript:"],
+        )
+        return (
+            response.get("choices", [{}])[0].get("text", "") if isinstance(response, dict) else ""
+        )
+
+    async def check_provider_health(
+        self, engine_preference: str | None = None, provider_base_url: str | None = None
+    ) -> ProviderHealth:
+        if engine_preference is None or provider_base_url is None:
+            engine_preference, provider_base_url = self._get_settings()
+
+        if engine_preference == "llamacpp":
+            from app.api.providers import LlamaCPPProvider
+
+            llama_cpp_provider = LlamaCPPProvider()
+            return await llama_cpp_provider.health_check()
+
+        if engine_preference in ("ollama", "lm_studio"):
+            try:
+                provider_type: ProviderType = engine_preference  # type: ignore
+                from app.api.providers import BaseProvider
+
+                http_provider: BaseProvider = get_provider(provider_type, provider_base_url)
+                return await http_provider.health_check()
+            except Exception as exc:
+                return ProviderHealth(available=False, error=str(exc), response_time_ms=None)
+
+        return ProviderHealth(
+            available=False, error=f"Unknown engine: {engine_preference}", response_time_ms=None
+        )

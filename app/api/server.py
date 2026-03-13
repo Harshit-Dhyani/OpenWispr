@@ -39,6 +39,7 @@ from app.api.routes import (
     history_router,
     hotkey_router,
     models_router,
+    providers_router,
     session_router,
     settings_router,
     snippets_router,
@@ -2258,6 +2259,7 @@ app.add_middleware(
 )
 app.include_router(system_router)
 app.include_router(models_router)
+app.include_router(providers_router)
 app.include_router(session_router)
 app.include_router(settings_router)
 app.include_router(history_router)
@@ -2265,6 +2267,121 @@ app.include_router(dictionary_router)
 app.include_router(snippets_router)
 app.include_router(style_router)
 app.include_router(hotkey_router)
+
+
+# Hotkey WebSocket and SSE endpoints (not in router module)
+@app.websocket("/api/transcription/hotkey/ws")
+async def hotkey_websocket(websocket: WebSocket):
+    """WebSocket endpoint for real-time hotkey updates."""
+    await websocket.accept()
+    client_id = id(websocket)
+    logger.debug("Hotkey WebSocket connected: client_id=%s", client_id)
+
+    svc = get_hotkey_service()
+    svc.register_websocket(websocket)
+
+    last_audio_update = 0.0
+    audio_throttle_ms = 50.0
+
+    async def send_event(event_type: str, data: dict[str, Any]) -> None:
+        nonlocal last_audio_update
+        try:
+            if event_type == "hotkey_audio_level":
+                now = time.time() * 1000
+                if now - last_audio_update < audio_throttle_ms:
+                    return
+                last_audio_update = now
+            await websocket.send_json(
+                {
+                    "type": event_type,
+                    "payload": data,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+        except Exception as exc:
+            logger.debug("WebSocket send error: %s", exc)
+
+    svc.register_callback(send_event)
+
+    try:
+        status = svc.get_status()
+        await websocket.send_json(
+            {
+                "type": "hotkey_status",
+                "payload": {
+                    "state": status.state,
+                    "is_recording": status.is_recording,
+                    "partial_text": status.partial_text,
+                    "audio_level": status.audio_level,
+                    "levels": [status.audio_level] * 36 if status.audio_level > 0 else [0.0] * 36,
+                    "session_id": status.session_id,
+                    "duration_ms": status.duration_ms,
+                },
+            }
+        )
+
+        while True:
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
+                if message.get("action") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "keepalive"})
+
+    except WebSocketDisconnect:
+        logger.debug("Hotkey WebSocket disconnected: client_id=%s", client_id)
+    except Exception as exc:
+        logger.debug("Hotkey WebSocket error: %s", exc)
+    finally:
+        svc.unregister_callback(send_event)
+        svc.unregister_websocket(websocket)
+        try:
+            await websocket.close(code=1000, reason="hotkey-websocket-closed")
+        except Exception:
+            pass
+
+
+@app.get("/api/transcription/hotkey/events")
+async def hotkey_events(
+    request: Request,
+    svc: HotkeyTranscriptionService = Depends(get_hotkey_service),
+) -> StreamingResponse:
+    """SSE endpoint for hotkey transcription events."""
+    client_id = id(request)
+    logger.debug("Hotkey SSE connect: client_id=%s", client_id)
+
+    queue = asyncio.Queue(maxsize=100)
+    loop = asyncio.get_running_loop()
+    last_audio_update = 0.0
+    audio_throttle_ms = 50.0
+
+    def on_event(event_type: str, data: dict[str, Any]) -> None:
+        nonlocal last_audio_update
+        if event_type == "hotkey_audio_level":
+            now = time.time() * 1000
+            if now - last_audio_update < audio_throttle_ms:
+                return
+            last_audio_update = now
+        try:
+            queue.put_nowait({"type": event_type, "payload": data})
+        except asyncio.QueueFull:
+            logger.warning("Hotkey SSE queue full, dropping event: %s", event_type)
+
+    svc.register_callback(on_event)
+
+    async def event_generator():
+        try:
+            while True:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield f"data: {json.dumps(event)}\n\n"
+        except asyncio.TimeoutError:
+            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+        except Exception as exc:
+            logger.debug("Hotkey SSE error: %s", exc)
+        finally:
+            svc.unregister_callback(on_event)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.get("/api/events")

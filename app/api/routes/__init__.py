@@ -2,6 +2,7 @@ from .dictionary import router as dictionary_router
 from .history import router as history_router
 from .hotkey import router as hotkey_router
 from .models import router as models_router
+from .providers import router as providers_router
 from .session import router as session_router
 from .settings import router as settings_router
 from .snippets import router as snippets_router
@@ -13,6 +14,7 @@ __all__ = [
     "history_router",
     "hotkey_router",
     "models_router",
+    "providers_router",
     "session_router",
     "settings_router",
     "snippets_router",
