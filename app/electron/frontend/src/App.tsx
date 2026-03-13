@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityFeed } from './components/ActivityFeed';
 import { AppSidebar } from './components/AppSidebar';
+import { DictationView } from './components/DictationView';
 import { DictionaryPage } from './pages/DictionaryPage';
 import { HomePage } from './pages/HomePage';
-import { ModeCardsRow } from './components/ModeCardsRow';
 import { QuickSettingsDrawer } from './components/QuickSettingsDrawer';
-import { SettingsPanel } from './components/SettingsPanel';
-import { MainContent } from './components/MainContent';
+import { QuickSettingsContent } from './components/QuickSettingsContent';
+import { SessionsView } from './components/SessionsView';
+import { SettingsPanel } from './components/settings/SettingsPanel';
 import { SnippetsPage } from './pages/SnippetsPage';
 import { useEventSource, type EventSourceEvent } from './hooks/useEventSource';
 import {
@@ -34,7 +34,7 @@ import {
 import { resolveSourceModelId, syncInheritedAsrModelIds } from './lib/asrRouting';
 import { getEligibleDevices, resolveRequestedDeviceId } from './lib/sessionStart';
 import { DEFAULT_SETTINGS, isFakeSetting } from './config/settingsSchema';
-import type { SettingsState } from './config/settingsSchema';
+import type { SettingsState, HotkeySettings } from './config/settingsSchema';
 import { sanitizeSettings } from './config/settingsMigration';
 import type {
   Device,
@@ -437,9 +437,6 @@ function App() {
         (migrated.audio.default_capture_source as FormState['captureMode'] | undefined) ||
         (migrated.audio.captureMode as FormState['captureMode'] | undefined) ||
         'microphone';
-      const hotkeyCaptureSource =
-        (migrated.hotkey.capture_source as FormState['captureMode'] | undefined) ||
-        defaultCaptureSource;
       mergeFormDefaults({
         sessionTitle: migrated.general.defaultSessionTitle || undefined,
         captureMode: defaultCaptureSource,
@@ -456,31 +453,7 @@ function App() {
       // Apply hotkey config to Electron main process
       const hotkeyApi = window.openwisprDesktop?.hotkey;
       if (hotkeyApi) {
-        await hotkeyApi.updateConfig({
-          enabled: migrated.hotkey.enabled,
-          key_combination: migrated.hotkey.key_combination,
-          microphone_key_combination: migrated.hotkey.microphone_key_combination,
-          system_key_combination: migrated.hotkey.system_key_combination,
-          hold_mode: migrated.hotkey.hold_mode,
-          auto_inject: migrated.hotkey.auto_inject,
-          language: migrated.hotkey.language,
-          capture_source: hotkeyCaptureSource,
-          device_id: migrated.hotkey.device_id,
-          default_asr_model_id: migrated.transcription.default_asr_model_id,
-          microphone_asr_model_id: migrated.transcription.microphone_asr_model_id,
-          system_asr_model_id: migrated.transcription.system_asr_model_id,
-          finish_mode_default: migrated.hotkey.finish_mode_default,
-          enable_refiner_on_stop: migrated.hotkey.enable_refiner_on_stop,
-          save_debug_wav: migrated.hotkey.save_debug_wav,
-          mute_openwispr_audio_during_dictation:
-            migrated.audio.mute_openwispr_audio_during_dictation,
-          show_floating_window: migrated.hotkey.show_floating_window,
-          show_floating_coach_result: migrated.coach.show_floating_coach_result,
-          floating_window_position: migrated.hotkey.floating_window_position,
-          record_on_start: migrated.hotkey.record_on_start,
-          stop_on_release: migrated.hotkey.stop_on_release,
-          copy_to_clipboard: migrated.hotkey.copy_to_clipboard,
-        } as any);
+        await hotkeyApi.updateConfig(migrated.hotkey as Partial<HotkeySettings>);
       }
 
       if (migrated.transcription.preload_model) {
@@ -613,33 +586,7 @@ function App() {
       // Apply hotkey config to Electron main process
       const hotkeyApi = window.openwisprDesktop.hotkey;
       if (hotkeyApi) {
-        const hotkeyResult = await hotkeyApi.updateConfig({
-          enabled: persistedSettings.hotkey.enabled,
-          key_combination: persistedSettings.hotkey.key_combination,
-          microphone_key_combination: persistedSettings.hotkey.microphone_key_combination,
-          system_key_combination: persistedSettings.hotkey.system_key_combination,
-          hold_mode: persistedSettings.hotkey.hold_mode,
-          auto_inject: persistedSettings.hotkey.auto_inject,
-          language: persistedSettings.hotkey.language,
-          capture_source:
-            (persistedSettings.hotkey.capture_source as FormState['captureMode'] | undefined) ||
-            normalizedCaptureSource,
-          device_id: persistedSettings.hotkey.device_id,
-          default_asr_model_id: persistedSettings.transcription.default_asr_model_id,
-          microphone_asr_model_id: persistedSettings.transcription.microphone_asr_model_id,
-          system_asr_model_id: persistedSettings.transcription.system_asr_model_id,
-          finish_mode_default: persistedSettings.hotkey.finish_mode_default,
-          enable_refiner_on_stop: persistedSettings.hotkey.enable_refiner_on_stop,
-          save_debug_wav: persistedSettings.hotkey.save_debug_wav,
-          mute_openwispr_audio_during_dictation:
-            persistedSettings.audio.mute_openwispr_audio_during_dictation,
-          show_floating_window: persistedSettings.hotkey.show_floating_window,
-          show_floating_coach_result: persistedSettings.coach.show_floating_coach_result,
-          floating_window_position: persistedSettings.hotkey.floating_window_position,
-          record_on_start: persistedSettings.hotkey.record_on_start,
-          stop_on_release: persistedSettings.hotkey.stop_on_release,
-          copy_to_clipboard: persistedSettings.hotkey.copy_to_clipboard,
-        } as any);
+        const hotkeyResult = await hotkeyApi.updateConfig(persistedSettings.hotkey as Partial<HotkeySettings>);
         if (!hotkeyResult?.success) {
           throw new Error(hotkeyResult?.error || 'Unable to apply hotkey settings.');
         }
@@ -1350,7 +1297,6 @@ function App() {
     }
   }
 
-  const busy = isStarting || isStopping;
   const connectionStatus =
     sseStatus === 'connected'
       ? 'sse-connected'
@@ -1586,266 +1532,56 @@ function App() {
     />
   );
   const dictationView = (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl border-2 border-lawn-border bg-lawn-bg/60 p-4 shadow-brutal-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-muted">
-              Dictation workspace
-            </p>
-            <h2 className="mt-2 font-display text-4xl uppercase tracking-tight text-lawn-border">
-              Talk, clean up, paste
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-lawn-muted">
-              Mic and hotkey dictation stay lightweight here. Use the quick drawer for language, finish action,
-              and source-aware model choices without opening the full settings panel.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (isDictationTransitioning) {
-                  return;
-                }
-                void (isDictationRecording ? stopDictation() : startDictation());
-              }}
-              disabled={isDictationTransitioning}
-              className="border-2 border-lawn-accent bg-lawn-accent px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg"
-            >
-              {dictationLifecycleState === 'starting'
-                ? 'Starting…'
-                : dictationLifecycleState === 'stopping'
-                  ? 'Stopping…'
-                  : isDictationRecording
-                    ? 'Stop Dictation'
-                    : 'Start Dictation'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuickSettingsMode('dictation')}
-              className="border-2 border-lawn-border bg-lawn-bg px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-border"
-            >
-              Quick settings
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePage('settings')}
-              className="border-2 border-lawn-border bg-lawn-dark px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg"
-            >
-              Open settings
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 border-2 border-lawn-border bg-lawn-bg p-3">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Language</span>
-              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">{dictationLanguage || 'auto'}</p>
-            </div>
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Model</span>
-              <p className="mt-1 text-xs font-bold text-lawn-border">{dictationModelId}</p>
-            </div>
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Finish</span>
-              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">
-                {settings.hotkey.finish_mode_default.replace(/_/g, ' ')}
-              </p>
-            </div>
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
-              <p className="mt-1 text-xs font-bold text-lawn-border">
-                {dictationDevices.find((device) => device.id === settings.hotkey.device_id)?.name ||
-                  dictationDevices[0]?.name ||
-                  'Default device'}
-              </p>
-            </div>
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Runtime</span>
-              <p className="mt-1 text-xs font-bold text-lawn-border">{activeRuntimeStatus}</p>
-            </div>
-            <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Refiner</span>
-              <p className="mt-1 text-xs font-bold uppercase text-lawn-border">
-                {settings.hotkey.enable_refiner_on_stop ? 'Enabled' : 'Disabled'}
-              </p>
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
-              {connectionStatus}
-            </span>
-            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
-              {gpuStatus}
-            </span>
-            <span className="border border-lawn-border px-2 py-1 text-[10px] font-black uppercase text-lawn-border">
-              {dictationHotkeyLabel || 'No hotkey set'}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="grid min-h-0 flex-1 gap-4 p-4 2xl:grid-cols-[minmax(0,1.1fr)_340px]">
-        <div className="min-h-0 overflow-hidden">
-          <MainContent
-            scope="dictation"
-            snapshot={dictationSnapshot}
-            liveLatency={liveLatency}
-            liveDraft={dictationLiveDraft}
-            transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
-            coachResult={dictationCoachResult ?? null}
-            coachStatus={dictationCoachStatus ?? null}
-            coachDisplaySource={dictationCoachDisplaySource ?? null}
-            coachError={dictationCoachError}
-            originalText={dictationAggregatedText}
-            pasteText={dictationPasteText || dictationPostprocessedText}
-            showCoachDiff={settings.coach.show_diff_view}
-            workspaceLabel="Dictation"
-            workspaceTitle="Mic / hotkey timeline"
-            workspaceDescription="Quick dictation, low-latency feedback, and one shared timeline for recent spoken text."
-          />
-        </div>
-        <div className="min-h-0 overflow-hidden">
-          <div className="h-full min-h-0 overflow-hidden">
-            <ActivityFeed
-              session={dictationSnapshot.session}
-              transcript={dictationSnapshot.transcript}
-              health={dictationSnapshot.health}
-              variant="sidebar"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <DictationView
+      liveLatency={liveLatency}
+      dictationSnapshot={dictationSnapshot}
+      dictationLiveDraft={dictationLiveDraft}
+      transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
+      dictationCoachResult={dictationCoachResult}
+      dictationCoachStatus={dictationCoachStatus}
+      dictationCoachDisplaySource={dictationCoachDisplaySource}
+      dictationCoachError={dictationCoachError}
+      dictationAggregatedText={dictationAggregatedText}
+      dictationPasteText={dictationPasteText}
+      dictationPostprocessedText={dictationPostprocessedText}
+      showCoachDiff={settings.coach.show_diff_view}
+      isDictationRecording={isDictationRecording}
+      isDictationTransitioning={isDictationTransitioning}
+      dictationLifecycleState={dictationLifecycleState}
+      dictationLanguage={dictationLanguage}
+      dictationModelId={dictationModelId}
+      dictationDevices={dictationDevices}
+      settingsHotkey={settings.hotkey}
+      connectionStatus={connectionStatus}
+      gpuStatus={gpuStatus}
+      dictationHotkeyLabel={dictationHotkeyLabel}
+      onStartDictation={startDictation}
+      onStopDictation={stopDictation}
+      onOpenQuickSettings={() => setQuickSettingsMode('dictation')}
+      onOpenSettings={() => setActivePage('settings')}
+    />
   );
 
   const sessionsView = (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto]">
-          <div className="space-y-4">
-            <div className="border-2 border-lawn-border bg-lawn-bg/60 p-4 shadow-brutal-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-muted">
-                Session workspace
-              </p>
-              <h2 className="mt-2 font-display text-4xl uppercase tracking-tight text-lawn-border">
-                Long-form transcription
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-lawn-muted">
-                System audio is the default here. Use the session controls for meetings, videos, exports, and review.
-              </p>
-            </div>
-            <ModeCardsRow
-              cards={[
-                {
-                  title: 'Session Workspace',
-                  description: `${form.sessionTitle || 'Untitled session'} · ${snapshot.session?.status ?? 'ready'}`,
-                  controls: (
-                    <input
-                      value={form.sessionTitle}
-                      onChange={(event) => handleSidebarFieldChange('sessionTitle', event.target.value)}
-                      className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-                    />
-                  ),
-                },
-                {
-                  title: 'Long-form Transcription',
-                  description: `${form.captureMode === 'system' ? 'System audio' : 'Microphone'} · ${sessionModelId}`,
-                  controls: (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <select
-                        value={form.captureMode}
-                        onChange={(event) => handleSidebarFieldChange('captureMode', event.target.value as FormState['captureMode'])}
-                        className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-                      >
-                        <option value="system">System Audio</option>
-                        <option value="microphone">Microphone</option>
-                      </select>
-                      <select
-                        value={form.deviceId}
-                        onChange={(event) => handleSidebarFieldChange('deviceId', event.target.value)}
-                        className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-                      >
-                        {sessionDevices.map((device) => (
-                          <option key={device.id} value={device.id}>
-                            {device.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ),
-                },
-                {
-                  title: 'Session Export + Notes',
-                  description: `${form.exportRoot || 'sessions'} · PDF context and exports stay attached to this session`,
-                  controls: (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <select
-                        value={form.languageMode}
-                        onChange={(event) => handleSidebarFieldChange('languageMode', event.target.value)}
-                        className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-                      >
-                        {snapshot.available_languages.map((language) => (
-                          <option key={language} value={language}>
-                            {language}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border">
-                        {form.exportRoot || 'sessions'}
-                      </div>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </div>
-          <div className="flex flex-wrap gap-3 xl:flex-col xl:items-stretch">
-            <button
-              type="button"
-              onClick={() => void (snapshot.session?.status === 'running' ? stopSession() : startSession())}
-              disabled={busy}
-              className="border-2 border-lawn-accent bg-lawn-accent px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {snapshot.session?.status === 'running' ? 'Stop Session' : 'Start Session'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuickSettingsMode('sessions')}
-              className="border-2 border-lawn-border bg-lawn-bg px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-border"
-            >
-              Quick settings
-            </button>
-            <button
-              type="button"
-              onClick={() => void preloadModel()}
-              className="border-2 border-lawn-border bg-lawn-dark px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg"
-            >
-              {preloadStatus.loading ? preloadHeadline : 'Prepare model'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void attachPdf()}
-              className="border-2 border-lawn-border bg-lawn-bg px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-border"
-            >
-              Attach PDF context
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 p-4">
-        <MainContent
-          scope="session"
-          snapshot={snapshot}
-          liveLatency={liveLatency}
-          liveDraft={liveDraft}
-          transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
-          workspaceLabel="Sessions"
-          workspaceTitle={form.sessionTitle || 'System Audio Session'}
-          workspaceDescription={`Source: ${form.captureMode === 'system' ? 'system audio' : 'microphone'} · Model: ${sessionModelId} · Execution: ${form.executionMode}`}
-        />
-      </div>
-    </div>
+    <SessionsView
+      snapshot={snapshot}
+      liveLatency={liveLatency}
+      liveDraft={liveDraft}
+      transcriptDebugEvents={settings.advanced.debugMode ? transcriptDebugEvents : []}
+      form={form}
+      sessionDevices={sessionDevices}
+      sessionModelId={sessionModelId}
+      isStarting={isStarting}
+      isStopping={isStopping}
+      preloadStatus={preloadStatus}
+      preloadHeadline={preloadHeadline}
+      onFieldChange={handleSidebarFieldChange}
+      onStartSession={startSession}
+      onStopSession={stopSession}
+      onPreloadModel={preloadModel}
+      onAttachPdf={attachPdf}
+      onOpenQuickSettings={() => setQuickSettingsMode('sessions')}
+    />
   );
 
   const settingsView = (
@@ -1906,87 +1642,25 @@ function App() {
         description="Only the everyday controls for microphone or hotkey dictation live here."
         onClose={() => setQuickSettingsMode(null)}
       >
-        <div className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Source</span>
-            <select
-              value={dictationCaptureSource}
-              onChange={(event) => void updateDictationSetting('capture_source', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              <option value="microphone">Microphone</option>
-              <option value="system">System Audio</option>
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
-            <select
-              value={settings.hotkey.device_id || dictationDevices[0]?.id || ''}
-              onChange={(event) => void updateDictationSetting('device_id', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {dictationDevices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Language</span>
-            <select
-              value={dictationLanguage}
-              onChange={(event) => void updateDictationSetting('language', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {snapshot.available_languages.map((language) => (
-                <option key={language} value={language}>
-                  {language}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Dictation model</span>
-            <select
-              value={dictationModelId}
-              onChange={(event) => void updateDictationSetting('model_id', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {modelManager.catalog
-                .filter((entry) => entry.category === 'asr')
-                .map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.display_name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Finish action</span>
-            <select
-              value={settings.hotkey.finish_mode_default}
-              onChange={(event) => void updateDictationSetting('finish_mode_default', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              <option value="finish_and_paste">Finish &amp; Paste</option>
-              <option value="finish">Finish only</option>
-              <option value="cancel">Cancel</option>
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Refiner mode</span>
-            <select
-              value={settings.transcription.refinement_mode}
-              onChange={(event) => void updateDictationSetting('refinement_mode', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              <option value="off">Off</option>
-              <option value="strict">Strict</option>
-              <option value="polished">Polished</option>
-            </select>
-          </label>
-        </div>
+        <QuickSettingsContent
+          mode="dictation"
+          dictationCaptureSource={dictationCaptureSource}
+          dictationDevices={dictationDevices}
+          dictationLanguage={dictationLanguage}
+          dictationModelId={dictationModelId}
+          settingsHotkey={settings.hotkey}
+          settingsTranscription={settings.transcription}
+          snapshot={snapshot}
+          form={form}
+          sessionDevices={sessionDevices}
+          sessionModelId={sessionModelId}
+          modelManager={modelManager}
+          onDictationSettingChange={updateDictationSetting}
+          onFieldChange={handleSidebarFieldChange}
+          onSessionModelChange={updateSessionModelSetting}
+          onChooseDirectory={chooseDirectory}
+          onAttachPdf={attachPdf}
+        />
       </QuickSettingsDrawer>
     ) : quickSettingsMode === 'sessions' ? (
       <QuickSettingsDrawer
@@ -1995,109 +1669,25 @@ function App() {
         description="Use the essentials here. Deeper tuning stays in the Settings page."
         onClose={() => setQuickSettingsMode(null)}
       >
-        <div className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Session title</span>
-            <input
-              value={form.sessionTitle}
-              onChange={(event) => handleSidebarFieldChange('sessionTitle', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Source</span>
-            <select
-              value={form.captureMode}
-              onChange={(event) => handleSidebarFieldChange('captureMode', event.target.value as FormState['captureMode'])}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              <option value="system">System Audio</option>
-              <option value="microphone">Microphone</option>
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Device</span>
-            <select
-              value={form.deviceId}
-              onChange={(event) => handleSidebarFieldChange('deviceId', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {sessionDevices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">ASR model</span>
-            <select
-              value={sessionModelId}
-              onChange={(event) => void updateSessionModelSetting(event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {modelManager.catalog
-                .filter((entry) => entry.category === 'asr')
-                .map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.display_name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Quality mode</span>
-            <select
-              value={form.liveMode}
-              onChange={(event) => handleSidebarFieldChange('liveMode', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {snapshot.available_live_modes.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Execution mode</span>
-            <select
-              value={form.executionMode}
-              onChange={(event) => handleSidebarFieldChange('executionMode', event.target.value)}
-              className="w-full border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-            >
-              {snapshot.available_execution_modes.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">Export folder</span>
-            <div className="flex gap-2">
-              <input
-                value={form.exportRoot}
-                onChange={(event) => handleSidebarFieldChange('exportRoot', event.target.value)}
-                className="min-w-0 flex-1 border-2 border-lawn-border bg-lawn-bg px-3 py-2 text-sm font-bold text-lawn-border outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => void chooseDirectory()}
-                className="border-2 border-lawn-border bg-lawn-dark px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-lawn-bg"
-              >
-                Browse
-              </button>
-            </div>
-          </label>
-          <button
-            type="button"
-            onClick={() => void attachPdf()}
-            className="w-full border-2 border-lawn-accent bg-lawn-accent px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-lawn-bg"
-          >
-            Attach PDF context
-          </button>
-        </div>
+        <QuickSettingsContent
+          mode="sessions"
+          dictationCaptureSource={dictationCaptureSource}
+          dictationDevices={dictationDevices}
+          dictationLanguage={dictationLanguage}
+          dictationModelId={dictationModelId}
+          settingsHotkey={settings.hotkey}
+          settingsTranscription={settings.transcription}
+          snapshot={snapshot}
+          form={form}
+          sessionDevices={sessionDevices}
+          sessionModelId={sessionModelId}
+          modelManager={modelManager}
+          onDictationSettingChange={updateDictationSetting}
+          onFieldChange={handleSidebarFieldChange}
+          onSessionModelChange={updateSessionModelSetting}
+          onChooseDirectory={chooseDirectory}
+          onAttachPdf={attachPdf}
+        />
       </QuickSettingsDrawer>
     ) : null;
 
