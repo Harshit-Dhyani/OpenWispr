@@ -360,6 +360,12 @@ class CoachSettings:
     show_floating_coach_result: bool = field(
         default_factory=lambda: get_setting("show_floating_coach_result").default
     )
+    coach_runtime_enabled: bool = field(
+        default_factory=lambda: get_setting("coach_runtime_enabled").default
+    )
+    coach_selected_model_id: str = field(
+        default_factory=lambda: get_setting("coach_selected_model_id").default
+    )
     coach_prompt_templates: list[CoachPromptTemplateSettings] = field(
         default_factory=lambda: [
             CoachPromptTemplateSettings(**template) for template in get_default_coach_templates()
@@ -502,13 +508,22 @@ class SettingsManager:
         """Initialize the settings manager.
 
         Args:
-            settings_dir: Directory to store settings file. Defaults to app directory.
+            settings_dir: Directory to store settings file. Defaults to user data directory.
         """
         if settings_dir is None:
-            app_dir = Path(__file__).parent.parent.parent
-            self.settings_path = app_dir / self.SETTINGS_FILENAME
-        else:
-            self.settings_path = settings_dir / self.SETTINGS_FILENAME
+            # Use platform-appropriate user data directory
+            if sys.platform == "win32":
+                base = Path(os.getenv("APPDATA") or (Path.home() / "AppData" / "Roaming"))
+            elif sys.platform == "darwin":
+                base = Path.home() / "Library" / "Application Support"
+            else:
+                base = Path(os.getenv("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+            # Use OpenWispr subdirectory
+            settings_dir = base / "OpenWispr"
+
+        settings_dir = Path(settings_dir)
+        settings_dir.mkdir(parents=True, exist_ok=True)
+        self.settings_path = settings_dir / self.SETTINGS_FILENAME
 
         self._settings: SettingsState = DEFAULT_SETTINGS_STATE
         self._mode_container: SettingsContainer = create_default_mode_configs()

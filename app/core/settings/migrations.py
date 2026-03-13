@@ -60,7 +60,7 @@ def _v1_to_v2(settings: dict[str, Any]) -> dict[str, Any]:
 
     # Add refinement settings
     transcription.setdefault("refinement_mode", "off")
-    transcription.setdefault("refinement_profile", "raw")
+    transcription.setdefault("refinement_profile", "clean_dictation")
     refiner.setdefault("selected_model_id", "qwen2.5-3b-instruct")
     refiner.setdefault("runtime_enabled", False)
     refiner.setdefault("engine_preference", "llamacpp")

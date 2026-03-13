@@ -33,7 +33,8 @@ class HistoryDatabase:
         self._conn = sqlite3.connect(
             str(self.db_path),
             check_same_thread=False,
-            timeout=30.0,  # Wait up to 30 seconds for locks
+            isolation_level=None,  # Enable autocommit for single-statement writes
+            timeout=30.0,
         )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL;")
