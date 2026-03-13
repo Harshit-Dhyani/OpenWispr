@@ -14,24 +14,20 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app.config.coach_prompts import get_default_coach_templates
 from app.config.settings import (
     CURRENT_SETTINGS_VERSION,
     FAKE_SETTINGS,
-    get_all_defaults,
-    get_category_defaults,
     get_setting,
 )
-from app.config.coach_prompts import get_default_coach_templates
 from app.core.model_catalog import MODEL_CATALOG_BY_ID
-from app.core.settings.config import ModeConfig, SettingsContainer, create_default_mode_configs
 from app.core.modes import (
     ModeSettings,
     SystemModeDefaults,
     TranscriptionMode,
     WisprModeDefaults,
-    get_mode_configuration,
-    get_mode_defaults,
 )
+from app.core.settings.config import ModeConfig, SettingsContainer, create_default_mode_configs
 from app.core.settings.migrations import migrate_to_current, needs_migration
 from app.core.settings.validator import SettingsValidator, ValidationResult
 
@@ -113,7 +109,7 @@ def _normalize_settings_payload(data: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _build_coach_settings(raw: dict[str, Any] | None) -> "CoachSettings":
+def _build_coach_settings(raw: dict[str, Any] | None) -> CoachSettings:
     payload = dict(raw or {})
     overrides = payload.get("coach_overrides", {}) or {}
     templates = payload.get("coach_prompt_templates", get_default_coach_templates())
@@ -145,6 +141,7 @@ __all__ = [
     "DEFAULT_SETTINGS_STATE",
     "SettingsManager",
     "get_settings_manager",
+    "reset_settings_manager",
 ]
 
 
@@ -526,7 +523,7 @@ class SettingsManager:
             return
 
         try:
-            with open(self.settings_path, "r", encoding="utf-8") as f:
+            with open(self.settings_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Migrate if needed

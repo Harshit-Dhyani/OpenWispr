@@ -10,10 +10,9 @@ from typing import Any, Literal
 
 from app.config.settings import (
     SETTINGS_REGISTRY,
-    get_settings_by_category,
     get_all_categories,
+    get_settings_by_category,
     validate_setting,
-    get_category_defaults,
 )
 
 

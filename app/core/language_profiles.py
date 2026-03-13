@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 LANGUAGE_CATALOG: list[tuple[str, str]] = [
     ("auto", "Auto-detect"),
     ("en", "English"),

@@ -11,31 +11,24 @@ import asyncio
 import logging
 import threading
 import time
-import traceback
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from app.audio.system_pipeline import SystemPipeline, SystemPipelineConfig
 from app.audio.wispr_pipeline import WisprPipeline, WisprPipelineConfig
-from app.core.settings.config import AppSettings
-from app.core.logging_utils import configure_logging
-from app.core.modes import (
-    ModeConfiguration,
-    ModeSettings,
-    SystemModeDefaults,
-    TranscriptionMode,
-    WisprModeDefaults,
-    get_mode_configuration,
-    get_mode_defaults,
-)
 from app.core.models import SessionHealth, SessionState, TranscriptSegment
+from app.core.modes import (
+    TranscriptionMode,
+)
 from app.core.session_manager import SessionManager
+from app.core.settings.config import AppSettings
 from app.core.settings.manager import SettingsManager, get_settings_manager
 from app.stt.streaming_engine import (
     DualModeTranscriptionEngine,
     EngineState,
+)
+from app.stt.streaming_engine import (
     TranscriptionMode as EngineMode,
 )
 
@@ -950,7 +943,7 @@ class ModeManager:
                 # Wait before next check
                 try:
                     await asyncio.wait_for(self._stop_monitoring.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
             except Exception as e:
@@ -972,7 +965,7 @@ class ModeManager:
         if self._monitoring_task and not self._monitoring_task.done():
             try:
                 await asyncio.wait_for(self._monitoring_task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._monitoring_task.cancel()
 
         # Stop current mode

@@ -1,3 +1,5 @@
-"""Backward-compatible shim for settings manager APIs."""
+"""Backward compatibility shim - SettingsManager moved to app.core.settings.manager."""
 
-from app.core.settings.manager import *  # noqa: F401,F403
+from app.core.settings.manager import SettingsManager, SettingsState
+
+__all__ = ["SettingsManager", "SettingsState"]

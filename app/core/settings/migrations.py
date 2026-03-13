@@ -7,9 +7,10 @@ Each migration is a function that transforms settings from version N to N+1.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from app.config.settings import get_category_defaults, CURRENT_SETTINGS_VERSION
+from app.config.settings import CURRENT_SETTINGS_VERSION, get_category_defaults
 
 logger = logging.getLogger(__name__)
 

@@ -13,11 +13,12 @@ import threading
 import time
 import uuid
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -186,7 +187,6 @@ class PlatformTextInjector:
         """Windows text injection using clipboard + paste shortcut."""
         try:
             import ctypes
-            from ctypes import wintypes
 
             # Copy to clipboard first
             if not self._copy_windows(text):
@@ -261,7 +261,6 @@ class PlatformTextInjector:
         """Windows clipboard using ctypes."""
         try:
             import ctypes
-            from ctypes import wintypes
 
             CF_UNICODETEXT = 13
             GHND = 0x0042
@@ -324,8 +323,8 @@ class PlatformTextInjector:
             process.communicate(text, timeout=2)
             if process.returncode == 0:
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Linux clipboard (xclip) failed: {e}")
 
         try:
             # Try wl-copy (Wayland)
@@ -580,7 +579,7 @@ class HotkeySession:
             # Initialize metrics
             self._metrics = HotkeySessionMetrics(session_id=self._session_id)
             self._metrics.start_time = time.monotonic()
-            self._started_at = datetime.now(timezone.utc)
+            self._started_at = datetime.now(UTC)
 
             # Transition to recording
             self._transition_state(HotkeySessionState.RECORDING)
@@ -732,8 +731,8 @@ class HotkeySession:
             try:
                 if "backend" in locals():
                     backend.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to stop audio backend: {e}")
 
     def _process_streaming_partial(self) -> None:
         """Process partial transcription for real-time feedback."""
@@ -895,7 +894,7 @@ class HotkeySession:
         try:
             self.config.output_dir.mkdir(parents=True, exist_ok=True)
 
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             filename = f"hotkey_{self._session_id}_{timestamp}"
 
             # Save transcript
@@ -965,9 +964,9 @@ class HotkeySession:
             if self._transcriber is not None:
                 try:
                     self._transcriber.stop()
-                except Exception:
-                    pass
-                self._transcriber = None
+                except Exception as e:
+                    logger.warning(f"Failed to stop transcriber: {e}")
+                    self._transcriber = None
 
         with self._state_lock:
             self._state = HotkeySessionState.IDLE

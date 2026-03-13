@@ -21,38 +21,32 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
-import shutil
-import tempfile
 import threading
 import time
 import wave
-from collections import deque
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum, auto
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any
 from uuid import uuid4
 
 import numpy as np
 
-from app.audio.backends.base import to_mono
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.settings.config import AppSettings, resolve_live_profile
 from app.core.logging_utils import configure_logging
 from app.core.models import (
     AudioDeviceInfo,
-    FormulaFinding,
     SessionDocument,
     SessionHealth,
     SessionState,
     TranscriptSegment,
     utc_now,
 )
-from app.core.modes import TranscriptionMode
+from app.core.session.formatters import ExportFormat, MarkdownFormatter, SrtFormatter
+from app.core.settings.config import AppSettings, resolve_live_profile
 from app.stem.postprocess import NotesBundle, StemNoteProcessor
 from app.storage.document_store import ContextProvider, DocumentStore
 from app.storage.session_store import SessionWriter
@@ -64,55 +58,7 @@ logger = logging.getLogger(__name__)
 WhisperTranscriber = FastTranscriber
 
 
-# =============================================================================
-# Export Formatters
-# =============================================================================
-
-
-class ExportFormat(Enum):
-    """Supported export formats."""
-
-    TXT = "txt"
-    JSON = "json"
-    SRT = "srt"
-    MD = "md"
-
-    @classmethod
-    def from_string(cls, value: str) -> ExportFormat:
-        """Convert string to ExportFormat enum."""
-        try:
-            return cls(value.lower())
-        except ValueError:
-            raise ValueError(f"Unknown export format: {value}")
-
-
-class SrtFormatter:
-    """Formatter for SRT subtitle export."""
-
-    @staticmethod
-    def format_time(seconds: float) -> str:
-        """Convert seconds to SRT time format (HH:MM:SS,mmm)."""
-        td = timedelta(seconds=seconds)
-        hours, remainder = divmod(td.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        milliseconds = int(td.microseconds / 1000)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
-
-    @classmethod
-    def format_segments(cls, segments: list[TranscriptSegment]) -> str:
-        """Format segments as SRT subtitles."""
-        lines = []
-        visible = [s for s in segments if not s.suppressed]
-
-        for i, segment in enumerate(visible, 1):
-            start = cls.format_time(segment.start)
-            end = cls.format_time(segment.end)
-            lines.append(f"{i}")
-            lines.append(f"{start} --> {end}")
-            lines.append(segment.display_text)
-            lines.append("")
-
-        return "\n".join(lines)
+# Re-export for backward compatibility
 
 
 class MarkdownFormatter:
@@ -1186,7 +1132,7 @@ class SystemSessionHandler:
 
             return self.session
 
-        except Exception as e:
+        except Exception:
             self.logger.exception("session_start_failed")
             self._cleanup_on_error()
             raise
@@ -1211,7 +1157,11 @@ class SystemSessionHandler:
             raise FileNotFoundError(f"Session file not found: {session_file}")
 
         # Parse existing session data
-        metadata = json.loads(session_file.read_text(encoding="utf-8"))
+        try:
+            metadata = json.loads(session_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            self.logger.warning(f"Failed to parse session file: {e}")
+            raise
 
         # Create new session with loaded data
         self.create_session(
@@ -2064,9 +2014,15 @@ def load_session_from_disk(session_dir: Path) -> dict[str, Any]:
 
     # Load metadata
     if metadata_path.exists():
-        result["metadata"] = json.loads(metadata_path.read_text(encoding="utf-8"))
+        try:
+            result["metadata"] = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to parse session metadata: {e}")
     elif session_path.exists():
-        result["metadata"] = {"session": json.loads(session_path.read_text(encoding="utf-8"))}
+        try:
+            result["metadata"] = {"session": json.loads(session_path.read_text(encoding="utf-8"))}
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to parse session data: {e}")
 
     # Load segments
     transcript_path = session_dir / "transcript.jsonl"
@@ -2083,7 +2039,9 @@ def load_session_from_disk(session_dir: Path) -> dict[str, Any]:
     # Load formulas
     formulas_path = session_dir / "formulas.json"
     if formulas_path.exists():
-        result["formulas"] = json.loads(formulas_path.read_text(encoding="utf-8"))
+        try:
+            result["formulas"] = json.loads(formulas_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to parse formulas data: {e}")
 
     return result
-

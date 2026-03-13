@@ -10,12 +10,11 @@ import enum
 import logging
 import traceback
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Optional, Union
-
-from app.core.logging_utils import JsonFormatter
+from typing import Any, Union
 
 logger = logging.getLogger("openwispr.errors")
 
@@ -81,15 +80,15 @@ class AppError(Exception):
     message: str
     category: ErrorCategory = ErrorCategory.SYSTEM_UNKNOWN
     severity: ErrorSeverity = ErrorSeverity.ERROR
-    code: Optional[str] = None
+    code: str | None = None
     details: dict[str, Any] = field(default_factory=dict)
-    cause: Optional[BaseException] = None
+    cause: BaseException | None = None
     recoverable: bool = True
     retry_allowed: bool = True
     max_retries: int = 3
     error_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    stack_trace: Optional[str] = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    stack_trace: str | None = None
 
     def __post_init__(self):
         super().__init__(self.message)
@@ -123,9 +122,9 @@ class AppError(Exception):
 class AudioError(AppError):
     """Audio-related error with device information."""
 
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
-    backend: Optional[str] = None
+    device_id: str | None = None
+    device_name: str | None = None
+    backend: str | None = None
 
     def __post_init__(self):
         if self.category not in {
@@ -142,10 +141,10 @@ class AudioError(AppError):
 class ModelError(AppError):
     """Model-related error with model information."""
 
-    model_name: Optional[str] = None
-    model_path: Optional[str] = None
-    compute_type: Optional[str] = None
-    device: Optional[str] = None
+    model_name: str | None = None
+    model_path: str | None = None
+    compute_type: str | None = None
+    device: str | None = None
 
     def __post_init__(self):
         if self.category not in {
@@ -163,10 +162,10 @@ class ModelError(AppError):
 class NetworkError(AppError):
     """Network-related error with endpoint information."""
 
-    endpoint: Optional[str] = None
-    method: Optional[str] = None
-    status_code: Optional[int] = None
-    response_body: Optional[str] = None
+    endpoint: str | None = None
+    method: str | None = None
+    status_code: int | None = None
+    response_body: str | None = None
 
     def __post_init__(self):
         if self.category not in {
@@ -183,10 +182,10 @@ class NetworkError(AppError):
 class SessionError(AppError):
     """Session-related error with file information."""
 
-    session_id: Optional[str] = None
-    file_path: Optional[str] = None
-    file_size: Optional[int] = None
-    available_space: Optional[int] = None
+    session_id: str | None = None
+    file_path: str | None = None
+    file_size: int | None = None
+    available_space: int | None = None
 
     def __post_init__(self):
         if self.category not in {
@@ -284,7 +283,7 @@ class UserNotifier:
     def __init__(
         self,
         min_severity: ErrorSeverity = ErrorSeverity.WARNING,
-        callback: Optional[Callable[[dict[str, str]], None]] = None,
+        callback: Callable[[dict[str, str]], None] | None = None,
     ):
         self.min_severity = min_severity
         self.callback = callback
@@ -304,7 +303,7 @@ class UserNotifier:
         message_data = self._format_message(error)
         self._notification_history.append(
             {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "error_id": error.error_id,
                 "data": message_data,
             }
@@ -343,7 +342,7 @@ class UserNotifier:
         }
 
     def suppress_category(
-        self, category: ErrorCategory, duration_seconds: Optional[float] = None
+        self, category: ErrorCategory, duration_seconds: float | None = None
     ) -> None:
         """Temporarily suppress notifications for a category."""
         self._suppressed_categories.add(category)
@@ -371,7 +370,7 @@ class ErrorReporter:
 
     def __init__(
         self,
-        report_dir: Optional[Path] = None,
+        report_dir: Path | None = None,
         enable_telemetry: bool = True,
         enable_crash_dumps: bool = True,
     ):
@@ -379,14 +378,14 @@ class ErrorReporter:
         self.enable_telemetry = enable_telemetry
         self.enable_crash_dumps = enable_crash_dumps
         self._error_counts: dict[ErrorCategory, int] = {}
-        self._session_start = datetime.now(timezone.utc)
+        self._session_start = datetime.now(UTC)
 
         if self.enable_crash_dumps:
             self.report_dir.mkdir(parents=True, exist_ok=True)
 
     def report(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
-    ) -> Optional[str]:
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
+    ) -> str | None:
         """Report an error to telemetry and optionally save crash dump."""
         self._error_counts[error.category] = self._error_counts.get(error.category, 0) + 1
 
@@ -395,7 +394,7 @@ class ErrorReporter:
             "error": error.to_dict(),
             "context": context or {},
             "session_duration_seconds": (
-                datetime.now(timezone.utc) - self._session_start
+                datetime.now(UTC) - self._session_start
             ).total_seconds(),
         }
 
@@ -410,11 +409,11 @@ class ErrorReporter:
 
         return None
 
-    def _save_crash_dump(self, error: OpenWisprError, context: Optional[dict[str, Any]]) -> str:
+    def _save_crash_dump(self, error: OpenWisprError, context: dict[str, Any] | None) -> str:
         """Save crash dump file for analysis."""
         dump_path = (
             self.report_dir
-            / f"crash_{error.error_id}_{int(datetime.now(timezone.utc).timestamp())}.json"
+            / f"crash_{error.error_id}_{int(datetime.now(UTC).timestamp())}.json"
         )
 
         import json
@@ -446,7 +445,7 @@ class ErrorReporter:
 
     def _calculate_error_rate(self) -> float:
         """Calculate errors per minute."""
-        duration_minutes = (datetime.now(timezone.utc) - self._session_start).total_seconds() / 60
+        duration_minutes = (datetime.now(UTC) - self._session_start).total_seconds() / 60
         if duration_minutes <= 0:
             return 0.0
         return sum(self._error_counts.values()) / duration_minutes
@@ -465,7 +464,7 @@ class RetryConfig:
         max_delay: float = 60.0,
         exponential_base: float = 2.0,
         jitter: bool = True,
-        retryable_exceptions: Optional[set[type[BaseException]]] = None,
+        retryable_exceptions: set[type[BaseException]] | None = None,
     ):
         self.max_retries = max_retries
         self.base_delay = base_delay
@@ -476,9 +475,9 @@ class RetryConfig:
 
 
 def with_retry(
-    config: Optional[RetryConfig] = None,
-    on_retry: Optional[Callable[[int, BaseException], None]] = None,
-    on_exhausted: Optional[Callable[[BaseException], None]] = None,
+    config: RetryConfig | None = None,
+    on_retry: Callable[[int, BaseException], None] | None = None,
+    on_exhausted: Callable[[BaseException], None] | None = None,
 ):
     """Decorator for retry with exponential backoff."""
     cfg = config or RetryConfig()
@@ -532,9 +531,9 @@ def with_retry(
 
 async def with_retry_async(
     func: Callable[..., Coroutine],
-    config: Optional[RetryConfig] = None,
-    on_retry: Optional[Callable[[int, BaseException], Coroutine]] = None,
-    on_exhausted: Optional[Callable[[BaseException], Coroutine]] = None,
+    config: RetryConfig | None = None,
+    on_retry: Callable[[int, BaseException], Coroutine] | None = None,
+    on_exhausted: Callable[[BaseException], Coroutine] | None = None,
     *args,
     **kwargs,
 ):
@@ -582,8 +581,8 @@ class ErrorHandler:
 
     def __init__(
         self,
-        notifier: Optional[UserNotifier] = None,
-        reporter: Optional[ErrorReporter] = None,
+        notifier: UserNotifier | None = None,
+        reporter: ErrorReporter | None = None,
     ):
         self.notifier = notifier or UserNotifier()
         self.reporter = reporter or ErrorReporter()
@@ -617,7 +616,7 @@ class ErrorHandler:
     def handle(
         self,
         error: OpenWisprError,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Handle an error through all registered handlers."""
         # Check rate limiting
@@ -653,7 +652,7 @@ class ErrorHandler:
         self,
         exc: BaseException,
         category: ErrorCategory = ErrorCategory.SYSTEM_UNKNOWN,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Convert generic exception to AppError and handle."""
         if isinstance(exc, AppError):
@@ -690,7 +689,7 @@ class ErrorHandler:
 # ============================================
 # Singleton Instance
 # ============================================
-_default_handler: Optional[ErrorHandler] = None
+_default_handler: ErrorHandler | None = None
 
 
 def get_error_handler() -> ErrorHandler:
@@ -708,7 +707,7 @@ def set_default_handler(handler: ErrorHandler) -> None:
 
 
 # Convenience functions
-def handle_error(error: OpenWisprError, context: Optional[dict[str, Any]] = None) -> None:
+def handle_error(error: OpenWisprError, context: dict[str, Any] | None = None) -> None:
     """Handle an error using the default handler."""
     get_error_handler().handle(error, context)
 
@@ -718,6 +717,6 @@ def notify_user(error: OpenWisprError) -> None:
     get_error_handler().notifier.notify(error)
 
 
-def report_error(error: OpenWisprError, context: Optional[dict[str, Any]] = None) -> Optional[str]:
+def report_error(error: OpenWisprError, context: dict[str, Any] | None = None) -> str | None:
     """Report an error using the default reporter."""
     return get_error_handler().reporter.report(error, context)

@@ -6,18 +6,14 @@ and WebSocket streaming for real-time UI updates.
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-import platform
 import threading
 import time
 from collections import deque
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
-from enum import Enum, auto
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 from .metrics import (
     Alert,
@@ -43,8 +39,8 @@ class ResourceSnapshot:
     memory_percent: float
     disk_io_read_mb: float
     disk_io_write_mb: float
-    gpu_percent: Optional[float] = None
-    gpu_memory_mb: Optional[float] = None
+    gpu_percent: float | None = None
+    gpu_memory_mb: float | None = None
     thread_count: int = 0
     open_files: int = 0
 
@@ -54,7 +50,7 @@ class PerformanceSnapshot:
     """Complete performance snapshot for UI."""
 
     timestamp: float
-    session_id: Optional[str]
+    session_id: str | None
 
     # Latency metrics
     first_word_latency_ms: float
@@ -68,8 +64,8 @@ class PerformanceSnapshot:
     # Resources
     cpu_percent: float
     memory_mb: float
-    gpu_percent: Optional[float]
-    gpu_memory_mb: Optional[float]
+    gpu_percent: float | None
+    gpu_memory_mb: float | None
 
     # Audio
     buffer_health_percent: float
@@ -92,9 +88,9 @@ class LatencyProfiler:
 
     def __init__(self, max_samples: int = 1000):
         self._samples: deque = deque(maxlen=max_samples)
-        self._active_profiles: Dict[str, Dict[str, Any]] = {}
+        self._active_profiles: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
-        self._phase_times: Dict[str, deque] = {
+        self._phase_times: dict[str, deque] = {
             "audio_capture": deque(maxlen=max_samples),
             "preprocessing": deque(maxlen=max_samples),
             "vad_detection": deque(maxlen=max_samples),
@@ -133,7 +129,7 @@ class LatencyProfiler:
             if phase in self._phase_times:
                 self._phase_times[phase].append(elapsed_ms)
 
-    def end_profile(self, profile_id: str) -> Optional[LatencyBreakdown]:
+    def end_profile(self, profile_id: str) -> LatencyBreakdown | None:
         """End profiling and return breakdown."""
         with self._lock:
             if profile_id not in self._active_profiles:
@@ -173,7 +169,7 @@ class LatencyProfiler:
                 total_ms=sum(s.total_ms for s in self._samples) / n,
             )
 
-    def get_phase_stats(self, phase: str) -> Dict[str, float]:
+    def get_phase_stats(self, phase: str) -> dict[str, float]:
         """Get statistics for a specific phase."""
         with self._lock:
             times = list(self._phase_times.get(phase, []))
@@ -209,7 +205,7 @@ class ResourceMonitor:
         self._history: deque = deque(maxlen=history_size)
         self._lock = threading.RLock()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._interval = 1.0
 
         # Try to import psutil for better resource monitoring
@@ -295,11 +291,11 @@ class ResourceMonitor:
 
             try:
                 open_files = len(self._process.open_files())
-            except Exception:
-                    open_files = 0
+            except Exception as e:
+                logger.warning("Failed to get open files count: %s", e)
+                open_files = 0
         else:
             # Fallback to basic monitoring
-            import os
 
             cpu_percent = 0.0
             memory_mb = 0.0
@@ -320,8 +316,8 @@ class ResourceMonitor:
 
                 mem_info = self._pynvml.nvmlDeviceGetMemoryInfo(self._gpu_handle)
                 gpu_memory_mb = mem_info.used / (1024 * 1024)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to get GPU stats: %s", e)
 
         return ResourceSnapshot(
             timestamp=timestamp,
@@ -340,13 +336,13 @@ class ResourceMonitor:
         """Get current resource snapshot."""
         return self._collect_snapshot()
 
-    def get_history(self, seconds: int = 300) -> List[ResourceSnapshot]:
+    def get_history(self, seconds: int = 300) -> list[ResourceSnapshot]:
         """Get resource history."""
         cutoff = time.time() - seconds
         with self._lock:
             return [s for s in self._history if s.timestamp >= cutoff]
 
-    def get_average(self, seconds: int = 300) -> Optional[ResourceSnapshot]:
+    def get_average(self, seconds: int = 300) -> ResourceSnapshot | None:
         """Get average resource usage."""
         history = self.get_history(seconds)
 
@@ -355,7 +351,7 @@ class ResourceMonitor:
 
         n = len(history)
 
-        def avg(values: List[Optional[float]]) -> Optional[float]:
+        def avg(values: list[float | None]) -> float | None:
             valid = [v for v in values if v is not None]
             return sum(valid) / len(valid) if valid else None
 
@@ -383,21 +379,21 @@ class PerformanceDashboard:
         self._latency_profiler = LatencyProfiler()
         self._reporter = get_reporter()
 
-        self._websocket_clients: Set[Any] = set()
+        self._websocket_clients: set[Any] = set()
         self._lock = threading.RLock()
         self._running = False
-        self._streaming_thread: Optional[threading.Thread] = None
+        self._streaming_thread: threading.Thread | None = None
         self._stream_interval = 1.0
 
         # Summary report scheduling
         self._last_minute_report = 0.0
         self._last_5min_report = 0.0
         self._last_hour_report = 0.0
-        self._report_callbacks: List[Callable[[str, Dict], None]] = []
+        self._report_callbacks: list[Callable[[str, dict], None]] = []
 
         # Session tracking
-        self._session_start_time: Optional[float] = None
-        self._session_id: Optional[str] = None
+        self._session_start_time: float | None = None
+        self._session_id: str | None = None
 
     def start(
         self,
@@ -544,23 +540,23 @@ class PerformanceDashboard:
         """Get average latency breakdown."""
         return self._latency_profiler.get_average_breakdown()
 
-    def get_resource_history(self, seconds: int = 300) -> List[ResourceSnapshot]:
+    def get_resource_history(self, seconds: int = 300) -> list[ResourceSnapshot]:
         """Get resource history."""
         return self._resource_monitor.get_history(seconds)
 
     def get_alerts(
         self,
-        severity: Optional[AlertSeverity] = None,
+        severity: AlertSeverity | None = None,
         limit: int = 50,
-    ) -> List[Alert]:
+    ) -> list[Alert]:
         """Get recent alerts."""
         return self._alert_manager.get_alerts(severity=severity)[:limit]
 
-    def add_report_callback(self, callback: Callable[[str, Dict], None]) -> None:
+    def add_report_callback(self, callback: Callable[[str, dict], None]) -> None:
         """Add callback for periodic reports."""
         self._report_callbacks.append(callback)
 
-    def remove_report_callback(self, callback: Callable[[str, Dict], None]) -> None:
+    def remove_report_callback(self, callback: Callable[[str, dict], None]) -> None:
         """Remove report callback."""
         if callback in self._report_callbacks:
             self._report_callbacks.remove(callback)
@@ -626,7 +622,7 @@ class PerformanceDashboard:
         """Record latency phase."""
         self._latency_profiler.record_phase(profile_id, phase)
 
-    def end_latency_profile(self, profile_id: str) -> Optional[LatencyBreakdown]:
+    def end_latency_profile(self, profile_id: str) -> LatencyBreakdown | None:
         """End latency profiling."""
         return self._latency_profiler.end_profile(profile_id)
 
@@ -634,7 +630,7 @@ class PerformanceDashboard:
 class PerformanceMonitor:
     """Main performance monitoring coordinator."""
 
-    _instance: Optional[PerformanceMonitor] = None
+    _instance: PerformanceMonitor | None = None
     _lock = threading.Lock()
 
     def __new__(cls) -> PerformanceMonitor:
@@ -711,7 +707,7 @@ class PerformanceMonitor:
 
         logger.info("Performance monitor stopped")
 
-    def _on_metric_update(self, name: str, data: Dict[str, Any]) -> None:
+    def _on_metric_update(self, name: str, data: dict[str, Any]) -> None:
         """Handle metric update for alerting."""
         if "value" in data:
             self._alert_manager.check_metric(name, data["value"])
@@ -731,7 +727,7 @@ class PerformanceMonitor:
         """Get alert manager."""
         return self._alert_manager
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get monitoring status."""
         return {
             "running": self._running,
@@ -741,7 +737,7 @@ class PerformanceMonitor:
             "collector_metrics": len(self._collector.snapshot_all()),
         }
 
-    def export_metrics(self, filepath: Union[str, Path], format: str = "json") -> None:
+    def export_metrics(self, filepath: str | Path, format: str = "json") -> None:
         """Export metrics to file."""
         filepath = Path(filepath)
 
@@ -754,7 +750,7 @@ class PerformanceMonitor:
 
 
 # Global instance
-_monitor: Optional[PerformanceMonitor] = None
+_monitor: PerformanceMonitor | None = None
 
 
 def get_monitor() -> PerformanceMonitor:

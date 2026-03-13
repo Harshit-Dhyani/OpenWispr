@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 
 def utc_now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 @dataclass(slots=True)
@@ -155,7 +155,7 @@ class SessionState:
         device_id: str,
         live_mode: str,
         execution_mode: str,
-    ) -> "SessionState":
+    ) -> SessionState:
         return cls(
             session_id=uuid4().hex,
             title=title,

@@ -9,23 +9,23 @@ from __future__ import annotations
 import enum
 import logging
 import shutil
+import tempfile
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, TypeVar
 
-from app.core.constants import GPU_FALLBACK_KEYWORDS, ModelConstants
+from app.core.constants import GPU_FALLBACK_KEYWORDS
 from app.core.error_handler import (
-    AppError,
     AudioError,
     ErrorCategory,
-    ErrorSeverity,
     ModelError,
     NetworkError,
+    OpenWisprError,
     RetryConfig,
     SessionError,
-    OpenWisprError,
     with_retry,
 )
 
@@ -54,7 +54,7 @@ class RecoveryResult:
     error_id: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
-    fallback_applied: Optional[str] = None
+    fallback_applied: str | None = None
     recovery_time_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -81,8 +81,8 @@ class FallbackOption(Generic[T]):
 
     name: str
     value: T
-    condition: Optional[Callable[[], bool]] = None
-    on_activate: Optional[Callable[[T], None]] = None
+    condition: Callable[[], bool] | None = None
+    on_activate: Callable[[T], None] | None = None
 
 
 class FallbackChain(Generic[T]):
@@ -93,25 +93,25 @@ class FallbackChain(Generic[T]):
         self.options = options
         self.current_index = 0
         self._activated: list[str] = []
-        self._on_fallback: Optional[Callable[[str, T], None]] = None
+        self._on_fallback: Callable[[str, T], None] | None = None
 
     def set_fallback_callback(self, callback: Callable[[str, T], None]) -> None:
         """Set callback for when fallback is activated."""
         self._on_fallback = callback
 
-    def current(self) -> Optional[T]:
+    def current(self) -> T | None:
         """Get current active value."""
         if 0 <= self.current_index < len(self.options):
             return self.options[self.current_index].value
         return None
 
-    def current_name(self) -> Optional[str]:
+    def current_name(self) -> str | None:
         """Get current option name."""
         if 0 <= self.current_index < len(self.options):
             return self.options[self.current_index].name
         return None
 
-    def fallback(self) -> tuple[bool, Optional[T]]:
+    def fallback(self) -> tuple[bool, T | None]:
         """Move to next fallback option."""
         start_index = self.current_index
 
@@ -162,7 +162,7 @@ class FallbackChain(Generic[T]):
 # ============================================
 def create_compute_fallback_chain(
     primary_compute: str = "cuda",
-    on_fallback: Optional[Callable[[str, str], None]] = None,
+    on_fallback: Callable[[str, str], None] | None = None,
 ) -> FallbackChain[str]:
     """Create GPU -> CPU fallback chain."""
 
@@ -190,7 +190,7 @@ def create_compute_fallback_chain(
 
 def create_model_size_fallback_chain(
     primary_model: str = "medium",
-    on_fallback: Optional[Callable[[str, str], None]] = None,
+    on_fallback: Callable[[str, str], None] | None = None,
 ) -> FallbackChain[str]:
     """Create model size fallback chain: medium -> small -> base -> tiny."""
 
@@ -221,7 +221,7 @@ def create_model_size_fallback_chain(
 
 def create_batch_size_fallback_chain(
     primary_batch: int = 8,
-    on_fallback: Optional[Callable[[str, int], None]] = None,
+    on_fallback: Callable[[str, int], None] | None = None,
 ) -> FallbackChain[int]:
     """Create batch size fallback chain."""
 
@@ -268,7 +268,7 @@ class RecoveryStrategy(ABC):
 
     @abstractmethod
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         """Attempt to recover from the error."""
         pass
@@ -331,10 +331,10 @@ class RecoveryStrategy(ABC):
 class AudioDeviceRecoveryStrategy(RecoveryStrategy):
     """Recover from audio device disconnection by switching to default."""
 
-    def __init__(self, device_manager: Optional[Any] = None):
+    def __init__(self, device_manager: Any | None = None):
         super().__init__("audio_device_switch", priority=10)
         self.device_manager = device_manager
-        self._fallback_device_id: Optional[str] = None
+        self._fallback_device_id: str | None = None
 
     def can_handle(self, error: OpenWisprError) -> bool:
         return (
@@ -343,7 +343,7 @@ class AudioDeviceRecoveryStrategy(RecoveryStrategy):
         )
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         ctx = context or {}
         available_devices = ctx.get("available_devices", [])
@@ -393,7 +393,7 @@ class AudioPermissionRecoveryStrategy(RecoveryStrategy):
         )
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         # Permission errors require user action - provide guidance
         platform = (context or {}).get("platform", "unknown")
@@ -419,8 +419,8 @@ class ModelOOMRecoveryStrategy(RecoveryStrategy):
 
     def __init__(
         self,
-        compute_fallback: Optional[FallbackChain[str]] = None,
-        batch_fallback: Optional[FallbackChain[int]] = None,
+        compute_fallback: FallbackChain[str] | None = None,
+        batch_fallback: FallbackChain[int] | None = None,
     ):
         super().__init__("model_oom_recovery", priority=5)
         self.compute_fallback = compute_fallback or create_compute_fallback_chain()
@@ -438,7 +438,7 @@ class ModelOOMRecoveryStrategy(RecoveryStrategy):
         return any(kw in msg_lower for kw in GPU_FALLBACK_KEYWORDS) and "memory" in msg_lower
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         start_time = time.time()
         applied_fallbacks = []
@@ -484,7 +484,7 @@ class ModelOOMRecoveryStrategy(RecoveryStrategy):
 class ModelDownloadStrategy(RecoveryStrategy):
     """Auto-download missing models with progress feedback."""
 
-    def __init__(self, model_cache_dir: Optional[Path] = None):
+    def __init__(self, model_cache_dir: Path | None = None):
         super().__init__("model_auto_download", priority=10)
         self.model_cache_dir = model_cache_dir or Path.home() / ".openwispr" / "models"
         self._download_progress: dict[str, float] = {}
@@ -524,7 +524,7 @@ class ModelDownloadStrategy(RecoveryStrategy):
         return True
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         if not isinstance(error, ModelError) or not error.model_name:
             return self._failed(error.error_id, "Cannot download: unknown model name")
@@ -554,7 +554,7 @@ class ModelFallbackStrategy(RecoveryStrategy):
 
     def __init__(
         self,
-        model_fallback: Optional[FallbackChain[str]] = None,
+        model_fallback: FallbackChain[str] | None = None,
     ):
         super().__init__("model_size_fallback", priority=15)
         self.model_fallback = model_fallback or create_model_size_fallback_chain()
@@ -566,7 +566,7 @@ class ModelFallbackStrategy(RecoveryStrategy):
         }
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         success, new_model = self.model_fallback.fallback()
 
@@ -613,7 +613,7 @@ class NetworkRetryStrategy(RecoveryStrategy):
         )
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         error_key = f"{error.category.value}:{error.endpoint or 'unknown'}"
         retry_count = self._retry_counts.get(error_key, 0) + 1
@@ -662,7 +662,7 @@ class OfflineModeStrategy(RecoveryStrategy):
         )
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         if self._offline_mode_active:
             return self._partial(
@@ -709,7 +709,7 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
         return isinstance(error, SessionError) and error.category == ErrorCategory.SESSION_DISK_FULL
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         ctx = context or {}
         session_manager = ctx.get("session_manager")
@@ -732,6 +732,9 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
             free_gb = stat.free / (1024**3)
             total_gb = stat.total / (1024**3)
         except Exception:
+            logger.warning(
+                f"Failed to get disk space info for path: {error.file_path or 'default'}"
+            )
             free_gb = 0
             total_gb = 0
 
@@ -759,7 +762,7 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
         temp_paths = [
             Path.home() / ".openwispr" / "temp",
             Path.home() / ".openwispr" / "cache",
-            Path("/tmp") if not hasattr(Path, "is_dir") or Path("/tmp").exists() else None,
+            Path(tempfile.gettempdir()) if Path(tempfile.gettempdir()).exists() else None,
         ]
 
         for path in temp_paths:
@@ -775,6 +778,7 @@ class DiskFullRecoveryStrategy(RecoveryStrategy):
                             }
                         )
                 except Exception:
+                    logger.warning(f"Failed to scan temp directory for cleanup candidates: {path}")
                     pass
 
         return candidates
@@ -790,7 +794,7 @@ class SessionCorruptionRecoveryStrategy(RecoveryStrategy):
         return isinstance(error, SessionError) and error.category == ErrorCategory.SESSION_CORRUPTED
 
     def recover(
-        self, error: OpenWisprError, context: Optional[dict[str, Any]] = None
+        self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
         file_path = error.file_path
 
@@ -801,7 +805,7 @@ class SessionCorruptionRecoveryStrategy(RecoveryStrategy):
 
         # Attempt 1: Try to read partial JSON
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Try to extract valid JSON objects
@@ -821,7 +825,7 @@ class SessionCorruptionRecoveryStrategy(RecoveryStrategy):
                 try:
                     import json
 
-                    with open(backup_path, "r", encoding="utf-8") as f:
+                    with open(backup_path, encoding="utf-8") as f:
                         recovered_data = json.load(f)
                     recovery_attempts.append("backup_restore")
                 except Exception as e:
@@ -846,7 +850,7 @@ class SessionCorruptionRecoveryStrategy(RecoveryStrategy):
             "Could not recover any data from corrupted session",
         )
 
-    def _extract_valid_json(self, content: str) -> Optional[dict]:
+    def _extract_valid_json(self, content: str) -> dict | None:
         """Attempt to extract valid JSON from corrupted content."""
         import json
 
@@ -877,7 +881,7 @@ class RecoveryManager:
         self._fallback_chains: dict[str, FallbackChain] = {}
         self._recovery_history: list[RecoveryResult] = []
         self._max_history = 100
-        self._on_recovery: Optional[Callable[[RecoveryResult], None]] = None
+        self._on_recovery: Callable[[RecoveryResult], None] | None = None
 
     def register_strategy(self, strategy: RecoveryStrategy) -> None:
         """Register a recovery strategy."""
@@ -897,7 +901,7 @@ class RecoveryManager:
     def attempt_recovery(
         self,
         error: OpenWisprError,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """Attempt to recover from an error using registered strategies."""
         logger.info(f"Attempting recovery for {error.error_id} ({error.category.value})")
@@ -959,7 +963,7 @@ class RecoveryManager:
             except Exception as e:
                 logger.error(f"Recovery callback failed: {e}")
 
-    def get_fallback_chain(self, name: str) -> Optional[FallbackChain]:
+    def get_fallback_chain(self, name: str) -> FallbackChain | None:
         """Get a registered fallback chain by name."""
         return self._fallback_chains.get(name)
 
@@ -1022,7 +1026,7 @@ def create_default_recovery_manager() -> RecoveryManager:
 
 
 # Singleton instance
-_default_manager: Optional[RecoveryManager] = None
+_default_manager: RecoveryManager | None = None
 
 
 def get_recovery_manager() -> RecoveryManager:

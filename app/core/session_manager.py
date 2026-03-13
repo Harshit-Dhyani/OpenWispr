@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.settings.config import AppSettings, resolve_live_profile
 from app.core.logging_utils import configure_logging
 from app.core.models import AudioDeviceInfo, SessionHealth, SessionState, TranscriptSegment, utc_now
+from app.core.settings.config import AppSettings, resolve_live_profile
 from app.stem.postprocess import StemNoteProcessor
 from app.storage.document_store import ContextProvider, DocumentStore
 from app.storage.session_store import SessionWriter
@@ -516,7 +520,7 @@ class SessionManager:
             samples = self.audio_source.read(timeout=0.05)
             loop_count += 1
 
-            print(
+            logger.debug(
                 f"[AUDIO_LOOP] samples read: {'None' if samples is None else f'{len(samples)} samples'}"
             )
 
@@ -528,7 +532,9 @@ class SessionManager:
             chunk_count = len(chunks)
             self._chunks_processed += chunk_count
 
-            print(f"[AUDIO_LOOP] chunks created: {chunk_count} (total: {self._chunks_processed})")
+            logger.debug(
+                f"[AUDIO_LOOP] chunks created: {chunk_count} (total: {self._chunks_processed})"
+            )
 
             if self.session:
                 self.session.health.audio_stream_active = True
@@ -536,10 +542,10 @@ class SessionManager:
 
             for chunk in chunks:
                 if self.transcriber:
-                    print(f"[AUDIO_LOOP] submitting chunk to transcriber")
+                    logger.debug("[AUDIO_LOOP] submitting chunk to transcriber")
                     self.transcriber.submit(chunk)
                 else:
-                    print(f"[AUDIO_LOOP] WARNING: no transcriber available")
+                    logger.debug("[AUDIO_LOOP] WARNING: no transcriber available")
 
             self._maybe_rebuild_outputs()
             self._emit_health()
@@ -554,7 +560,7 @@ class SessionManager:
                     "stream_time": round(stream_time, 3),
                     "dropped_frames": self.audio_source.dropped_frames,
                 }
-                print(f"[AUDIO_LOOP] logging extra dict: {extra_dict}")
+                logger.debug(f"[AUDIO_LOOP] logging extra dict: {extra_dict}")
                 if self.logger:
                     self.logger.debug(
                         "audio_loop_stats",
@@ -976,4 +982,3 @@ def _normalize_transcript_text(text: str) -> str:
             for character in text
         ).split()
     )
-

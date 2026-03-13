@@ -9,9 +9,9 @@ from app.core.error_handler import (
     ErrorSeverity,
     ModelError,
     NetworkError,
+    OpenWisprError,
     RetryConfig,
     SessionError,
-    OpenWisprError,
     UserNotifier,
     get_error_handler,
     handle_error,
@@ -20,7 +20,6 @@ from app.core.error_handler import (
     with_retry,
     with_retry_async,
 )
-from app.core.recovery_strategies import RecoveryStatus
 from app.core.recovery_strategies import (
     AudioDeviceRecoveryStrategy,
     AudioPermissionRecoveryStrategy,
@@ -34,6 +33,7 @@ from app.core.recovery_strategies import (
     OfflineModeStrategy,
     RecoveryManager,
     RecoveryResult,
+    RecoveryStatus,
     RecoveryStrategy,
     SessionCorruptionRecoveryStrategy,
     create_batch_size_fallback_chain,
