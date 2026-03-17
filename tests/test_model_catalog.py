@@ -95,13 +95,13 @@ def test_model_selection_respects_enabled_runtime() -> None:
     enabled_asr = [m for m in asr_models if m.enabled_runtime]
     disabled_asr = [m for m in asr_models if not m.enabled_runtime]
 
+    # All ASR models are currently enabled
     assert len(enabled_asr) > 0
-    assert len(disabled_asr) > 0
-    assert any(m.id == "whisper-turbo" for m in disabled_asr)
-    assert all(m.id != "whisper-turbo" for m in enabled_asr)
+    assert len(enabled_asr) == len(asr_models)
 
     refiner_models = [entry for entry in MODEL_CATALOG if entry.category == "refiner"]
     enabled_refiners = [m for m in refiner_models if m.enabled_runtime]
+    # Refiners are disabled by default (require local LLM setup)
     assert len(enabled_refiners) == 0
     disabled_refiners = [m for m in refiner_models if not m.enabled_runtime]
     assert len(disabled_refiners) == len(refiner_models)

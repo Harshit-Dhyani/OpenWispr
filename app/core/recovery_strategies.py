@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
-from app.core.constants import GPU_FALLBACK_KEYWORDS
+from app.config.constants import GPU_FALLBACK_KEYWORDS
 from app.core.error_handler import (
     AudioError,
     ErrorCategory,

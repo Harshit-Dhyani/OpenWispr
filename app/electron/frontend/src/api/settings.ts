@@ -87,6 +87,7 @@ async function withRetry<T>(
       return await operation();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Settings API error (attempt ${attempt + 1}/${maxRetries + 1}):`, lastError.message);
       
       if (attempt === maxRetries) {
         throw lastError;
@@ -123,6 +124,31 @@ async function getApiOrigin(): Promise<string> {
 async function buildUrl(path: string): Promise<string> {
   const origin = await getApiOrigin();
   return `${origin}${path}`;
+}
+
+/**
+ * Get storage paths from the backend
+ */
+export async function getStoragePaths(): Promise<{
+  download_root: string;
+  models_path: string;
+  refiner_models_path: string;
+  app_data: string;
+  settings_file: string;
+}> {
+  const url = await buildUrl('/api/system/storage');
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get storage paths: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 /**
@@ -360,6 +386,7 @@ export async function validateSettingsOnBackend(
       errors: data.errors,
     };
   } catch (error) {
+    console.error('Settings validation error:', error instanceof Error ? error.message : String(error));
     return {
       valid: false,
       errors: [{ path: '', message: String(error) }],
@@ -463,7 +490,7 @@ export function createSettingsSyncConnection(
         }
       };
     } catch (error) {
-      // Fall back to SSE
+      console.error('WebSocket connection error, falling back to SSE:', error instanceof Error ? error.message : String(error));
       connectSSE();
     }
   };
@@ -504,6 +531,7 @@ export function createSettingsSyncConnection(
         }
       };
     } catch (error) {
+      console.error('SSE connection error:', error instanceof Error ? error.message : String(error));
       notifyStatus('error');
       onError?.(error instanceof Error ? error : new Error(String(error)));
     }

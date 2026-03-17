@@ -1,4 +1,11 @@
-from __future__ import annotations
+"""PyAudio WASAPI backend for low-latency Windows audio capture.
+
+Audio backend using PyAudio with WASAPI for low-latency loopback capture
+on Windows. Preferred backend for production use due to superior performance.
+
+Key class:
+    PyAudioWasapiBackend: AudioBackend implementation using PyAudio/WASAPI
+"""
 
 import logging
 import time
@@ -26,6 +33,18 @@ def _normalize_name(name: str) -> str:
 
 
 class PyAudioWasapiBackend(AudioBackend):
+    """PyAudio/WASAPI audio capture backend for Windows.
+
+    Low-latency audio capture using PyAudio with WASAPI. Searches available
+    devices and attempts multiple format/rate/channel combinations until one
+    succeeds. Falls back gracefully on failures, collecting attempts for diagnostics.
+
+    State:
+        - Manages PyAudio instance and stream lifecycle
+        - Tracks runtime sample rate and channel count (may differ from requested)
+        - Resolved device name stored after successful initialization
+    """
+
     backend_name = "pyaudio"
 
     def __init__(
@@ -52,6 +71,7 @@ class PyAudioWasapiBackend(AudioBackend):
         self.attempts: list[BackendAttempt] = []
 
     def _iter_device_infos(self) -> list[dict[str, Any]]:
+        """Query available audio devices from PyAudio."""
         device_infos: list[dict[str, Any]] = []
         count = self._pa.get_device_count()
         for index in range(count):
@@ -61,6 +81,7 @@ class PyAudioWasapiBackend(AudioBackend):
         return device_infos
 
     def _rank_device_infos(self, device_infos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Rank devices by match quality against name hints, preferring loopback/virtual cables."""
         hints = [_normalize_name(name) for name in self.name_hints if name]
         ranked: list[tuple[tuple[int, int, str], dict[str, Any]]] = []
         for info in device_infos:
@@ -88,6 +109,11 @@ class PyAudioWasapiBackend(AudioBackend):
         return [info for _, info in ranked]
 
     def start(self) -> None:
+        """Initialize PyAudio and open a capture stream.
+
+        Attempts multiple devices, sample rates, channel counts, and formats
+        until one succeeds. Collects all failed attempts for error reporting.
+        """
         try:
             import pyaudiowpatch as pyaudio  # type: ignore[import-not-found]
         except Exception as exc:
@@ -181,6 +207,7 @@ class PyAudioWasapiBackend(AudioBackend):
             raise
 
     def stop(self) -> None:
+        """Stop and close the audio stream, terminate PyAudio instance."""
         if self._stream is not None:
             try:
                 if self._stream.is_active():
@@ -194,6 +221,14 @@ class PyAudioWasapiBackend(AudioBackend):
         self._running = False
 
     def read(self, timeout: float = 0.25) -> np.ndarray | None:
+        """Read audio data from the stream.
+
+        Args:
+            timeout: Maximum time to wait for data in seconds.
+
+        Returns:
+            Mono audio array at target sample rate, or None on timeout.
+        """
         if self._stream is None:
             return None
 
@@ -245,6 +280,15 @@ class PyAudioWasapiBackend(AudioBackend):
         return None
 
     def probe(self, *, duration: float, output_dir) -> DeviceProbeResult:
+        """Probe device by recording audio for specified duration.
+
+        Args:
+            duration: Recording duration in seconds.
+            output_dir: Directory to write probe WAV file.
+
+        Returns:
+            DeviceProbeResult with audio metrics and path to recorded file.
+        """
         if output_dir is None:
             raise ValueError("output_dir must not be None")
         started_here = False

@@ -1,3 +1,9 @@
+/**
+ * SettingsSchema - Zod schemas for runtime settings validation
+ * 
+ * Defines and validates all user-facing settings with Zod,
+ * including bounds, labels, and default values.
+ */
 import { z } from 'zod';
 import {
   AudioConstants,
@@ -78,9 +84,9 @@ export type GeneralSettings = z.infer<typeof generalSettingsSchema>;
 // ============================================
 export const transcriptionSettingsSchema = z.object({
   model_name: z.enum(VALID_MODEL_NAMES).default(ModelConstants.DEFAULT_MODEL_NAME),
-  default_asr_model_id: z.string().default('whisper-medium'),
-  microphone_asr_model_id: z.string().default('whisper-medium'),
-  system_asr_model_id: z.string().default('whisper-medium'),
+  default_asr_model_id: z.string().default('whisper-turbo'),
+  microphone_asr_model_id: z.string().default('whisper-turbo'),
+  system_asr_model_id: z.string().default('whisper-turbo'),
   refinement_mode: z.enum(VALID_REFINEMENT_MODES).default(RefinerConstants.DEFAULT_REFINEMENT_MODE),
   refinement_profile: z.enum(['raw', 'clean_dictation', 'professional', 'student_notes', 'code_logs']).default('clean_dictation'),
   transcription_mode: z.enum(['dictation', 'literal', 'session_paragraph']).default('dictation'),
@@ -145,9 +151,11 @@ export type TranscriptionSettings = z.infer<typeof transcriptionSettingsSchema>;
 
 export const refinerSettingsSchema = z.object({
   selected_model_id: z.string().default(RefinerConstants.DEFAULT_MODEL_ID),
-  runtime_enabled: z.boolean().default(false),
+  custom_model_id: z.string().default(''),
+  runtime_enabled: z.boolean().default(true),
   cleanup_instructions: z.string().default(''),
   engine_preference: z.enum(VALID_REFINER_ENGINES).default(RefinerConstants.DEFAULT_ENGINE_PREFERENCE),
+  refiner_provider_base_url: z.string().default(''),
 });
 
 export type RefinerSettings = z.infer<typeof refinerSettingsSchema>;
@@ -182,11 +190,12 @@ export const hotkeySettingsSchema = z.object({
   system_key_combination: z.string().min(1).default('CommandOrControl+Shift+Y'),
   hold_mode: z.boolean().default(false),
   auto_inject: z.boolean().default(true),
+  auto_transform: z.boolean().default(true),
   language: z.string().default(UIConstants.DEFAULT_LANGUAGE),
   capture_source: z.enum(['system', 'microphone']).default('microphone'),
   device_id: z.string().default(AudioConstants.DEFAULT_CAPTURE_DEVICE_ID),
   finish_mode_default: z.enum(['finish', 'finish_and_paste', 'cancel']).default('finish_and_paste'),
-  enable_refiner_on_stop: z.boolean().default(false),
+  enable_refiner_on_stop: z.boolean().default(true),
   save_debug_wav: z.boolean().default(false),
   show_floating_window: z.boolean().default(true),
   floating_window_position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']).default('bottom-right'),
@@ -236,7 +245,7 @@ export const coachSettingsSchema = z.object({
     keep_slang: true,
     target_style: 'simple',
   }),
-  privacy_mode: z.enum(['local_only', 'allow_llm']).default('local_only'),
+  privacy_mode: z.enum(['local_only', 'allow_llm']).default('allow_llm'),
   show_floating_coach_result: z.boolean().default(true),
   coach_runtime_enabled: z.boolean().default(true),
   coach_selected_model_id: z.string().default('qwen2.5-3b-instruct'),
@@ -339,9 +348,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   },
   transcription: {
     model_name: ModelConstants.DEFAULT_MODEL_NAME,
-    default_asr_model_id: 'whisper-medium',
-    microphone_asr_model_id: 'whisper-medium',
-    system_asr_model_id: 'whisper-medium',
+    default_asr_model_id: 'whisper-turbo',
+    microphone_asr_model_id: 'whisper-turbo',
+    system_asr_model_id: 'whisper-turbo',
     refinement_mode: RefinerConstants.DEFAULT_REFINEMENT_MODE,
     refinement_profile: 'clean_dictation',
     transcription_mode: 'dictation',
@@ -367,9 +376,11 @@ export const DEFAULT_SETTINGS: SettingsState = {
   },
   refiner: {
     selected_model_id: RefinerConstants.DEFAULT_MODEL_ID,
-    runtime_enabled: false,
+    custom_model_id: '',
+    runtime_enabled: true,
     cleanup_instructions: '',
     engine_preference: RefinerConstants.DEFAULT_ENGINE_PREFERENCE,
+    refiner_provider_base_url: '',
   },
   audio: {
     captureMode: 'microphone',
@@ -389,11 +400,12 @@ export const DEFAULT_SETTINGS: SettingsState = {
     system_key_combination: 'CommandOrControl+Shift+Y',
     hold_mode: false,
     auto_inject: true,
+    auto_transform: true,
     language: UIConstants.DEFAULT_LANGUAGE,
     capture_source: 'microphone',
     device_id: AudioConstants.DEFAULT_CAPTURE_DEVICE_ID,
     finish_mode_default: 'finish_and_paste',
-    enable_refiner_on_stop: false,
+    enable_refiner_on_stop: true,
     save_debug_wav: false,
     show_floating_window: true,
     floating_window_position: 'bottom-right',
@@ -418,7 +430,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
       keep_slang: true,
       target_style: 'simple',
     },
-    privacy_mode: 'local_only',
+    privacy_mode: 'allow_llm',
     show_floating_coach_result: true,
     coach_runtime_enabled: true,
     coach_selected_model_id: 'qwen2.5-3b-instruct',

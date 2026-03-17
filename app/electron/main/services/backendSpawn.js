@@ -1,4 +1,11 @@
-// Backend Python process management
+/**
+ * Backend Python process management for OpenWispr
+ * Spawns, monitors, and restarts the Python backend. Handles packaged vs dev mode,
+ * Python path resolution, environment setup, and health checks. Exports:
+ * resolveBackendLayout, resolvePythonLaunch, backendAlreadyRunning, waitForBackendReady,
+ * startBackend, stopBackend
+ * @module backendSpawn
+ */
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -10,6 +17,10 @@ let suppressRestart = false;
 let restartAttempts = 0;
 const MAX_BACKEND_RESTARTS = 3;
 
+/**
+ * Resolves the backend layout configuration for packaged or dev mode
+ * @returns {object} Layout object with mode, projectRoot, appRoot, apiMainPath, and bundledPython paths
+ */
 function resolveBackendLayout() {
   const devRepoRoot = path.resolve(__dirname, "..", "..", "..", "..");
   const packagedBackendRoot = path.join(process.resourcesPath, "backend");
@@ -36,6 +47,11 @@ function resolveBackendLayout() {
   };
 }
 
+/**
+ * Resolves the Python executable and arguments to launch the backend
+ * Tries: OPENWISPR_PYTHON env, bundled venv, fallback venv, then system Python
+ * @returns {object} Launch config with command, args, and layout
+ */
 function resolvePythonLaunch() {
   const layout = resolveBackendLayout();
   const fallbackRepoRoot = path.resolve(process.resourcesPath, "..", "..", "..", "..", "..");
@@ -73,6 +89,10 @@ function resolvePythonLaunch() {
   return { command: "py", args: ["-3", layout.apiMainPath], layout };
 }
 
+/**
+ * Checks if the backend API is already running and responsive
+ * @returns {Promise<boolean>} True if backend health check passes
+ */
 async function backendAlreadyRunning() {
   try {
     const response = await fetch(`${state.API_ORIGIN}/api/health`);
@@ -87,6 +107,11 @@ async function backendAlreadyRunning() {
   }
 }
 
+/**
+ * Polls backend health endpoint until ready or timeout
+ * @param {number} [timeoutMs=20000] - Maximum wait time in milliseconds
+ * @returns {Promise<boolean>} True if backend becomes ready within timeout
+ */
 async function waitForBackendReady(timeoutMs = 20000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -98,6 +123,11 @@ async function waitForBackendReady(timeoutMs = 20000) {
   return false;
 }
 
+/**
+ * Starts the Python backend process or connects to external backend
+ * Handles dev external mode, packaged mode, dev mode, and automatic restart on crash
+ * @returns {Promise<boolean>} True if backend started successfully
+ */
 async function startBackend() {
   console.log("[backend] OPENWISPR_DEV_EXTERNAL_BACKEND:", process.env.OPENWISPR_DEV_EXTERNAL_BACKEND);
   if (state.backendProcess) {
@@ -136,7 +166,7 @@ async function startBackend() {
   }
 
   const backendEnv = {
-    ...process.env,
+    PATH: process.env.PATH,
     PYTHONPATH: pythonPath,
     OPENWISPR_DOWNLOAD_ROOT: modelsRoot,
   };
@@ -189,6 +219,9 @@ async function startBackend() {
   return waitForBackendReady(60000);
 }
 
+/**
+ * Stops the backend process and suppresses automatic restart
+ */
 function stopBackend() {
   suppressRestart = true;
   clearTimeout(restartTimer);

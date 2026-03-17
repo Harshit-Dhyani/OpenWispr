@@ -1,3 +1,15 @@
+"""Backend service orchestrating transcription, sessions, and model management.
+
+This module provides the BackendService class that coordinates:
+- Session management (recording sessions, transcript sessions)
+- Model loading and caching (Whisper models)
+- Audio device management
+- Provider/health state tracking
+
+The service acts as the central orchestration layer between API routes
+and the underlying STT/audio subsystems.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -59,6 +71,15 @@ class BackendSnapshot:
 
 
 class BackendService:
+    """Central orchestration service for transcription sessions and model management.
+
+    Coordinates SessionManager for recording/transcript sessions, Whisper model
+    loading/caching, audio device management, and provider/health state tracking.
+    Publishes events for real-time UI updates via registered callbacks.
+
+    Key collaborators: SessionManager, ModelService, RefinementQueue, StreamingMetrics.
+    """
+
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
         self.manager = SessionManager(settings)
@@ -102,6 +123,7 @@ class BackendService:
         return self._streaming_metrics.snapshot()
 
     def get_snapshot(self) -> BackendSnapshot:
+        """Get current backend state snapshot including session, transcripts, and health."""
         with self._lock:
             with self._model_cache_lock:
                 cache_info = {
@@ -143,6 +165,7 @@ class BackendService:
             )
 
     def get_snapshot_payload(self) -> dict[str, Any]:
+        """Get backend state snapshot formatted for frontend consumption."""
         snapshot = self.get_snapshot()
         return {
             "session": snapshot.session,
@@ -167,6 +190,19 @@ class BackendService:
 
     def get_model_install_state(self) -> list[dict[str, Any]]:
         return self._model_service.get_installed_state()
+
+    def get_storage_paths(self) -> dict[str, Any]:
+        """Get storage paths for models, settings, and data."""
+        download_root = self.settings.download_root
+        app_data = download_root.parent
+
+        return {
+            "download_root": str(download_root),
+            "models_path": str(download_root / "asr"),
+            "refiner_models_path": str(download_root / "refiner"),
+            "app_data": str(app_data),
+            "settings_file": str(app_data / "settings.json"),
+        }
 
     def get_cached_model(self, model_name: str) -> ModelCacheEntry | None:
         """Get a cached model if available."""
@@ -211,7 +247,6 @@ class BackendService:
         self._preload_cancelled.clear()
 
         def _load():
-
             def emit_progress(progress: float, message: str, stage: str):
                 self._publish_event(
                     "preload_progress",
@@ -521,6 +556,16 @@ class BackendService:
                 extra=f"device={self._health.get('model_runtime_device', 'unknown')}",
             )
             user_settings = get_settings_manager().get_settings()
+
+            # Use model based on engine preference:
+            # - Ollama/LM Studio: use custom_model_id (from their server)
+            # - llama.cpp: use selected_model_id (from catalog)
+            engine = user_settings.refiner.engine_preference or "llamacpp"
+            if engine in ("ollama", "lm_studio") and user_settings.refiner.custom_model_id:
+                model_id = user_settings.refiner.custom_model_id
+            else:
+                model_id = user_settings.refiner.selected_model_id
+
             self._refinement_queue.enqueue(
                 session_id=session_id,
                 segment=serialized,
@@ -528,7 +573,7 @@ class BackendService:
                 refinement_profile=getattr(
                     user_settings.transcription, "refinement_profile", "raw"
                 ),
-                model_id=user_settings.refiner.selected_model_id,
+                model_id=model_id,
                 runtime_enabled=user_settings.refiner.runtime_enabled,
                 language_hint=serialized["language"] or "auto",
             )

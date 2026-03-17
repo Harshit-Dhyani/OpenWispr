@@ -1,7 +1,7 @@
 ---
 title: Performance Documentation
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/core/performance_monitor.py
   - app/stt/streaming_engine.py
@@ -156,8 +156,8 @@ def _adapt_beam_size(self) -> None:
 
 | Mode | Target Latency | Min Beam | Max Beam | Config Source |
 |------|---------------|----------|----------|---------------|
-| WISPR | 200ms | 1 | 3 | `StreamingConfig` (line 725) |
-| SYSTEM | 1000ms | 1 | 5 | `StreamingConfig` (line 733) |
+| WISPR | 200ms | 1 | 3 | `StreamingConfig` (line 762) |
+| SYSTEM | 1000ms | 1 | 5 | `StreamingConfig` (line 770) |
 
 ---
 
@@ -359,7 +359,7 @@ def _setup_default_thresholds(self) -> None:
 ### 6.1 For Minimum Latency
 
 ```python
-# streaming_engine.py - WISPR mode config (line 720-726)
+# streaming_engine.py - WISPR mode config (line 762-768)
 wispr_config = StreamingConfig(
     window_ms=200,        # Was 400
     overlap_ms=40,        # Was 80
@@ -377,7 +377,7 @@ OPENWISPR_COMPUTE_TYPE="int8"
 ### 6.2 For Maximum Accuracy
 
 ```python
-# streaming_engine.py - SYSTEM mode config (line 728-734)
+# streaming_engine.py - SYSTEM mode config (line 770-776)
 system_config = StreamingConfig(
     window_ms=2000,       # Was 1000
     overlap_ms=400,       # Was 200
@@ -396,7 +396,7 @@ vad_threshold = 0.4  # More strict voice detection
 |----------|-------|--------|---------|-----------------|
 | High-end GPU | large-v3 | cuda | float16 | 400-800ms |
 | Mid GPU | medium | cuda | float16 | 200-400ms |
-| Low GPU | base | cuda | int8 | 80-150ms |
+| Low GPU | small | cuda | int8 | 80-150ms |
 | CPU only | tiny | cpu | int8 | 100-200ms |
 
 ### 6.4 Context Carryover Tuning (`streaming_engine.py:264-306`)
@@ -414,7 +414,7 @@ decay_factor: float = 0.8      # Reliability decay on low confidence
 
 ---
 
-## 7. Performance Optimization Audit Findings
+## 7. Performance Optimization Recommendations
 
 ### 7.1 Quick Settings Changes (High Impact)
 
@@ -450,32 +450,35 @@ With the recommended changes:
 
 ### 7.4 "Speed Monster" Preset (Maximum Speed)
 
-For the fastest possible transcription with acceptable accuracy:
+For the fastest possible transcription with acceptable accuracy, use these tuning values via environment variables:
+
+```powershell
+# Environment variables for Speed Monster mode
+$env:OPENWISPR_DEFAULT_MODEL="small"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
+$env:OPENWISPR_DEVICE="cuda"  # or cpu if no GPU
+$env:OPENWISPR_CHUNK_SECONDS="0.5"
+```
+
+Or apply these code changes for permanent tuning:
 
 ```python
-# app/config/constants.py - Apply these changes
+# app/config/constants.py
+DEFAULT_MODEL_NAME = "small"
+DEFAULT_COMPUTE_TYPE = "int8"
+DEFAULT_CHUNK_SECONDS = 0.5
 
-# Model: smallest available
-DEFAULT_MODEL_NAME = "small"          # Was: medium
-DEFAULT_COMPUTE_TYPE = "int8"          # Was: float16
-DEFAULT_CHUNK_SECONDS = 0.5            # Was: 1.6
+# app/stt/model_pool.py
+MODEL_TTL_SECONDS = 300  # 5 minutes instead of 30
 
-# app/stt/model_pool.py - Apply these changes
-MODEL_TTL_SECONDS = 300                # Was: 1800 (5 min vs 30 min)
-
-# app/stt/streaming_engine.py - WISPR mode (line 720-726)
+# app/stt/streaming_engine.py - WISPR mode
 wispr_config = StreamingConfig(
-    window_ms=200,                      # Was: 400
-    overlap_ms=40,                      # Was: 80
-    target_latency_ms=100.0,           # Was: 200.0
+    window_ms=200,
+    overlap_ms=40,
+    target_latency_ms=100.0,
     min_beam_size=1,
-    max_beam_size=2,                    # Was: 3
+    max_beam_size=2,
 )
-
-# Environment variables for Speed Monster mode
-# OPENWISPR_DEFAULT_MODEL=small
-# OPENWISPR_COMPUTE_TYPE=int8
-# OPENWISPR_DEVICE=cpu  # or cuda if available
 ```
 
 ### 7.5 Memory Optimization Summary

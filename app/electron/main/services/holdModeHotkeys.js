@@ -1,3 +1,10 @@
+/**
+ * Hold mode hotkey handling for recording control
+ * Parses accelerator strings, normalizes modifiers across platforms, manages
+ * iohook key listeners for hold-to-record functionality. Exports: parseHoldAccelerator,
+ * createHoldModeController
+ * @module holdModeHotkeys
+ */
 function normalizeModifierToken(token, platform) {
   const normalized = String(token || "").trim().toLowerCase();
   if (!normalized) {

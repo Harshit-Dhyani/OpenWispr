@@ -1,3 +1,9 @@
+/**
+ * Languages - Language options and display utilities
+ * 
+ * Provides language options for transcription and helper functions
+ * to get display labels for language codes.
+ */
 export type LanguageOption = {
   code: string;
   label: string;

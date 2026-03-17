@@ -1,403 +1,424 @@
-"""
-Hotkey Lifecycle Tests
+"""Hotkey Lifecycle Tests - Real Behavior Tests
 
-Tests full hotkey registration, activation, and deactivation lifecycle:
-- State machine transitions
-- Registration/unregistration flows
-- Cleanup on errors
-- Cleanup on app termination
+Tests actual hotkey functionality including:
+- HotkeySession state machine transitions
+- Service instantiation and API contracts
+- Callback handling
+- State transitions
 
-Regression protection for:
-- Hotkey not properly unregistered on app close
-- State not reset on error
-- Multiple registration attempts
-- Memory leaks from uncleaned state
+Integration notes: Full end-to-end testing requires:
+- Mocked audio backend (LoopbackAudioSource)
+- Mocked transcriber (FastTranscriber)
+- Mocked WebSocket connections
+- Mocked settings manager
+- Electron/IPC layer for hotkey registration
+
+For unit tests, we test:
+1. HotkeySession state machine in isolation (no audio dependencies)
+2. HotkeyTranscriptionService instantiation and basic structure
+3. Callback registration and invocation
+4. State transition logic
 """
 
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
+import time
+from enum import Enum
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
-class TestHotkeyRegistration:
-    """Test hotkey registration lifecycle."""
-
-    def test_register_requires_valid_accelerator(self):
-        """Verify registration requires non-empty accelerator."""
-        accelerator = "Ctrl+Shift+R"
-
-        assert accelerator is not None
-        assert len(accelerator) > 0
-
-    def test_unregister_after_register(self):
-        """Verify unregister can be called after register."""
-        registered = True
-        unregistered = False
-
-        if registered:
-            unregistered = True
-
-        assert registered is True
-        assert unregistered is True
-
-    def test_register_same_key_twice_handled(self):
-        """Verify registering same key twice doesn't double-register."""
-        registered_keys = set()
-
-        registered_keys.add("Ctrl+Shift+R")
-        registered_keys.add("Ctrl+Shift+R")
-
-        assert len(registered_keys) == 1
+from app.core.hotkey_session import (
+    CircularAudioBuffer,
+    HotkeySession,
+    HotkeySessionConfig,
+    HotkeySessionState,
+    PlatformTextInjector,
+)
 
 
-class TestHotkeyStateTransitions:
-    """Test hotkey state machine transitions."""
+class TestHotkeySessionStateMachine:
+    """Test HotkeySession state machine in isolation."""
 
-    def test_idle_to_recording_transition(self):
-        """Verify state transitions from idle to recording."""
-        state = "idle"
+    def test_initial_state_is_idle(self):
+        """Verify session starts in IDLE state."""
+        session = HotkeySession()
+        assert session.state == HotkeySessionState.IDLE
 
-        state = "recording"
+    def test_session_id_is_unique(self):
+        """Verify each session gets a unique ID."""
+        session1 = HotkeySession()
+        session2 = HotkeySession()
+        assert session1.session_id != session2.session_id
+        assert len(session1.session_id) == 12
 
-        assert state == "recording"
+    def test_start_transitions_to_recording(self):
+        """Verify start() transitions from IDLE to RECORDING."""
+        session = HotkeySession()
 
-    def test_recording_to_idle_transition(self):
-        """Verify state transitions from recording to idle."""
-        state = "recording"
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            result = session.start()
 
-        state = "idle"
+        assert result is True
+        assert session.state == HotkeySessionState.RECORDING
 
-        assert state == "idle"
+    def test_start_fails_when_not_idle(self):
+        """Verify start() fails when already recording."""
+        session = HotkeySession()
 
-    def test_recording_to_cancelled_transition(self):
-        """Verify cancelled state from recording."""
-        state = "recording"
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            session.start()
 
-        state = "cancelled"
+            result = session.start()
 
-        assert state == "cancelled"
+        assert result is False
+        assert session.state == HotkeySessionState.RECORDING
 
-    def test_invalid_transition_blocked(self):
-        """Verify invalid state transitions are prevented."""
-        valid_transitions = {
-            "idle": ["recording"],
-            "recording": ["idle", "cancelled", "stopping"],
-            "stopping": ["idle"],
-            "cancelled": ["idle"],
-        }
+    def test_stop_transitions_from_recording_to_processing(self):
+        """Verify stop() transitions from RECORDING to PROCESSING."""
+        session = HotkeySession()
 
-        current = "idle"
-        next_states = valid_transitions.get(current, [])
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            mock_backend.return_value.backend.read = MagicMock(return_value=None)
 
-        assert "recording" in next_states
-        assert "cancelled" not in next_states
+            session.start()
+            result = session.stop()
 
+        assert result is True
+        assert session.state == HotkeySessionState.PROCESSING
 
-class TestHotkeyActivation:
-    """Test hotkey activation flow."""
-
-    def test_activation_starts_recording(self):
-        """Verify activation starts recording."""
-        is_recording = False
-
-        def activate():
-            nonlocal is_recording
-            is_recording = True
-
-        activate()
-
-        assert is_recording is True
-
-    def test_activation_with_source_parameter(self):
-        """Verify activation accepts source parameter."""
-        source = "microphone"
-
-        captured_source = source
-
-        assert captured_source == "microphone"
-
-    def test_activation_blocks_while_active(self):
-        """Verify activation is blocked while already active."""
-        is_recording = True
-
-        def activate():
-            if is_recording:
-                return False
-            return True
-
-        result = activate()
+    def test_stop_fails_when_not_recording(self):
+        """Verify stop() fails when not in RECORDING state."""
+        session = HotkeySession()
+        result = session.stop()
 
         assert result is False
 
+    def test_invalid_state_transitions_are_blocked(self):
+        """Verify state machine blocks invalid transitions."""
+        session = HotkeySession()
+
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+
+            session.start()
+            assert session.state == HotkeySessionState.RECORDING
+
+            session._state = HotkeySessionState.ERROR
+            result = session.start()
+
+            assert result is False
+
+
+class TestHotkeySessionCallbacks:
+    """Test callback registration and invocation."""
+
+    def test_callbacks_can_be_registered(self):
+        """Verify callbacks can be set via set_callbacks()."""
+        session = HotkeySession()
+
+        on_partial = MagicMock()
+        on_state_change = MagicMock()
+        on_complete = MagicMock()
+        on_error = MagicMock()
+
+        session.set_callbacks(
+            on_partial=on_partial,
+            on_state_change=on_state_change,
+            on_complete=on_complete,
+            on_error=on_error,
+        )
+
+        assert session._on_partial is on_partial
+        assert session._on_state_change is on_state_change
+        assert session._on_complete is on_complete
+        assert session._on_error is on_error
+
+    def test_state_change_callback_invoked_on_start(self):
+        """Verify state change callback is called when starting."""
+        session = HotkeySession()
+        callback = MagicMock()
+        session.set_callbacks(on_state_change=callback)
+
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            session.start()
+
+        callback.assert_called_once()
+        args = callback.call_args[0]
+        assert args[0] == HotkeySessionState.IDLE
+        assert args[1] == HotkeySessionState.RECORDING
+
+    def test_state_change_callback_invoked_on_stop(self):
+        """Verify state change callback is called when stopping."""
+        session = HotkeySession()
+        callback = MagicMock()
+        session.set_callbacks(on_state_change=callback)
+
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            mock_backend.return_value.backend.read = MagicMock(return_value=None)
+            session.start()
+            callback.reset_mock()
+            session.stop()
+
+        callback.assert_called_once()
+        args = callback.call_args[0]
+        assert args[0] == HotkeySessionState.RECORDING
+        assert args[1] == HotkeySessionState.PROCESSING
 
-class TestHotkeyDeactivation:
-    """Test hotkey deactivation flow."""
+
+class TestHotkeySessionMetrics:
+    """Test session metrics collection."""
 
-    def test_deactivation_stops_recording(self):
-        """Verify deactivation stops recording."""
-        is_recording = True
+    def test_metrics_initialized_on_creation(self):
+        """Verify metrics are created with session ID."""
+        session = HotkeySession()
+        assert session.metrics.session_id == session.session_id
+        assert session.metrics.start_time == 0.0
+        assert session.metrics.total_audio_samples == 0
 
-        def deactivate():
-            nonlocal is_recording
-            is_recording = False
+    def test_start_time_recorded_on_start(self):
+        """Verify start time is recorded when session starts."""
+        session = HotkeySession()
 
-        deactivate()
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            before = time.monotonic()
+            session.start()
+            after = time.monotonic()
 
-        assert is_recording is False
+        assert session.metrics.start_time >= before
+        assert session.metrics.start_time <= after
 
-    def test_deactivation_returns_transcript(self):
-        """Verify deactivation returns composed transcript."""
-        transcript = "Test transcript"
+    def test_stop_time_recorded_on_stop(self):
+        """Verify stop time is recorded when session stops."""
+        session = HotkeySession()
 
-        def stop():
-            return {"transcript": transcript}
+        with patch("app.core.hotkey_session.open_audio_backend") as mock_backend:
+            mock_backend.return_value = MagicMock()
+            mock_backend.return_value.backend.read = MagicMock(return_value=None)
 
-        result = stop()
+            session.start()
+            before = time.monotonic()
+            session.stop()
+            after = time.monotonic()
 
-        assert result["transcript"] == "Test transcript"
+        assert session.metrics.stop_time >= before
+        assert session.metrics.stop_time <= after
 
-    def test_deactivation_idempotent(self):
-        """Verify multiple deactivations don't cause errors."""
-        is_recording = True
-        call_count = 0
 
-        def deactivate():
-            nonlocal call_count
-            call_count += 1
+class TestHotkeySessionConfig:
+    """Test session configuration."""
 
-        deactivate()
-        deactivate()
-        deactivate()
+    def test_default_config_values(self):
+        """Verify default configuration values."""
+        config = HotkeySessionConfig()
 
-        assert call_count == 3
+        assert config.sample_rate == 16000
+        assert config.max_duration_seconds == 60.0
+        assert config.channels == 1
+        assert config.auto_inject is True
+        assert config.copy_to_clipboard is True
+        assert config.model_name == "tiny"
 
+    def test_custom_config_applied(self):
+        """Verify custom configuration is applied."""
+        config = HotkeySessionConfig(
+            sample_rate=48000,
+            max_duration_seconds=30.0,
+            model_name="base",
+        )
 
-class TestHotkeyErrorCleanup:
-    """Test cleanup on error conditions."""
+        assert config.sample_rate == 48000
+        assert config.max_duration_seconds == 30.0
+        assert config.model_name == "base"
 
-    def test_error_resets_recording_state(self):
-        """Verify errors reset recording state."""
-        is_recording = True
-        error_occurred = True
 
-        if error_occurred:
-            is_recording = False
+class TestCircularAudioBuffer:
+    """Test in-memory audio buffer."""
 
-        assert is_recording is False
+    def test_buffer_starts_empty(self):
+        """Verify buffer starts empty."""
+        buffer = CircularAudioBuffer(sample_rate=16000, max_duration_seconds=1.0)
 
-    def test_error_cleans_up_audio_resources(self):
-        """Verify audio resources cleaned up on error."""
-        audio_open = True
-        error_occurred = True
+        assert buffer.duration_seconds == 0.0
+        assert buffer.sample_count == 0
+        assert buffer.is_full is False
 
-        if error_occurred:
-            audio_open = False
+    def test_push_increases_sample_count(self):
+        """Verify pushing samples increases count."""
+        import numpy as np
 
-        assert audio_open is False
+        buffer = CircularAudioBuffer(sample_rate=16000, max_duration_seconds=1.0)
+        samples = np.zeros(1600, dtype=np.float32)
 
-    def test_error_cleans_up_transcriber(self):
-        """Verify transcriber cleaned up on error."""
-        transcriber_active = True
+        count = buffer.push(samples)
 
-        def handle_error():
-            nonlocal transcriber_active
-            transcriber_active = False
+        assert count == 1600
+        assert buffer.sample_count == 1600
 
-        handle_error()
+    def test_clear_resets_buffer(self):
+        """Verify clear() resets the buffer."""
+        import numpy as np
 
-        assert transcriber_active is False
+        buffer = CircularAudioBuffer(sample_rate=16000, max_duration_seconds=1.0)
+        samples = np.zeros(1600, dtype=np.float32)
+        buffer.push(samples)
 
+        buffer.clear()
 
-class TestHotkeyWebSocketLifecycle:
-    """Test WebSocket lifecycle in hotkey sessions."""
+        assert buffer.sample_count == 0
+        assert buffer.duration_seconds == 0.0
 
-    def test_websocket_registered_on_session_start(self):
-        """Verify WebSocket is registered when session starts."""
-        ws_registered = False
+    def test_buffer_wraps_when_full(self):
+        """Verify oldest data is overwritten when full."""
+        import numpy as np
 
-        def start_session():
-            nonlocal ws_registered
-            ws_registered = True
+        buffer = CircularAudioBuffer(sample_rate=16000, max_duration_seconds=1.0)
 
-        start_session()
+        for i in range(3):
+            samples = np.ones(8000, dtype=np.float32) * (i + 1)
+            buffer.push(samples)
 
-        assert ws_registered is True
+        assert buffer.is_full is True
+        assert buffer.sample_count == 16000
 
-    def test_websocket_closed_on_session_stop(self):
-        """Verify WebSocket is closed when session stops."""
-        ws_closed = False
+    def test_get_all_returns_numpy_array(self):
+        """Verify get_all() returns numpy array."""
+        import numpy as np
 
-        def stop_session():
-            nonlocal ws_closed
-            ws_closed = True
+        buffer = CircularAudioBuffer(sample_rate=16000, max_duration_seconds=1.0)
+        samples = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+        buffer.push(samples)
 
-        stop_session()
+        result = buffer.get_all()
 
-        assert ws_closed is True
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 3
 
-    def test_websocket_notifies_on_transcript(self):
-        """Verify WebSocket receives transcript events."""
-        events = []
 
-        def on_transcript(event):
-            events.append(event)
+class TestHotkeyTranscriptionServiceStructure:
+    """Test HotkeyTranscriptionService structure and API."""
 
-        on_transcript("segment")
-        on_transcript("final")
+    def test_service_can_be_imported(self):
+        """Verify service can be imported."""
+        from app.api.services.hotkey_transcription_service import (
+            HotkeyTranscriptionService,
+            HotkeyConfig,
+            HotkeyStartResponse,
+            HotkeyStopResponse,
+            HotkeyStatusResponse,
+        )
 
-        assert len(events) == 2
+        assert HotkeyTranscriptionService is not None
 
+    def test_service_has_required_methods(self):
+        """Verify service has start_session and stop_session methods."""
+        from app.api.services.hotkey_transcription_service import (
+            HotkeyTranscriptionService,
+        )
+        from app.core.settings.config import AppSettings
 
-class TestHotkeyConcurrentHandling:
-    """Test concurrent hotkey handling."""
+        settings = MagicMock(spec=AppSettings)
+        service = HotkeyTranscriptionService(settings)
 
-    def test_prevents_concurrent_sessions(self):
-        """Verify concurrent sessions are prevented."""
-        session_active = False
+        assert hasattr(service, "start_session")
+        assert hasattr(service, "stop_session")
+        assert hasattr(service, "get_status")
+        assert hasattr(service, "register_websocket")
+        assert hasattr(service, "unregister_websocket")
 
-        def start_session():
-            nonlocal session_active
-            if session_active:
-                return False
-            session_active = True
-            return True
+    @pytest.mark.asyncio
+    async def test_stop_session_returns_correct_type_when_idle(self):
+        """Verify stop_session returns HotkeyStopResponse when no session active."""
+        from app.api.services.hotkey_transcription_service import (
+            HotkeyTranscriptionService,
+        )
+        from app.core.settings.config import AppSettings
 
-        first = start_session()
-        second = start_session()
+        settings = MagicMock(spec=AppSettings)
+        service = HotkeyTranscriptionService(settings)
 
-        assert first is True
-        assert second is False
+        response = await service.stop_session()
 
-    def test_session_blocks_during_stop(self):
-        """Verify start blocked during stop."""
-        state = "stopping"
+        assert response.status == "idle"
+        assert response.final_transcription == ""
 
-        can_start = state == "idle"
+    def test_get_status_returns_correct_type_when_idle(self):
+        """Verify get_status returns HotkeyStatusResponse when idle."""
+        from app.api.services.hotkey_transcription_service import (
+            HotkeyTranscriptionService,
+        )
+        from app.core.settings.config import AppSettings
 
-        assert can_start is False
+        settings = MagicMock(spec=AppSettings)
+        service = HotkeyTranscriptionService(settings)
 
+        status = service.get_status()
 
-class TestHotkeyConfigUpdates:
-    """Test hotkey configuration updates."""
+        assert status.state == "idle"
+        assert status.is_recording is False
+        assert status.session_id is None
 
-    def test_config_change_applies_immediately(self):
-        """Verify config changes apply immediately."""
-        config = {"enabled": True}
 
-        config["enabled"] = False
+class TestHotkeyStateEnums:
+    """Test state enum values."""
 
-        assert config["enabled"] is False
+    def test_session_state_values(self):
+        """Verify all expected state values exist."""
+        states = [s.name for s in HotkeySessionState]
 
-    def test_config_change_doesnt_break_active_session(self):
-        """Verify config change doesn't break active session."""
-        session_config = {"hold_mode": False}
-        active_session = True
+        assert "IDLE" in states
+        assert "RECORDING" in states
+        assert "PROCESSING" in states
+        assert "COMPLETE" in states
+        assert "ERROR" in states
 
-        if active_session:
-            session_config_copy = session_config.copy()
 
-        assert "hold_mode" in session_config_copy
+class TestHotkeyIntegrationNotes:
+    """Documentation of what's needed for full integration testing."""
 
+    def test_integration_testing_requirements(self):
+        """Document integration test requirements.
 
-class TestHotkeyCleanupOnAppClose:
-    """Test cleanup when app closes."""
+        Full integration tests would require:
 
-    def test_unregister_all_on_close(self):
-        """Verify all hotkeys unregistered on app close."""
-        registered = ["Ctrl+Shift+R", "Ctrl+Shift+T"]
-        unregistered = []
+        1. Mocked audio backend:
+           - Mock LoopbackAudioSource to avoid real audio device
+           - Provide synthetic audio data for transcription
 
-        def on_close():
-            for key in registered:
-                unregistered.append(key)
-            registered.clear()
+        2. Mocked transcriber:
+           - Mock FastTranscriber to return predefined transcripts
+           - Or use a tiny test model with known audio
 
-        on_close()
+        3. Mocked settings:
+           - Mock get_settings_manager() to return test settings
+           - Mock model catalog to return known model IDs
 
-        assert len(registered) == 0
-        assert len(unregistered) == 2
+        4. WebSocket testing:
+           - Create test WebSocket connections
+           - Verify messages are sent correctly
 
-    def test_finalize_pending_session_on_close(self):
-        """Verify pending sessions finalized on close."""
-        has_pending = True
+        5. Hotkey registration (Electron/IPC):
+           - Cannot test in pure Python
+           - Requires e2e test with Electron running
+           - Or mock the IPC layer
 
-        def on_close():
-            nonlocal has_pending
-            if has_pending:
-                has_pending = False
+        6. Text injection:
+           - Mock PlatformTextInjector
+           - Or test only on CI with display
 
-        on_close()
-
-        assert has_pending is False
-
-
-class TestHotkeyStateIsolation:
-    """Test state isolation between sessions."""
-
-    def test_each_session_has_isolated_state(self):
-        """Verify each session has isolated state."""
-        session1_state = {"transcript": ""}
-        session2_state = {"transcript": ""}
-
-        session1_state["transcript"] = "session1 text"
-
-        assert session1_state["transcript"] != session2_state["transcript"]
-
-    def test_session_cleanup_doesnt_affect_others(self):
-        """Verify session cleanup doesn't affect other sessions."""
-        sessions = [
-            {"id": "s1", "active": True},
-            {"id": "s2", "active": True},
-        ]
-
-        sessions[0]["active"] = False
-
-        assert sessions[1]["active"] is True
-
-
-class TestHotkeyLifecycleEdgeCases:
-    """Test edge cases in hotkey lifecycle."""
-
-    def test_rapid_start_stop_handled(self):
-        """Verify rapid start/stop doesn't cause errors."""
-        state = "idle"
-        operations = 0
-
-        for _ in range(10):
-            state = "recording"
-            operations += 1
-            state = "idle"
-            operations += 1
-
-        assert operations == 20
-        assert state == "idle"
-
-    def test_stop_without_start_handled(self):
-        """Verify stop without start is handled gracefully."""
-        was_recording = False
-
-        def stop():
-            return {"status": "idle", "transcript": ""}
-
-        result = stop()
-
-        assert result["status"] == "idle"
-
-    def test_double_stop_handled(self):
-        """Verify double stop is handled gracefully."""
-        stop_count = 0
-
-        def stop():
-            nonlocal stop_count
-            stop_count += 1
-            return {"status": "idle"}
-
-        stop()
-        result = stop()
-
-        assert stop_count == 2
-        assert result["status"] == "idle"
+        These tests verify:
+        - State machine logic
+        - API contracts
+        - Callback flows
+        - Buffer behavior
+        - Configuration handling
+        """
+        pass

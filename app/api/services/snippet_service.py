@@ -1,7 +1,16 @@
+"""Snippet service for text expansion triggers.
+
+Provides SnippetService for managing text expansion snippets with trigger
+and expansion pairs. Supports scopes (personal/shared/team), CRUD operations,
+import/export functionality, and text expansion application.
+"""
+
 from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +18,17 @@ from typing import Any
 from app.storage.history_db import HistoryDatabase
 
 _ALLOWED_SCOPES = {"personal", "shared", "team"}
+
+# In-memory cache for snippet entries
+_snippet_cache: dict[str, tuple[list[dict], float]] = {}
+_cache_lock = threading.Lock()
+_CACHE_TTL_SECONDS = 30.0
+
+
+def invalidate_snippet_cache() -> None:
+    """Clear the snippet cache."""
+    with _cache_lock:
+        _snippet_cache.clear()
 
 
 @dataclass(frozen=True)
@@ -18,6 +38,15 @@ class SnippetApplyResult:
 
 
 class SnippetService:
+    """Service for managing text expansion snippets.
+
+    Provides CRUD operations for text expansion triggers with scope support
+    (personal/shared/team). Supports text expansion application with usage tracking,
+    import/export functionality, and cache management for performance.
+
+    Key collaborators: HistoryDatabase for persistence.
+    """
+
     def __init__(self, db: HistoryDatabase) -> None:
         self._db = db
 
@@ -32,7 +61,18 @@ class SnippetService:
     def _normalize_trigger(trigger: str) -> str:
         return " ".join(trigger.strip().split()).lower()
 
-    def list_entries(self, *, scope: str | None = None, search: str | None = None) -> list[dict[str, Any]]:
+    def list_entries(
+        self, *, scope: str | None = None, search: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List snippet entries with optional scope filtering and search.
+
+        Args:
+            scope: Filter by scope (personal, shared, team)
+            search: Search term for trigger or expansion
+
+        Returns:
+            List of snippet entry records
+        """
         params: list[Any] = []
         filters: list[str] = []
         normalized_scope = self._normalize_scope(scope) if scope else None
@@ -61,6 +101,11 @@ class SnippetService:
         return rows
 
     def get_entry(self, snippet_id: str) -> dict[str, Any] | None:
+        """Get a snippet entry by ID.
+
+        Returns:
+            Entry dict if found, None otherwise.
+        """
         row = self._db.query_one(
             """
             SELECT id, trigger, expansion, scope, enabled, usage_count, created_at, updated_at
@@ -83,6 +128,20 @@ class SnippetService:
         scope: str | None = None,
         enabled: bool = True,
     ) -> dict[str, Any]:
+        """Create a new snippet entry.
+
+        Args:
+            trigger: The trigger text to expand
+            expansion: The expansion text
+            scope: Scope (personal, shared, team)
+            enabled: Whether entry is enabled
+
+        Returns:
+            The created entry record
+
+        Raises:
+            ValueError: If trigger is empty
+        """
         normalized_trigger = self._normalize_trigger(trigger)
         if not normalized_trigger:
             raise ValueError("Snippet trigger cannot be empty")
@@ -95,7 +154,14 @@ class SnippetService:
                 id, trigger, trigger_normalized, expansion, scope, enabled, usage_count, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             """,
-            (snippet_id, trigger.strip(), normalized_trigger, expansion, normalized_scope, 1 if enabled else 0),
+            (
+                snippet_id,
+                trigger.strip(),
+                normalized_trigger,
+                expansion,
+                normalized_scope,
+                1 if enabled else 0,
+            ),
         )
         created = self.get_entry(snippet_id)
         if created is None:
@@ -103,6 +169,19 @@ class SnippetService:
         return created
 
     def update_entry(self, snippet_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing snippet entry.
+
+        Args:
+            snippet_id: ID of entry to update
+            updates: Dict with fields to update (trigger, expansion, scope, enabled)
+
+        Returns:
+            The updated entry record
+
+        Raises:
+            KeyError: If entry not found
+            ValueError: If trigger is empty
+        """
         existing = self.get_entry(snippet_id)
         if existing is None:
             raise KeyError(snippet_id)
@@ -126,7 +205,14 @@ class SnippetService:
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             WHERE id = ?
             """,
-            (trigger.strip(), normalized_trigger, expansion, scope, 1 if enabled else 0, snippet_id),
+            (
+                trigger.strip(),
+                normalized_trigger,
+                expansion,
+                scope,
+                1 if enabled else 0,
+                snippet_id,
+            ),
         )
         updated = self.get_entry(snippet_id)
         if updated is None:
@@ -134,10 +220,27 @@ class SnippetService:
         return updated
 
     def delete_entry(self, snippet_id: str) -> bool:
+        """Delete a snippet entry.
+
+        Returns:
+            True if entry was deleted, False if not found.
+        """
         cursor = self._db.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
         return bool(cursor.rowcount)
 
     def expand_text(self, text: str, *, commit_usage: bool = False) -> SnippetApplyResult:
+        """Apply snippet expansions to text.
+
+        Expands triggers to their configured expansions using word-boundary
+        matching. Longer triggers are matched first to prevent partial expansions.
+
+        Args:
+            text: Input text to transform
+            commit_usage: Whether to increment usage counts
+
+        Returns:
+            SnippetApplyResult with transformed text and list of applied expansions
+        """
         if not text:
             return SnippetApplyResult(text=text, applied=[])
 
@@ -177,6 +280,14 @@ class SnippetService:
         return SnippetApplyResult(text=output, applied=applied)
 
     def preview_expand(self, text: str) -> dict[str, Any]:
+        """Preview snippet expansion without committing usage.
+
+        Args:
+            text: Input text to preview
+
+        Returns:
+            Dict with input_text, output_text, and applied list
+        """
         result = self.expand_text(text, commit_usage=False)
         return {
             "input_text": text,
@@ -184,7 +295,18 @@ class SnippetService:
             "applied": result.applied,
         }
 
-    def import_entries(self, payload: list[dict[str, Any]], *, replace_existing: bool = False) -> dict[str, int]:
+    def import_entries(
+        self, payload: list[dict[str, Any]], *, replace_existing: bool = False
+    ) -> dict[str, int]:
+        """Import snippet entries from payload.
+
+        Args:
+            payload: List of snippet dicts with trigger, expansion, scope, enabled
+            replace_existing: Whether to update existing entries with same trigger/scope
+
+        Returns:
+            Dict with inserted and updated counts
+        """
         inserted = 0
         updated = 0
 
@@ -223,5 +345,10 @@ class SnippetService:
         return {"inserted": inserted, "updated": updated}
 
     def export_entries(self) -> str:
+        """Export all snippet entries as JSON.
+
+        Returns:
+            JSON string of all snippet entries
+        """
         entries = self.list_entries()
         return json.dumps(entries, ensure_ascii=False, indent=2)

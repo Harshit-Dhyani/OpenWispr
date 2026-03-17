@@ -1,3 +1,10 @@
+"""Main window UI for desktop application.
+
+Provides the primary Qt-based main window interface for OpenWispr,
+including session management, transcript display, audio device controls,
+and settings configuration.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -189,7 +196,9 @@ class MainWindow(QMainWindow):
             self.manager.attach_pdf(path)
 
     def on_segment(self, segment: TranscriptSegment) -> None:
-        self.transcript_view.appendPlainText(f"[{segment.start:.2f} - {segment.end:.2f}] {segment.display_text}")
+        self.transcript_view.appendPlainText(
+            f"[{segment.start:.2f} - {segment.end:.2f}] {segment.display_text}"
+        )
 
     def on_health(self, health: SessionHealth, meter_value: float) -> None:
         self.level_meter.setValue(min(100, int(meter_value * 220)))
@@ -217,4 +226,3 @@ class MainWindow(QMainWindow):
             self.review_list.addItem(
                 f"[{segment.start:.2f} - {segment.end:.2f}] {segment.text} :: {', '.join(segment.review_reasons)}"
             )
-

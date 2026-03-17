@@ -214,7 +214,7 @@ class SystemValidator:
     def validate_settings_synchronization(self) -> tuple[bool, str, dict]:
         """Validate settings sync between components."""
         try:
-            from app.core.settings_manager import SettingsManager
+            from app.core.settings.manager import SettingsManager
 
             from app.core.mode_manager import get_mode_manager, reset_mode_manager
 
@@ -546,7 +546,7 @@ class SystemValidator:
     def validate_system_session_lifecycle(self) -> tuple[bool, str, dict]:
         """Validate system session lifecycle."""
         try:
-            from app.core.config import AppSettings
+            from app.core.settings.config import AppSettings
 
             from app.core.system_session import SystemSessionConfig, SystemSessionHandler
 

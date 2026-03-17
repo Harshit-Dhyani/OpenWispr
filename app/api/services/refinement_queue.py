@@ -1,3 +1,30 @@
+"""Asynchronous queue for transcript refinement with debouncing.
+
+This module provides the RefinementQueue class that manages background
+refinement jobs with debouncing to avoid redundant processing:
+
+- Jobs are queued with a debounce timer (default 250ms)
+- If a new job arrives before debounce completes, previous job is cancelled
+- Single-threaded executor ensures sequential processing
+- Superseded jobs are tracked in metrics
+
+The queue handles the refinement pipeline:
+1. Receive segment from transcription
+2. Wait for debounce period (collect rapid updates)
+3. Run refinement asynchronously
+4. Publish refined result via callback
+
+Thread Safety:
+- Lock protects job dictionary and metrics
+- Timer callbacks execute in single thread pool worker
+
+Edge Cases:
+- Segment with empty text: skipped silently
+- refinement_mode=off: skipped silently
+- Job superseded: metrics.record_superseded_refine() called
+- Refiner returns same text: no event published
+"""
+
 from __future__ import annotations
 
 import time
@@ -10,6 +37,22 @@ from app.api.services.refiner_service import RefinerService
 
 
 class RefinementQueue:
+    """Asynchronous transcript refinement queue with debouncing.
+
+    Manages background refinement jobs with debouncing to avoid redundant processing.
+    If a new job arrives before debounce completes, the previous job is cancelled.
+    Single-threaded executor ensures sequential processing.
+
+    State ownership:
+    - Owns active job state in memory (dict protected by lock)
+    - Single ThreadPoolExecutor worker for sequential processing
+    - Timer-based debounce mechanism
+
+    Thread safety:
+    - Lock protects job dictionary and metrics updates
+    - Timer callbacks execute in executor worker thread
+    """
+
     def __init__(
         self,
         *,
@@ -138,4 +181,3 @@ class RefinementQueue:
                 "segment": refined_segment,
             },
         )
-

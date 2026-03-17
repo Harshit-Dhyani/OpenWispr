@@ -1,3 +1,9 @@
+/**
+ * useEventSource - Hook for Server-Sent Events (SSE) connection
+ * 
+ * Manages SSE connection with automatic reconnection and fallback to HTTP polling
+ * when SSE is unavailable.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'polling' | 'error' | 'idle';

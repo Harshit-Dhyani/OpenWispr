@@ -1,4 +1,13 @@
-from __future__ import annotations
+"""Audio backend factory with fallback chain.
+
+Creates audio backends with automatic fallback for cross-platform compatibility.
+Tries preferred backend first, then falls back to alternatives if initialization
+fails. Provides detailed error reporting for debugging device issues.
+
+Key functions:
+    open_audio_backend: Creates backend with fallback chain
+    AudioBackendSelection: Dataclass with backend and failure details
+"""
 
 from dataclasses import dataclass, field
 

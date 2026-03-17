@@ -173,7 +173,7 @@ class TestSettingsFileIO:
 
     def test_settings_file_creation(self, temp_dir: Path) -> None:
         """Test settings file creation."""
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         settings_file = temp_dir / "user_settings.json"
         assert not settings_file.exists()
@@ -184,7 +184,7 @@ class TestSettingsFileIO:
 
     def test_settings_file_format(self, temp_dir: Path) -> None:
         """Test settings file format."""
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         manager = SettingsManager(settings_dir=temp_dir)
         manager._save()
@@ -204,7 +204,7 @@ class TestSettingsFileIO:
         settings_file.write_text("invalid json {{[")
 
         # Should create new settings without crashing
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         manager = SettingsManager(settings_dir=temp_dir)
 
@@ -304,7 +304,7 @@ class TestFilePermissions:
 
     def test_settings_file_permissions(self, temp_dir: Path) -> None:
         """Test settings file has correct permissions."""
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         manager = SettingsManager(settings_dir=temp_dir)
         manager._save()

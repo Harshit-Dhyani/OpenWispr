@@ -1,3 +1,15 @@
+"""Streaming metrics collection for transcription performance monitoring.
+
+Provides StreamingMetrics class for tracking transcription pipeline latency:
+- Draft (live) transcript emission timing
+- Commit (final) transcript emission timing
+- Refinement processing duration
+- Superseded refinement tracking (debounced jobs cancelled)
+
+Thread-safe with locking. Maintains rolling window of recent samples for
+average latency calculations.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -8,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 class StreamingMetrics:
+    """Streaming transcription performance metrics collector.
+
+    Tracks transcription pipeline latency with thread-safe rolling windows.
+    Maintains recent samples for average latency calculations.
+
+    State ownership:
+    - In-memory metrics only; not persisted
+    - Rolling windows: draft_emit (100), commit_emit (100), refine (50)
+    - Lock protects all metric updates
+
+    Metrics tracked:
+    - draft_emit_ms: live transcript emission timing
+    - commit_emit_ms: final transcript emission timing
+    - refine_ms: refinement processing duration
+    - superseded_refines: debounced jobs cancelled before execution
+    """
+
     def __init__(self) -> None:
         self._lock = Lock()
         self._draft_emit_ms: deque[float] = deque(maxlen=100)

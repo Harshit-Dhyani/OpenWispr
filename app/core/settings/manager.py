@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 RUNTIME_TO_CATALOG_MODEL = {
     "tiny": "whisper-tiny",
-    "base": "whisper-small",
+    "base": "whisper-tiny",
     "small": "whisper-small",
     "medium": "whisper-medium",
     "large-v3": "whisper-large-v3",
@@ -248,6 +248,7 @@ class RefinerSettings:
     """LLM refiner settings."""
 
     selected_model_id: str = field(default_factory=lambda: get_setting("selected_model_id").default)
+    custom_model_id: str = field(default_factory=lambda: get_setting("custom_model_id").default)
     runtime_enabled: bool = field(default_factory=lambda: get_setting("runtime_enabled").default)
     cleanup_instructions: str = field(
         default_factory=lambda: get_setting("cleanup_instructions").default
@@ -272,6 +273,7 @@ class HotkeySettings:
     )
     hold_mode: bool = field(default_factory=lambda: get_setting("hold_mode").default)
     auto_inject: bool = field(default_factory=lambda: get_setting("auto_inject").default)
+    auto_transform: bool = field(default_factory=lambda: get_setting("auto_transform").default)
     language: str = field(default_factory=lambda: get_setting("language").default)
     device_id: str = field(default_factory=lambda: get_setting("device_id").default)
     capture_source: str = field(default_factory=lambda: get_setting("capture_source").default)
@@ -367,6 +369,9 @@ class CoachSettings:
     )
     coach_selected_model_id: str = field(
         default_factory=lambda: get_setting("coach_selected_model_id").default
+    )
+    coach_engine_preference: str = field(
+        default_factory=lambda: get_setting("coach_engine_preference").default
     )
     coach_prompt_templates: list[CoachPromptTemplateSettings] = field(
         default_factory=lambda: [

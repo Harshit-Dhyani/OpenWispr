@@ -1,3 +1,10 @@
+/**
+ * Icon path resolution utilities for OpenWispr
+ * Resolves window and tray icon paths from build directory. Exports: getWindowIconPath,
+ * getTrayIconPath
+ * @module iconPaths
+ */
+
 const path = require('path');
 const fs = require('fs');
 

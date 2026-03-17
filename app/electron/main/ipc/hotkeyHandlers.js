@@ -1,5 +1,11 @@
-// Hotkey IPC handlers
-const { clipboard, globalShortcut } = require("electron");
+/**
+ * Hotkey IPC handlers for OpenWispr Electron main process
+ * Handles global hotkey registration, recording lifecycle, WebSocket communication,
+ * floating window updates, and text transformation. Key collaborators: handlers.js,
+ * floatingWindow.js, hotkeyStopPolicy.js, holdModeHotkeys.js
+ * @module hotkeyHandlers
+ */
+const { clipboard, globalShortcut, net } = require("electron");
 const state = require("../shared/state");
 const { updateTrayIcon, updateTrayTooltip } = require("../windows/trayUtils");
 const { createTray } = require("../windows/tray");
@@ -18,6 +24,71 @@ const { injectText } = require("../services/textInjector");
 const { createHoldModeController } = require("../services/holdModeHotkeys");
 const { shouldKeepFloatingResultVisible } = require("./hotkeyStopPolicy");
 const { ELECTRON_STRINGS } = require("../../strings/en");
+
+const API_BASE_URL = "http://127.0.0.1:8765";
+
+/**
+ * Transforms text via backend API for auto-correction, punctuation, casing, etc.
+ * @param {string} text - Raw transcribed text
+ * @returns {Promise<string>} Transformed text
+ */
+async function transformText(text) {
+  if (!text || !text.trim()) {
+    return text;
+  }
+
+  const shouldTransform =
+    state.hotkeyConfigState.auto_transform ??
+    state.cachedSettings?.hotkey?.auto_transform ??
+    true;
+
+  if (!shouldTransform) {
+    return text;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/text/transform`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: text,
+        apply_smart_punctuation: true,
+        apply_short_forms: true,
+        apply_url_normalization: true,
+        apply_casing: true,
+        apply_user_corrections: true,
+        apply_dictionary: true,
+        apply_snippets: true,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("[main] Transform API failed:", response.status);
+      return text;
+    }
+
+    const result = await response.json();
+    if (result.transformed && result.transformed !== text) {
+      if (state.isDebugLoggingEnabled()) {
+        console.log(
+          "[main] Text transformed:",
+          JSON.stringify({
+            original: text.substring(0, 50),
+            transformed: result.transformed.substring(0, 50),
+            expansions: result.expansions?.length || 0,
+          })
+        );
+      }
+      return result.transformed;
+    }
+    return text;
+  } catch (error) {
+    console.warn("[main] Transform error:", error.message);
+    return text;
+  }
+}
 
 let stopWaiter = null;
 let stopInFlightPromise = null;
@@ -73,6 +144,11 @@ function safeCreateTray() {
 
 function playStopSound() {}
 
+/**
+ * Validates if an accelerator string is properly formatted
+ * @param {string} accelerator - The keyboard accelerator string to validate
+ * @returns {{valid: boolean, error?: string}} Validation result
+ */
 function validateAccelerator(accelerator) {
   if (!accelerator || typeof accelerator !== "string") {
     return { valid: false, error: ELECTRON_STRINGS.hotkey.errors.noAcceleratorProvided };
@@ -80,6 +156,10 @@ function validateAccelerator(accelerator) {
   return { valid: true };
 }
 
+/**
+ * Gets the current renderer status based on lifecycle state
+ * @returns {string} Status string: "idle", "listening", "processing", or "error"
+ */
 function getRendererStatus() {
   switch (state.hotkeyLifecycleState) {
     case "recording":
@@ -94,6 +174,10 @@ function getRendererStatus() {
   }
 }
 
+/**
+ * Builds the current hotkey system state payload for IPC communication
+ * @returns {object} Complete hotkey state including enabled, isRecording, accelerators, mode, config, session
+ */
 function buildHotkeyStatePayload() {
   const microphoneAccelerator =
     state.currentMicrophoneHotkeyAccelerator ||
@@ -141,15 +225,28 @@ function buildHotkeyStatePayload() {
   };
 }
 
+/**
+ * Broadcasts current hotkey state to all renderer windows
+ */
 function emitStateChange() {
   const payload = buildHotkeyStatePayload();
   state.broadcastToWindows("hotkey-state-change", payload);
 }
 
+/**
+ * Broadcasts a transcript event to all renderer windows
+ * @param {string} type - Event type (e.g., "hotkey_status", "hotkey_commit_final")
+ * @param {object} payload - Event payload data
+ */
 function emitHotkeyTranscriptEvent(type, payload) {
   state.broadcastToWindows("hotkey-transcript-event", { type, payload });
 }
 
+/**
+ * Updates the hotkey lifecycle state and syncs UI components
+ * @param {string} nextState - New lifecycle state ("idle", "starting", "recording", "stopping", "error")
+ * @param {object} [extra={}] - Additional state to merge
+ */
 function applyLifecycleState(nextState, extra = {}) {
   state.hotkeyLifecycleState = nextState;
   if (extra.sessionId !== undefined) {
@@ -174,6 +271,11 @@ function applyLifecycleState(nextState, extra = {}) {
   emitStateChange();
 }
 
+/**
+ * Checks if a session ID matches the currently active session
+ * @param {string|null} sessionId - Session ID to validate
+ * @returns {boolean} True if session is expected/active
+ */
 function isExpectedHotkeySession(sessionId) {
   if (!sessionId) {
     return true;
@@ -228,10 +330,20 @@ function waitForStopAck(sessionId) {
   return stopWaiter.promise;
 }
 
+/**
+ * Resolves the capture source from config ("system" or "microphone")
+ * @param {object} [config=state.hotkeyConfigState] - Configuration to resolve from
+ * @returns {string} Capture source
+ */
 function resolveCaptureSource(config = state.hotkeyConfigState) {
   return config.capture_source === "system" ? "system" : "microphone";
 }
 
+/**
+ * Resolves the ASR model ID to use based on capture source and config
+ * @param {object} [config=state.hotkeyConfigState] - Configuration to resolve from
+ * @returns {string} Model identifier
+ */
 function resolveHotkeyModelId(config = state.hotkeyConfigState) {
   const captureSource = resolveCaptureSource(config);
   const sourceSpecificModel =
@@ -246,6 +358,11 @@ function resolveHotkeyModelId(config = state.hotkeyConfigState) {
   );
 }
 
+/**
+ * Checks if a hotkey accelerator is available or already registered
+ * @param {string} accelerator - The accelerator string to check
+ * @returns {{registered: boolean, ownedByApp?: boolean, error?: string}} Availability result
+ */
 function checkHotkeyAvailability(accelerator) {
   try {
     if (
@@ -271,10 +388,19 @@ function checkHotkeyAvailability(accelerator) {
   }
 }
 
+/**
+ * Resolves the transcription mode from cached settings
+ * @returns {string} Transcription mode ("dictation" or "session")
+ */
 function resolveTranscriptionMode() {
   return state.cachedSettings?.transcription?.transcription_mode || "dictation";
 }
 
+/**
+ * Checks if app audio should be muted during dictation for the given source
+ * @param {string} captureSource - Audio capture source
+ * @returns {boolean} True if app audio should be muted
+ */
 function shouldMuteAppAudioDuringDictation(captureSource) {
   if (captureSource !== "microphone") {
     return false;
@@ -285,6 +411,10 @@ function shouldMuteAppAudioDuringDictation(captureSource) {
   return Boolean(state.cachedSettings?.audio?.mute_openwispr_audio_during_dictation);
 }
 
+/**
+ * Mutes or unmutes audio in all OpenWispr windows
+ * @param {boolean} muted - Whether to mute audio
+ */
 function setOpenwisprWindowAudioMuted(muted) {
   const windows = [state.mainWindow, state.floatingWindow, state.quickSettingsWindow];
   for (const win of windows) {
@@ -301,6 +431,9 @@ function setOpenwisprWindowAudioMuted(muted) {
   }
 }
 
+/**
+ * Clears all registered global shortcuts and hold-mode controllers
+ */
 function clearRegisteredHotkeys() {
   holdModeController.clear();
   if (state.currentMicrophoneHotkeyAccelerator) {
@@ -314,6 +447,13 @@ function clearRegisteredHotkeys() {
   state.currentHotkeyAccelerator = null;
 }
 
+/**
+ * Toggles recording state for a specific audio source with debouncing
+ * @param {string} source - Audio source ("microphone" or "system")
+ * @param {boolean|undefined} forceState - Force start (true), stop (false), or toggle (undefined)
+ * @param {object} [options={}] - Toggle options
+ * @param {boolean} [options.keepFloatingResultVisible=false] - Whether to keep floating window visible
+ */
 async function toggleRecordingForSource(source, forceState, options = {}) {
   const now = Date.now();
   const useDebounce = forceState === undefined;
@@ -384,10 +524,20 @@ async function toggleRecordingForSource(source, forceState, options = {}) {
   }
 }
 
+/**
+ * Checks if hold-mode (release-driven) hotkeys are configured
+ * @param {object} [config=state.hotkeyConfigState] - Configuration to check
+ * @returns {boolean} True if hold mode is enabled
+ */
 function usesReleaseDrivenHotkeys(config = state.hotkeyConfigState) {
   return Boolean(config.hold_mode || config.stop_on_release);
 }
 
+/**
+ * Registers microphone and system audio hotkeys based on current configuration
+ * Supports both toggle mode and hold (release-driven) mode
+ * @returns {object} Registration result with success boolean and accelerator details
+ */
 function registerConfiguredHotkeys() {
   if (!state.hotkeyEnabled) {
     return { success: false, error: "Hotkey system is disabled" };
@@ -492,6 +642,11 @@ function registerConfiguredHotkeys() {
   }
 }
 
+/**
+ * Registers a global hotkey with the system using the provided accelerator
+ * @param {string} accelerator - The keyboard accelerator to register
+ * @returns {{success: boolean, accelerator?: string, error?: string}} Registration result
+ */
 function registerHotkey(accelerator) {
   state.hotkeyConfigState = {
     ...state.hotkeyConfigState,
@@ -501,12 +656,20 @@ function registerHotkey(accelerator) {
   return registerConfiguredHotkeys();
 }
 
+/**
+ * Unregisters all currently registered global hotkeys
+ * @returns {{success: boolean, wasRegistered: boolean}} Unregistration result
+ */
 function unregisterHotkey() {
   clearRegisteredHotkeys();
   emitStateChange();
   return { success: true, wasRegistered: true };
 }
 
+/**
+ * Establishes WebSocket connection for real-time transcription events
+ * @param {string|null} sessionId - The recording session identifier
+ */
 async function connectHotkeyWebSocket(sessionId) {
   try {
     const WebSocket = require("ws");
@@ -570,27 +733,34 @@ async function connectHotkeyWebSocket(sessionId) {
               currentText: state.hotkeyCurrentText,
               isRecording: false,
             });
-          } else if (payload.state === "idle") {
-            applyLifecycleState("idle", {
-              sessionId: null,
-              currentText: "",
-              isRecording: false,
-            });
           }
-          return;
-        }
 
-        if (message.type === "hotkey_loading") {
+          // Message type handlers continue below...
           if (!isExpectedHotkeySession(payload.session_id)) {
             return;
           }
           const stage = payload.stage || "loading";
+          
+          // Store model info when first received, preserve for subsequent events
+          if (payload.stt_model) {
+            state.hotkeySttModel = payload.stt_model;
+          }
+          if (payload.llm_provider) {
+            state.hotkeyLlmProvider = payload.llm_provider;
+          }
+          if (payload.llm_model) {
+            state.hotkeyLlmModel = payload.llm_model;
+          }
+          
           updateFloatingModelPreparation({
             active: stage !== "ready" && stage !== "error",
             stage,
             message: payload.message || "",
             modelName: payload.model_name || null,
             sessionId: payload.session_id ?? state.activeHotkeySessionId,
+            sttModel: payload.stt_model || state.hotkeySttModel || null,
+            llmProvider: payload.llm_provider || state.hotkeyLlmProvider || null,
+            llmModel: payload.llm_model || state.hotkeyLlmModel || null,
           });
           return;
         }
@@ -607,12 +777,7 @@ async function connectHotkeyWebSocket(sessionId) {
           emitStateChange();
           emitHotkeyTranscriptEvent("hotkey_draft_partial", payload);
           if (text) {
-            updateFloatingModelPreparation({
-              active: false,
-              stage: "ready",
-              message: "",
-              sessionId: payload.session_id ?? state.activeHotkeySessionId,
-            });
+            // Don't clear model preparation - preserve it until backend says ready
             updateFloatingTranscription(text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
               mode: payload.transcription_mode || resolveTranscriptionMode(),
@@ -661,6 +826,9 @@ async function connectHotkeyWebSocket(sessionId) {
               stage: "ready",
               message: "",
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
+              sttModel: payload.stt_model || state.hotkeySttModel || null,
+              llmProvider: payload.llm_provider || state.hotkeyLlmProvider || null,
+              llmModel: payload.llm_model || state.hotkeyLlmModel || null,
             });
             updateFloatingTranscription(liveBufferText || text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
@@ -687,6 +855,9 @@ async function connectHotkeyWebSocket(sessionId) {
               stage: "ready",
               message: "",
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
+              sttModel: payload.stt_model || state.hotkeySttModel || null,
+              llmProvider: payload.llm_provider || state.hotkeyLlmProvider || null,
+              llmModel: payload.llm_model || state.hotkeyLlmModel || null,
             });
             updateFloatingTranscription(text, {
               sessionId: payload.session_id ?? state.activeHotkeySessionId,
@@ -716,6 +887,15 @@ async function connectHotkeyWebSocket(sessionId) {
             committedText: "",
             partialText: "",
             isPartial: false,
+          });
+          updateFloatingModelPreparation({
+            active: true,
+            stage: "loading",
+            message: "Loading models...",
+            sessionId: payload.session_id ?? state.activeHotkeySessionId,
+            sttModel: payload.stt_model || state.hotkeySttModel || null,
+            llmProvider: payload.llm_provider || state.hotkeyLlmProvider || null,
+            llmModel: payload.llm_model || state.hotkeyLlmModel || null,
           });
           applyLifecycleState("recording", {
             sessionId: payload.session_id ?? state.activeHotkeySessionId,
@@ -809,6 +989,8 @@ async function connectHotkeyWebSocket(sessionId) {
               state.hotkeyConfigState.auto_inject &&
               !state.hotkeyPastedLiveCandidate
             ) {
+              // paste_text already has transformations applied by backend
+              // Inject directly without redundant API call for maximum speed
               void injectText(text).catch((error) => {
                 console.error("[main] Hotkey text injection failed:", error.message);
               });
@@ -902,6 +1084,9 @@ async function connectHotkeyWebSocket(sessionId) {
     state.hotkeyWebSocket.on("close", (code, reason) => {
       state.hotkeyWebSocket = null;
       state.hotkeyWebSocketSessionId = null;
+      state.hotkeySttModel = null;
+      state.hotkeyLlmProvider = null;
+      state.hotkeyLlmModel = null;
       if (code === 1000 && state.hotkeyLifecycleState === "stopping") {
         resolveStopWaiter(reason || "normal-close");
         return;
@@ -917,16 +1102,26 @@ async function connectHotkeyWebSocket(sessionId) {
   } catch {}
 }
 
+/**
+ * Closes the active hotkey WebSocket connection
+ */
 function closeHotkeyWebSocket() {
   if (state.hotkeyWebSocket) {
     try {
       state.hotkeyWebSocket.close(1000, "client-close");
-    } catch {}
+    } catch (error) {
+      console.error("[main] Failed to close websocket:", error.message);
+    }
     state.hotkeyWebSocket = null;
     state.hotkeyWebSocketSessionId = null;
   }
 }
 
+/**
+ * Applies hotkey configuration and re-registers hotkeys with new settings
+ * @param {object} config - Hotkey configuration object with key_combination, enabled, etc.
+ * @returns {{success: boolean, enabled?: boolean, error?: string}} Application result
+ */
 async function applyHotkeyConfig(config) {
   state.hotkeyConfigState = {
     ...state.hotkeyConfigState,
@@ -986,6 +1181,11 @@ async function applyHotkeyConfig(config) {
   return result;
 }
 
+/**
+ * Starts a new recording session for the specified audio source
+ * @param {string} [source="microphone"] - Audio source ("microphone" or "system")
+ * @returns {Promise<object>} Session start result with session_id
+ */
 async function startRecording(source = resolveCaptureSource()) {
   const captureSource = source === "system" ? "system" : "microphone";
   const muteAppAudio = shouldMuteAppAudioDuringDictation(captureSource);
@@ -1069,6 +1269,12 @@ async function startRecording(source = resolveCaptureSource()) {
   return result;
 }
 
+/**
+ * Stops the current recording session and processes final transcription
+ * @param {object} [options={}] - Stop options
+ * @param {boolean} [options.keepFloatingResultVisible=false] - Whether to keep floating window visible after stop
+ * @returns {Promise<object>} Stop result with final transcription data
+ */
 async function stopRecording(options = {}) {
   if (state.hotkeyLifecycleState === "idle" || state.hotkeyLifecycleState === "error") {
     return;
@@ -1206,16 +1412,31 @@ async function stopRecording(options = {}) {
   }
 }
 
+/**
+ * IPC handler wrapper for starting recording - initiates recording and returns state
+ * @param {string} [source] - Audio source ("microphone" or "system")
+ * @returns {Promise<object>} Current hotkey state payload
+ */
 async function requestStartRecording(source = resolveCaptureSource()) {
   await toggleRecordingForSource(source, true, { keepFloatingResultVisible: false });
   return buildHotkeyStatePayload();
 }
 
+/**
+ * IPC handler wrapper for stopping recording - stops recording and returns state
+ * @param {object} [options={}] - Stop options
+ * @returns {Promise<object>} Current hotkey state payload
+ */
 async function requestStopRecording(options = {}) {
   await toggleRecording(false, options);
   return buildHotkeyStatePayload();
 }
 
+/**
+ * Toggles recording state for the resolved capture source
+ * @param {boolean} forceState - True to start, false to stop
+ * @param {object} [options={}] - Toggle options
+ */
 async function toggleRecording(forceState, options = {}) {
   await toggleRecordingForSource(resolveCaptureSource(), forceState, options);
 }

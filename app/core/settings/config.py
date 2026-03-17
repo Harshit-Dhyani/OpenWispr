@@ -1,3 +1,13 @@
+"""Runtime application settings using Pydantic.
+
+Provides AppSettings (Pydantic BaseSettings) as the runtime configuration
+source. Loads from environment, config file, and defaults. Supports mode
+profiles (Wispr/System) for different latency/accuracy tradeoffs.
+
+This module is the runtime complement to app.config.settings which defines
+the declarative settings registry.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -13,6 +23,7 @@ from app.config.constants import (
     AppConstants,
     AudioConstants,
     AutoOptimizationConstants,
+    LIVE_MODE_PROFILES,
     ModelConstants,
     PerformanceConstants,
     ServerConstants,
@@ -55,6 +66,8 @@ def is_legacy_download_root(value: Any) -> bool:
     if value is None:
         return False
     normalized = str(value).strip().replace("\\", "/").rstrip("/")
+    if not normalized:
+        return True
     return normalized in {"models", "./models"}
 
 
@@ -349,6 +362,10 @@ class AppSettings(BaseSettings):
     @field_validator("download_root", mode="before")
     @classmethod
     def upgrade_legacy_download_root(cls, value: Any) -> Any:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            resolved = default_download_root()
+            logger.info("Using default download_root (empty input): %s", resolved)
+            return resolved
         if is_legacy_download_root(value):
             resolved = default_download_root()
             logger.info("Upgrading legacy download_root %r to %s", value, resolved)
@@ -395,16 +412,6 @@ class AppSettings(BaseSettings):
         self.temperature = settings.temperature
 
         logger.debug("Applied %s settings to global config", mode or self.mode_settings.active_mode)
-
-
-# Re-export from constants for backward compatibility
-LIVE_MODE_PROFILES: dict[str, dict[str, float]] = {
-    "ultra": {"chunk_seconds": 0.1, "overlap_seconds": 0.02},  # 100ms - fastest
-    "realtime": {"chunk_seconds": 0.2, "overlap_seconds": 0.04},  # 200ms - fast
-    "low_latency": {"chunk_seconds": 0.5, "overlap_seconds": 0.1},  # 500ms
-    "balanced": {"chunk_seconds": 1.0, "overlap_seconds": 0.2},  # 1s - default
-    "high_accuracy": {"chunk_seconds": 2.0, "overlap_seconds": 0.4},  # 2s
-}
 
 
 def resolve_live_profile(mode: str, settings: AppSettings) -> dict[str, float]:

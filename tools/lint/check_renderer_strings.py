@@ -1,3 +1,10 @@
+"""Check renderer strings - validates that frontend copy lives in centralized strings files.
+
+Detects hardcoded user-facing strings in .tsx files that should instead be defined
+in app/electron/frontend/src/strings/en.ts and referenced by key. Ensures UI
+consistency and makes localization possible.
+"""
+
 from __future__ import annotations
 
 import re

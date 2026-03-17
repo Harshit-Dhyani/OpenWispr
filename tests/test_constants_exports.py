@@ -1,6 +1,6 @@
 from app.config.constants import AppConstants as ConfigAppConstants
+from app.config.constants import AppConstants as CoreAppConstants
 from app.config.constants import AudioConstants
-from app.core.constants import AppConstants as CoreAppConstants
 
 
 def test_config_constants_reexport_core_app_constants() -> None:

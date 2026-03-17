@@ -1,3 +1,9 @@
+/**
+ * FeaturePageShell - Reusable page layout wrapper
+ * 
+ * Provides consistent header styling for feature pages with eyebrow,
+ * title, subtitle, enabled status, action buttons, and summary area.
+ */
 import type { ReactNode } from 'react';
 
 type FeaturePageShellProps = {

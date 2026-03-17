@@ -1,3 +1,8 @@
+/**
+ * Electron Strings - Localization constants for Electron shell UI
+ * 
+ * Contains hotkey, floating window status, actions, and result metadata strings.
+ */
 const ELECTRON_STRINGS = {
   hotkey: {
     errors: {

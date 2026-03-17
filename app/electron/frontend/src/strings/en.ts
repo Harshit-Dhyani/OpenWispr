@@ -1,3 +1,10 @@
+/**
+ * RendererStrings - English localization strings for the Electron renderer UI
+ * 
+ * Contains all user-facing text, labels, descriptions, and messages for settings,
+ * sidebar, pages, and transcription panels used in the OpenWispr desktop application.
+ */
+
 import {
   CAPTURE_MODE_LABELS,
   COMPUTE_TYPE_LABELS,
@@ -91,6 +98,10 @@ export const RENDERER_STRINGS = {
       minimizeToTrayDescription: 'Keep running in system tray when closed',
       startupWithSystemTitle: 'Start with System',
       startupWithSystemDescription: 'Launch automatically on Windows startup',
+      storagePathsTitle: 'Storage Locations',
+      storagePathsDescription: 'Where OpenWispr stores models and data (click to open folder)',
+      modelsFolder: 'Models Folder',
+      settingsFile: 'Settings File',
       themeOptions: [
         { value: 'light', label: 'Light (Lawn)' },
         { value: 'dark', label: 'Dark (Night)' },
@@ -202,6 +213,10 @@ export const RENDERER_STRINGS = {
           title: 'Auto-inject Text',
           description: 'Type transcription into active window',
         },
+        autoTransform: {
+          title: 'Auto-transform Text',
+          description: 'Apply smart formatting, short forms, and corrections to transcribed text',
+        },
         showFloatingWindow: {
           title: 'Show Floating Window',
           description: 'Display overlay during transcription',
@@ -275,14 +290,14 @@ export const RENDERER_STRINGS = {
       enableDescription: 'Run the optional coaching stage after microphone dictation finalizes.',
       privacyModeTitle: 'Privacy Mode',
       privacyModeDescription:
-        'Local only keeps the final transcript deterministic. Allow LLM enables coached JSON output.',
+        'Choose how the coach processes your transcript.',
       privacyModeOptions: [
-        { value: 'local_only', label: 'Local only' },
-        { value: 'allow_llm', label: 'Allow local LLM' },
+        { value: 'local_only', label: 'Deterministic (No AI)' },
+        { value: 'allow_llm', label: 'AI Enhanced' },
       ],
-      localOnlyWarningTitle: 'Coach is in fallback-only mode',
+      localOnlyWarningTitle: 'Coach is using fallback mode',
       localOnlyWarningDescription:
-        'Switch Privacy Mode to Allow local LLM if you want polished coach output instead of the faithful transcript.',
+        'Switch to "AI Enhanced" to get polished coach output with grammar and style improvements.',
       runtimeDisabledWarningTitle: 'Coach runtime is disabled',
       runtimeDisabledWarningDescription:
         'Enable the Refiner runtime and install a local coach model if you want the coach stage to produce polished output.',

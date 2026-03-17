@@ -362,7 +362,7 @@ class TestFlowControlIntegration:
     """Test flow control integration with session manager."""
 
     def test_session_manager_receives_health_updates(self) -> None:
-        from app.core.config import AppSettings
+        from app.core.settings.config import AppSettings
 
         from app.core.session_manager import SessionManager
 

@@ -1,3 +1,9 @@
+/**
+ * Session Start - Device selection utilities for session initialization
+ * 
+ * Provides functions to filter eligible devices by capture source type
+ * and resolve the requested device ID for session start.
+ */
 import type { Device } from '../types/api';
 
 export type CaptureSource = 'microphone' | 'system';

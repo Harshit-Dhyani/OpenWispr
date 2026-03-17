@@ -14,6 +14,9 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 class TestSessionSerialization:
@@ -101,7 +104,7 @@ class TestSettingsSerialization:
 
     def test_settings_state_to_dict(self, test_settings: dict) -> None:
         """Test settings state serialization."""
-        from app.core.settings_manager import SettingsState
+        from app.core.settings.manager import SettingsState
 
         state = SettingsState()
         data = state.to_dict() if hasattr(state, "to_dict") else test_settings

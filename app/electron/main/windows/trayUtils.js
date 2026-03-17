@@ -1,4 +1,10 @@
-// Tray utility functions - no circular dependencies
+/**
+ * Tray utility functions for OpenWispr
+ * Creates tray icons (from file or generated circles) and updates icon/tooltip.
+ * Separated from tray.js to avoid circular dependencies. Exports: createTrayIcons,
+ * createCircleIcon, updateTrayIcon, updateTrayTooltip
+ * @module trayUtils
+ */
 const { nativeImage } = require("electron");
 const state = require("../shared/state");
 const { getTrayIconPath } = require("../shared/iconPaths");

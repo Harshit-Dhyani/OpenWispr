@@ -21,16 +21,16 @@ export const CATEGORIES: {
   description: string;
 }[] = [
   {
-    id: 'general',
-    label: RENDERER_STRINGS.settings.categories.general.label,
-    icon: Settings,
-    description: RENDERER_STRINGS.settings.categories.general.description,
-  },
-  {
     id: 'models',
     label: RENDERER_STRINGS.settings.categories.models.label,
     icon: Bot,
     description: RENDERER_STRINGS.settings.categories.models.description,
+  },
+  {
+    id: 'general',
+    label: RENDERER_STRINGS.settings.categories.general.label,
+    icon: Settings,
+    description: RENDERER_STRINGS.settings.categories.general.description,
   },
   {
     id: 'transcription',

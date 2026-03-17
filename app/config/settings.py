@@ -56,6 +56,7 @@ FAKE_SETTINGS = frozenset(
         "noiseFiltering",
         "echoCancellation",
         "autoGainControl",
+        "backend",  # Legacy alias - use audio_backend instead
         # Transcription (performance-related)
         "max_workers",
         "use_parallel_processing",
@@ -64,6 +65,8 @@ FAKE_SETTINGS = frozenset(
         # Advanced
         "experimentalStem",
         "experimentalGpuAccel",
+        # Coach
+        "coach_show_live_hints",
     }
 )
 
@@ -98,6 +101,14 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default="",
         label="Export Directory",
         description="Default location for exported transcripts",
+    ),
+    "modelsDirectory": SettingDefinition(
+        name="modelsDirectory",
+        category="general",
+        type="string",
+        default="",
+        label="Models Directory",
+        description="Custom location for AI models. Leave empty to use default AppData location.",
     ),
     "autoSaveInterval": SettingDefinition(
         name="autoSaveInterval",
@@ -179,7 +190,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         name="system_asr_model_id",
         category="transcription",
         type="string",
-        default="whisper-turbo",
+        default="whisper-medium",
         label="System Audio ASR Model ID",
         description="Catalog ID for the default system-audio transcription model",
     ),
@@ -421,7 +432,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         name="runtime_enabled",
         category="refiner",
         type="boolean",
-        default=False,
+        default=True,
         label="Runtime Enabled",
         description="Enable runtime LLM refinement",
     ),
@@ -441,6 +452,14 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Engine Preference",
         description="Preferred LLM inference engine",
         options=["llamacpp", "ollama", "lm_studio"],
+    ),
+    "custom_model_id": SettingDefinition(
+        name="custom_model_id",
+        category="refiner",
+        type="string",
+        default="",
+        label="Custom Model ID",
+        description="Model ID from Ollama/LM Studio when using external provider",
     ),
     "refiner_provider_base_url": SettingDefinition(
         name="refiner_provider_base_url",
@@ -621,6 +640,14 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         label="Auto-inject Text",
         description="Type transcription into active window",
     ),
+    "auto_transform": SettingDefinition(
+        name="auto_transform",
+        category="hotkey",
+        type="boolean",
+        default=True,
+        label="Auto-transform Text",
+        description="Apply smart formatting, short forms, and corrections to transcribed text",
+    ),
     "language": SettingDefinition(
         name="language",
         category="hotkey",
@@ -659,7 +686,7 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         name="enable_refiner_on_stop",
         category="hotkey",
         type="boolean",
-        default=False,
+        default=True,
         label="Enable Refiner on Dictation Stop",
         description="Run the text refiner after hotkey dictation stops",
     ),
@@ -807,9 +834,9 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         name="privacy_mode",
         category="coach",
         type="enum",
-        default="local_only",
+        default="allow_llm",
         label="Coach Privacy Mode",
-        description="Allow local LLM coaching or stay transcript-only",
+        description="Choose between deterministic output (no AI) or AI-enhanced coaching",
         options=["local_only", "allow_llm"],
     ),
     "show_floating_coach_result": SettingDefinition(
@@ -843,6 +870,15 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
         default="qwen2.5-3b-instruct",
         label="Coach Model ID",
         description="LLM model for English coach",
+    ),
+    "coach_engine_preference": SettingDefinition(
+        name="coach_engine_preference",
+        category="coach",
+        type="enum",
+        default="llamacpp",
+        label="Coach Engine Preference",
+        description="Preferred LLM inference engine for coach",
+        options=["llamacpp", "ollama", "lm_studio"],
     ),
     # ============================================
     # History Settings

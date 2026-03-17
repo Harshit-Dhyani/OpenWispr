@@ -1,3 +1,11 @@
+/**
+ * Floating window state management for OpenWispr
+ * Resolves window bounds, positions, HTML path, and provides clamping utilities
+ * for keeping the floating window within screen work areas. Exports:
+ * DEFAULT_FLOATING_WINDOW_SIZE, clampFloatingWindowPosition, resolvePresetFloatingWindowPosition,
+ * resolveFloatingWindowBounds, resolveFloatingWindowHtmlPath
+ * @module floatingWindowState
+ */
 const path = require("path");
 const fs = require("fs");
 

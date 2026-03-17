@@ -1,3 +1,9 @@
+/**
+ * Floating window content path resolution for OpenWispr
+ * Resolves the HTML path for the floating transcription window, checking
+ * both packaged build and development locations. Exports: resolveFloatingWindowContentPath
+ * @module floatingWindowContentPath
+ */
 const fs = require("fs");
 const path = require("path");
 

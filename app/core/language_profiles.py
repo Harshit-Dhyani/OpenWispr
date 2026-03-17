@@ -1,3 +1,9 @@
+"""Language catalog and profile definitions for STT.
+
+Defines LANGUAGE_CATALOG mapping language codes to display names.
+Used by settings and UI for language selection.
+"""
+
 from __future__ import annotations
 
 LANGUAGE_CATALOG: list[tuple[str, str]] = [

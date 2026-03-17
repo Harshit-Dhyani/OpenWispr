@@ -1,3 +1,11 @@
+/**
+ * Shared state module for OpenWispr Electron main process
+ * Centralizes all mutable state including window references, hotkey configuration,
+ * recording state, backend process, and settings cache. Uses getters/setters for
+ * controlled access to module-level variables.
+ * Key collaborators: handlers.js, hotkeyHandlers.js, mainWindow.js, floatingWindow.js
+ */
+
 // Shared state for Electron main process
 const { app } = require("electron");
 const { APP_NAME, APP_SLUG, DOWNLOAD_USER_AGENT } = require("./generated/appMeta");
@@ -55,6 +63,11 @@ let hotkeyPastedLiveCandidate = false;
 let floatingWindowSuppressResult = false;
 let hotkeyMutedAppAudio = false;
 let isQuitting = false;
+
+// Model info for floating window display
+let hotkeySttModel = null;
+let hotkeyLlmProvider = null;
+let hotkeyLlmModel = null;
 
 // Tray icons cache
 let trayIconIdle = null;
@@ -227,6 +240,14 @@ module.exports = {
   set hotkeyMutedAppAudio(value) { hotkeyMutedAppAudio = value; },
   get isQuitting() { return isQuitting; },
   set isQuitting(value) { isQuitting = value; },
+
+  // Model info for floating window
+  get hotkeySttModel() { return hotkeySttModel; },
+  set hotkeySttModel(value) { hotkeySttModel = value; },
+  get hotkeyLlmProvider() { return hotkeyLlmProvider; },
+  set hotkeyLlmProvider(value) { hotkeyLlmProvider = value; },
+  get hotkeyLlmModel() { return hotkeyLlmModel; },
+  set hotkeyLlmModel(value) { hotkeyLlmModel = value; },
 
   // Tray icons
   get trayIconIdle() { return trayIconIdle; },

@@ -114,7 +114,7 @@ class TestVADParamsPassthrough:
         assert "vad_min_silence_ms" not in transcriber.vad_params
 
     def test_vad_params_from_session_manager(self) -> None:
-        from app.core.config import AppSettings
+        from app.core.settings.config import AppSettings
 
         from app.core.session_manager import SessionManager
 
@@ -178,7 +178,7 @@ class TestVADDefaults:
         assert transcriber.vad_params == {}
 
     def test_config_defaults_applied(self) -> None:
-        from app.core.config import AppSettings
+        from app.core.settings.config import AppSettings
 
         settings = AppSettings()
 
@@ -188,7 +188,7 @@ class TestVADDefaults:
         assert settings.vad_speech_pad_ms == 200
 
     def test_config_defaults_used_when_no_params_provided(self) -> None:
-        from app.core.config import AppSettings
+        from app.core.settings.config import AppSettings
 
         settings = AppSettings()
 

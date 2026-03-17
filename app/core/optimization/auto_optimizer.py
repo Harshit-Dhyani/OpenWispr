@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.core.system_profiler import SystemProfiler
+from app.core.profiling.system_profiler import SystemProfiler
 
 
 @dataclass

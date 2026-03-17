@@ -174,7 +174,7 @@ class TestSettingsMemory:
 
     def test_settings_memory_footprint(self) -> None:
         """Test settings memory footprint."""
-        from app.core.settings_manager import SettingsState
+        from app.core.settings.manager import SettingsState
 
         tracemalloc.start()
 

@@ -81,6 +81,16 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     isFake: false,
     isAdvanced: false,
   },
+  auto_transform: {
+    name: "auto_transform",
+    category: "hotkey",
+    type: "boolean",
+    default: true,
+    label: "Auto-transform Text",
+    description: "Apply smart formatting, short forms, and corrections to transcribed text",
+    isFake: false,
+    isAdvanced: false,
+  },
   backend: {
     name: "backend",
     category: "audio",
@@ -180,6 +190,17 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     default: true,
     label: "Enable English Coach",
     description: "Generate polished text and coaching notes after microphone dictation stops",
+    isFake: false,
+    isAdvanced: false,
+  },
+  coach_engine_preference: {
+    name: "coach_engine_preference",
+    category: "coach",
+    type: "enum",
+    default: "llamacpp",
+    label: "Coach Engine Preference",
+    description: "Preferred LLM inference engine for coach",
+    options: ["llamacpp", "ollama", "lm_studio"],
     isFake: false,
     isAdvanced: false,
   },
@@ -327,6 +348,16 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     isFake: false,
     isAdvanced: false,
   },
+  custom_model_id: {
+    name: "custom_model_id",
+    category: "refiner",
+    type: "string",
+    default: "",
+    label: "Custom Model ID",
+    description: "Model ID from Ollama/LM Studio when using external provider",
+    isFake: false,
+    isAdvanced: false,
+  },
   debugMode: {
     name: "debugMode",
     category: "advanced",
@@ -463,7 +494,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     name: "enable_refiner_on_stop",
     category: "hotkey",
     type: "boolean",
-    default: false,
+    default: true,
     label: "Enable Refiner on Dictation Stop",
     description: "Run the text refiner after hotkey dictation stops",
     isFake: false,
@@ -673,6 +704,16 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     isFake: false,
     isAdvanced: false,
   },
+  modelsDirectory: {
+    name: "modelsDirectory",
+    category: "general",
+    type: "string",
+    default: "",
+    label: "Models Directory",
+    description: "Custom location for AI models. Leave empty to use default AppData location.",
+    isFake: false,
+    isAdvanced: false,
+  },
   mute_openwispr_audio_during_dictation: {
     name: "mute_openwispr_audio_during_dictation",
     category: "audio",
@@ -743,9 +784,9 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     name: "privacy_mode",
     category: "coach",
     type: "enum",
-    default: "local_only",
+    default: "allow_llm",
     label: "Coach Privacy Mode",
-    description: "Allow local LLM coaching or stay transcript-only",
+    description: "Choose between deterministic output (no AI) or AI-enhanced coaching",
     options: ["local_only", "allow_llm"],
     isFake: false,
     isAdvanced: false,
@@ -764,7 +805,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     name: "refinement_mode",
     category: "transcription",
     type: "enum",
-    default: "off",
+    default: "strict",
     label: "Refinement Mode",
     description: "Post-processing mode for transcript refinement",
     options: ["off", "strict", "polished"],
@@ -809,7 +850,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     name: "runtime_enabled",
     category: "refiner",
     type: "boolean",
-    default: false,
+    default: true,
     label: "Runtime Enabled",
     description: "Enable runtime LLM refinement",
     isFake: false,
@@ -950,7 +991,7 @@ export const SETTINGS_REGISTRY: Record<string, SettingDefinition> = {
     name: "system_asr_model_id",
     category: "transcription",
     type: "string",
-    default: "whisper-turbo",
+    default: "whisper-medium",
     label: "System Audio ASR Model ID",
     description: "Catalog ID for the default system-audio transcription model",
     isFake: false,
@@ -1204,7 +1245,7 @@ export function validateSetting(name: string, value: unknown): ValidationResult 
 // ============================================
 // Settings Version
 // ============================================
-export const CURRENT_SETTINGS_VERSION = 5;
+export const CURRENT_SETTINGS_VERSION = 7;
 
 export function getSettingsVersion(): number {
   return CURRENT_SETTINGS_VERSION;

@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
-"""Generate TypeScript constants from Python configuration.
+"""Generate TypeScript configuration files from Python sources.
 
-This script reads the Python configuration files and generates
-TypeScript equivalents for the frontend to use.
+Reads Python configuration modules and generates TypeScript equivalents
+for the Electron frontend. This ensures frontend/backend consistency
+without manual duplication.
 
-Run this script whenever you modify app/config/:
+Input sources:
+- app/config/settings.py: Setting definitions and registry
+- app/config/constants.py: Backend constant values
+- app/config/text.py: UI labels and messages
+
+Output files (generated/):
+- constants.ts: Audio, model, UI, and quality constants
+- text.ts: Labels, descriptions, and UI copy
+- settings.ts: Setting registry with TypeScript types
+- index.ts: Barrel file re-exporting all generated modules
+
+Run this script whenever Python config files are modified:
+    python -m app.config.generate_ts
+    # or
     python app/config/generate_ts.py
+
+Generated files are committed to the repo - do not edit manually.
 """
 
 import json
@@ -15,6 +31,7 @@ from typing import Any
 # Import Python constants from authoritative source
 from app.config.constants import (
     COMMON_FILLER_WORDS,
+    COMMON_SHORT_FORMS,
     GPU_FALLBACK_KEYWORDS,
     HALLUCINATION_CONFIDENCE_THRESHOLD,
     HALLUCINATION_PHRASES,
@@ -261,6 +278,13 @@ def generate_constants_ts() -> str:
         f"export const HALLUCINATION_CONFIDENCE_THRESHOLD = {HALLUCINATION_CONFIDENCE_THRESHOLD};",
         "",
         "// ============================================",
+        "// Short Form Expansions",
+        "// ============================================",
+        "export const COMMON_SHORT_FORMS = "
+        + json.dumps(COMMON_SHORT_FORMS, sort_keys=True)
+        + " as const;",
+        "",
+        "// ============================================",
         "// Server/API Constants",
         "// ============================================",
         "export const ServerConstants = {",
@@ -332,12 +356,15 @@ def generate_constants_ts() -> str:
         f"  DEFAULT_MODEL_ID: '{RefinerConstants.DEFAULT_MODEL_ID}',",
         f"  DEFAULT_ENGINE_PREFERENCE: '{RefinerConstants.DEFAULT_ENGINE_PREFERENCE}' as const,",
         f"  DEFAULT_REFINEMENT_MODE: '{RefinerConstants.DEFAULT_REFINEMENT_MODE}' as const,",
+        f"  DEFAULT_REFINEMENT_PROFILE: '{RefinerConstants.DEFAULT_REFINEMENT_PROFILE}' as const,",
         "} as const;",
-        "",
         "export const VALID_REFINER_ENGINES = "
         + json.dumps(sorted(RefinerConstants.VALID_ENGINES))
         + " as const;",
         "export const VALID_REFINEMENT_MODES = ['off', 'strict', 'polished'] as const;",
+        "export const VALID_REFINEMENT_PROFILES = "
+        + json.dumps(sorted(RefinerConstants.VALID_REFINEMENT_PROFILES))
+        + " as const;",
         "",
         "// ============================================",
         "// GPU Fallback Keywords",

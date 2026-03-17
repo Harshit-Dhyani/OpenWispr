@@ -1,3 +1,9 @@
+/**
+ * Model download manager for Whisper models
+ * Handles model catalog fetching, download progress, resumable downloads with
+ * chunk validation, retry logic, and storage management. Exports: ModelDownloadManager
+ * @module modelDownloadManager
+ */
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");

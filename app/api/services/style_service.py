@@ -1,3 +1,10 @@
+"""Style service for text style profile management and application.
+
+Provides StyleService for managing text style profiles (formal, casual, etc.)
+with configurable rules for capitalization and punctuation. Supports profile
+assignments to contexts (personal, work, email) and style application to text.
+"""
+
 from __future__ import annotations
 
 import json
@@ -18,6 +25,21 @@ class StyleApplyResult:
 
 
 class StyleService:
+    """Text style profile management service.
+
+    Manages style profiles for text transformation with configurable rules
+    for capitalization and punctuation. Provides profile CRUD operations,
+    context assignments (personal, work, email), and style application.
+
+    State ownership:
+    - Owns profile and assignment state in the database
+    - Seed profiles (formal, casual, very_casual) created on init
+    - Thread-safe via database transaction locking
+
+    Dependencies:
+    - HistoryDatabase for persistence
+    """
+
     def __init__(self, db: HistoryDatabase) -> None:
         self._db = db
         self._ensure_seed_profiles()

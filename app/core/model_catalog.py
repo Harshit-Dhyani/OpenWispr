@@ -1,3 +1,12 @@
+"""Model catalog and metadata definitions.
+
+Provides ModelCatalogEntry, DownloadArtifact dataclasses and related
+type definitions for describing available STT and refiner models.
+
+Defines model families (whisper, qwen, mistral, phi), engines
+(faster-whisper, llamacpp, ollama), and speed tiers.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -173,7 +182,7 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
         description_short="Fast high-end ASR option when Turbo is supported by the local runtime.",
         why_choose_this="Choose this when you want faster large-model style decoding on a good GPU.",
         runtime_model_name="turbo",
-        enabled_runtime=False,
+        enabled_runtime=True,
         download_artifacts=(
             _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "model.bin", 1_000_000_000),
             _hf_file("mobiuslabsgmbh/faster-whisper-large-v3-turbo", "config.json", 512),
@@ -196,7 +205,9 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
         runtime_model_name=None,
         enabled_runtime=False,
         download_artifacts=(
-            _hf_file("Qwen/Qwen2.5-3B-Instruct-GGUF", "qwen2.5-3b-instruct-q4_k_m.gguf", 1_700_000_000),
+            _hf_file(
+                "Qwen/Qwen2.5-3B-Instruct-GGUF", "qwen2.5-3b-instruct-q4_k_m.gguf", 1_700_000_000
+            ),
         ),
         default_runtime_config={"threads": 6, "gpuLayers": 24},
     ),
@@ -215,7 +226,9 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
         runtime_model_name=None,
         enabled_runtime=False,
         download_artifacts=(
-            _hf_file("Qwen/Qwen2.5-7B-Instruct-GGUF", "qwen2.5-7b-instruct-q4_k_m.gguf", 3_000_000_000),
+            _hf_file(
+                "Qwen/Qwen2.5-7B-Instruct-GGUF", "qwen2.5-7b-instruct-q4_k_m.gguf", 3_000_000_000
+            ),
         ),
         default_runtime_config={"threads": 8, "gpuLayers": 35},
     ),
@@ -234,7 +247,11 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
         runtime_model_name=None,
         enabled_runtime=False,
         download_artifacts=(
-            _hf_file("MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF", "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf", 3_000_000_000),
+            _hf_file(
+                "MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF",
+                "Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+                3_000_000_000,
+            ),
         ),
         default_runtime_config={"threads": 8, "gpuLayers": 35},
     ),
@@ -253,7 +270,11 @@ MODEL_CATALOG: tuple[ModelCatalogEntry, ...] = (
         runtime_model_name=None,
         enabled_runtime=False,
         download_artifacts=(
-            _hf_file("microsoft/Phi-3-mini-4k-instruct-gguf", "Phi-3-mini-4k-instruct-q4.gguf", 1_500_000_000),
+            _hf_file(
+                "microsoft/Phi-3-mini-4k-instruct-gguf",
+                "Phi-3-mini-4k-instruct-q4.gguf",
+                1_500_000_000,
+            ),
         ),
         default_runtime_config={"threads": 6, "gpuLayers": 20},
     ),

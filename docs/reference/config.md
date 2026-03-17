@@ -1,12 +1,12 @@
 ---
 title: Configuration Reference
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
-  - app/core/settings_manager.py
+  - app/core/settings/manager.py
   - app/config/settings.py
   - app/config/constants.py
-  - app/core/modes.py
+  - app/core/mode_manager.py
 ---
 
 # OpenWispr Configuration Reference
@@ -29,6 +29,9 @@ Complete reference for all OpenWispr configuration options, including environmen
 ## Settings Schema
 
 <!-- GENERATED: settings-schema -->
+
+> **Note:** Settings marked with `is_fake: true` in the registry are non-functional UI controls that appear in the UI but have no runtime effect. These include: `showNotifications`, `minimizeToTray`, `startupWithSystem`, `noiseFiltering`, `echoCancellation`, `autoGainControl`, `backend`, `max_workers`, `use_parallel_processing`, `preload_model`, `patience`, `experimentalStem`, `experimentalGpuAccel`, `coach_show_live_hints`.
+
 ## General Settings
 
 General settings.
@@ -38,6 +41,7 @@ General settings.
 | `defaultSessionTitle` | string | 'New Session' | |
 | `defaultLanguage` | string | 'auto' | |
 | `exportDirectory` | string | '' | |
+| `modelsDirectory` | string | '' | |
 | `autoSaveInterval` | number | 30 | |
 | `showNotifications` | boolean | True | |
 | `minimizeToTray` | boolean | True | |
@@ -51,11 +55,11 @@ Transcription settings.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `model_name` | string | 'medium' | |
-| `default_asr_model_id` | string | 'whisper-medium' | |
-| `microphone_asr_model_id` | string | 'whisper-medium' | |
+| `default_asr_model_id` | string | 'whisper-turbo' | |
+| `microphone_asr_model_id` | string | 'whisper-turbo' | |
 | `system_asr_model_id` | string | 'whisper-medium' | |
 | `refinement_mode` | string | 'off' | |
-| `refinement_profile` | string | 'clean_dictation' | |
+| `refinement_profile` | string | 'raw' | |
 | `transcription_mode` | string | 'dictation' | |
 | `compute_type` | string | 'float16' | |
 | `chunk_duration` | number | 1.6 | |
@@ -106,6 +110,7 @@ Refiner settings.
 | `runtime_enabled` | boolean | False | |
 | `cleanup_instructions` | string | '' | |
 | `engine_preference` | string | 'llamacpp' | |
+| `refiner_provider_base_url` | string | 'http://localhost:11434' | |
 
 ## Hotkey Settings
 
@@ -119,6 +124,7 @@ Hotkey settings.
 | `system_key_combination` | string | 'CommandOrControl+Shift+Y' | |
 | `hold_mode` | boolean | False | |
 | `auto_inject` | boolean | True | |
+| `auto_transform` | boolean | True | |
 | `language` | string | 'auto' | |
 | `device_id` | string | 'default' | |
 | `capture_source` | string | 'microphone' | |
@@ -150,6 +156,10 @@ Coach settings.
 | `privacy_mode` | string | 'local_only' | |
 | `show_floating_coach_result` | boolean | True | |
 | `coach_prompt_templates` | array | *computed* | |
+| `coach_provider_base_url` | string | 'http://localhost:11434' | |
+| `coach_runtime_enabled` | boolean | True | |
+| `coach_selected_model_id` | string | 'qwen2.5-3b-instruct' | |
+| `coach_engine_preference` | string | 'llamacpp' | |
 
 ## Advanced Settings
 
@@ -198,7 +208,7 @@ Style settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `style_default_profile` | string | '' | |
+| `style_default_profile` | string | 'casual' | |
 | `style_apply_enabled` | boolean | True | |
 <!-- END GENERATED -->
 
@@ -319,6 +329,7 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
     "defaultSessionTitle": "New Session",
     "defaultLanguage": "auto",
     "exportDirectory": "",
+    "modelsDirectory": "",
     "autoSaveInterval": 30,
     "showNotifications": true,
     "minimizeToTray": true,
@@ -327,8 +338,8 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
   },
   "transcription": {
     "model_name": "medium",
-    "default_asr_model_id": "whisper-medium",
-    "microphone_asr_model_id": "whisper-medium",
+    "default_asr_model_id": "whisper-turbo",
+    "microphone_asr_model_id": "whisper-turbo",
     "system_asr_model_id": "whisper-medium",
     "refinement_mode": "off",
     "refinement_profile": "raw",
@@ -371,13 +382,18 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
       "target_style": "simple"
     },
     "privacy_mode": "local_only",
-    "show_floating_coach_result": true
+    "show_floating_coach_result": true,
+    "coach_provider_base_url": "http://localhost:11434",
+    "coach_runtime_enabled": true,
+    "coach_selected_model_id": "qwen2.5-3b-instruct",
+    "coach_engine_preference": "llamacpp"
   },
   "refiner": {
     "selected_model_id": "qwen2.5-3b-instruct",
     "runtime_enabled": false,
     "cleanup_instructions": "",
-    "engine_preference": "llamacpp"
+    "engine_preference": "llamacpp",
+    "refiner_provider_base_url": "http://localhost:11434"
   },
   "audio": {
     "captureMode": "microphone",
@@ -395,8 +411,11 @@ The `user_settings.json` file stores all user-configurable settings. It is organ
   "hotkey": {
     "enabled": false,
     "key_combination": "Ctrl+Shift+T",
+    "microphone_key_combination": "Ctrl+Shift+T",
+    "system_key_combination": "CommandOrControl+Shift+Y",
     "hold_mode": false,
     "auto_inject": true,
+    "auto_transform": true,
     "language": "auto",
     "device_id": "default",
     "finish_mode_default": "finish_and_paste",
@@ -586,14 +605,14 @@ All settings are validated against these bounds. Values outside these ranges wil
 |---------|--------------|---------|
 | `model_name` | `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo` | `medium` |
 | `compute_type` | `float16`, `int8`, `int8_float16` | `float16` |
-| `theme` | `light`, `dark`, `cyber`, `dracula` | `light` |
+| `theme` | `light`, `dark`, `cyber`, `dracula`, `ocean`, `sunset`, `forest` | `light` |
 | `live_mode` | `ultra`, `realtime`, `low_latency`, `balanced`, `high_accuracy` | `balanced` |
 | `execution_mode` | `auto`, `cpu_only`, `gpu_only` | `auto` |
 | `optimization_mode` | `maximum`, `balanced`, `speed`, `low_memory` | `balanced` |
 | `refinement_mode` | `off`, `strict`, `polished` | `off` |
 | `refinement_profile` | `raw`, `clean_dictation`, `professional`, `student_notes`, `code_logs` | `raw` |
-| `transcription_mode` | `dictation`, `literal` | `dictation` |
-| `engine_preference` | `llamacpp`, `ollama` | `llamacpp` |
+| `transcription_mode` | `dictation`, `literal`, `session_paragraph` | `dictation` |
+| `engine_preference` | `llamacpp`, `ollama`, `lm_studio` | `llamacpp` |
 | `captureMode` | `system`, `microphone` | `microphone` |
 | `floating_window_position` | `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` | `bottom-right` |
 
@@ -883,20 +902,6 @@ Settings are automatically migrated when the app starts. Current version: **5**
 
 ---
 
-## Migration History
-
-Settings are automatically migrated when the app starts. Current version: **5**
-
-| Version | Changes |
-|---------|---------|
-| 1 | Initial versioned settings with categories (general, transcription, refiner, audio, hotkey, advanced) |
-| 2 | Added `default_asr_model_id`, `refinement_mode`, `refinement_profile`, and refiner settings |
-| 3 | Added hotkey settings, moved VAD settings to transcription category |
-| 4 | Renamed `backend` to `audio_backend`, removed duplicate VAD from audio |
-| 5 | Added `coach` category with English Coach settings and prompt templates |
-
----
-
 ## Known Issues and Bugs
 
 > **Audit Date: 2026-03-08** - This section documents known mismatches between documented defaults and actual runtime behavior.
@@ -910,10 +915,9 @@ Settings are automatically migrated when the app starts. Current version: **5**
 
 ### Default Mismatches
 
-| Setting | Documented Default | Actual Default | Location |
-|---------|-------------------|-----------------|----------|
-| `refinement_profile` | `clean_dictation` | `raw` (post-migration) | `app/config/settings.py` |
-| `style_default_profile` | `''` (empty) | Computed default | `app/config/settings.py:888` |
+*Previously documented mismatches have been resolved.*
+
+*Note: `style_default_profile` was previously documented as empty string but is now correctly documented as `casual`.*
 
 ### Performance-Affecting Settings
 
@@ -960,3 +964,4 @@ The following settings appear in the UI but have no runtime effect:
 - The `version` field in `user_settings.json` enables migration between app versions
 - Mode-specific settings in `modes` override global transcription settings when that mode is active
 - Fake/not-implemented settings are marked with `is_fake: true` in the registry
+

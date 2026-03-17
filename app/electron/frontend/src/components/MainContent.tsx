@@ -1,3 +1,12 @@
+/**
+ * MainContent - Routing container for dictation vs session content views
+ * 
+ * Conditionally renders DictationContent or SessionContent based on the scope prop.
+ * Manages transcript state, coach results, live drafts, and debug event display for both
+ * dictation and session recording modes.
+ * 
+ * @component
+ */
 import type { CoachResult, Formula, Segment, SessionSummary } from '../types/api';
 import { DictationContent } from './DictationContent';
 import { SessionContent } from './SessionContent';

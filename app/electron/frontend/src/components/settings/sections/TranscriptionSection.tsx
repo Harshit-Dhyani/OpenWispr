@@ -1,3 +1,10 @@
+/**
+ * TranscriptionSection - Transcription and refinement settings
+ * 
+ * Manages transcription language, punctation, formatting, refinement options,
+ * text filters, coaching settings, and preset management.
+ * Props: SectionProps with selectedPreset, availableModels, onApplyPreset callback.
+ */
 import { Mic, Zap, Gauge, Filter, Activity, Keyboard } from 'lucide-react';
 import { useState } from 'react';
 import { SectionHeader } from '../SectionHeader';
@@ -419,14 +426,10 @@ export function TranscriptionSection({
                 onChange={(v) => updateSetting('transcription', 'best_of', v)}
               />
             </div>
+            {!isFakeSetting('transcription', 'patience') && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label className="text-xs font-bold text-stone-500">{text.patience_label}</label>
-                {isFakeSetting('transcription', 'patience') && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold uppercase">
-                    Coming Soon
-                  </span>
-                )}
               </div>
               <NumberInput
                 value={settings.transcription.patience}
@@ -434,9 +437,9 @@ export function TranscriptionSection({
                 max={5}
                 step={0.1}
                 onChange={(v) => updateSetting('transcription', 'patience', v)}
-                disabled={isFakeSetting('transcription', 'patience')}
               />
             </div>
+            )}
             <div>
               <label className="text-xs font-bold text-stone-500 block mb-2">{text.temperature_label}</label>
               <NumberInput
@@ -500,42 +503,30 @@ export function TranscriptionSection({
             {text.performance_group_title}
           </h4>
           <div className="space-y-4">
+            {!isFakeSetting('transcription', 'use_parallel_processing') && (
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold block">{text.parallel_processing_title}</span>
-                  {isFakeSetting('transcription', 'use_parallel_processing') && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold uppercase">
-                      Coming Soon
-                    </span>
-                  )}
-                </div>
+                <span className="text-sm font-bold block">{text.parallel_processing_title}</span>
                 <p className="text-xs text-stone-500">{text.parallel_processing_description}</p>
               </div>
               <Toggle
                 checked={settings.transcription.use_parallel_processing}
                 onChange={(v) => updateSetting('transcription', 'use_parallel_processing', v)}
-                disabled={isFakeSetting('transcription', 'use_parallel_processing')}
               />
             </div>
+            )}
+            {!isFakeSetting('transcription', 'preload_model') && (
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold block">{text.preload_model_title}</span>
-                  {isFakeSetting('transcription', 'preload_model') && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold uppercase">
-                      Coming Soon
-                    </span>
-                  )}
-                </div>
+                <span className="text-sm font-bold block">{text.preload_model_title}</span>
                 <p className="text-xs text-stone-500">{text.preload_model_description}</p>
               </div>
               <Toggle
                 checked={settings.transcription.preload_model}
                 onChange={(v) => updateSetting('transcription', 'preload_model', v)}
-                disabled={isFakeSetting('transcription', 'preload_model')}
               />
             </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-bold block">{text.hotkey_optimized_title}</span>
@@ -546,21 +537,21 @@ export function TranscriptionSection({
                 onChange={(v) => updateSetting('transcription', 'hotkey_optimized', v)}
               />
             </div>
+            {!isFakeSetting('transcription', 'max_workers') && (
             <SettingCard
               title={text.max_workers_title}
               description={text.max_workers_description}
               changed={isChanged('transcription', 'max_workers')}
               onReset={() => resetSetting('transcription', 'max_workers')}
-              badge={isFakeSetting('transcription', 'max_workers') ? 'Coming Soon' : undefined}
             >
               <NumberInput
                 value={settings.transcription.max_workers}
                 min={1}
                 max={16}
                 onChange={(v) => updateSetting('transcription', 'max_workers', v)}
-                disabled={isFakeSetting('transcription', 'max_workers')}
               />
             </SettingCard>
+            )}
           </div>
             </div>
           </>

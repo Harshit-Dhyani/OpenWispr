@@ -1,4 +1,12 @@
-// Floating transcription window
+/**
+ * Floating transcription window for OpenWispr
+ * Creates and manages a transparent always-on-top overlay showing recording state,
+ * transcription text, audio visualizer, and coach results. Exports: createFloatingWindow,
+ * showFloatingWindow, hideFloatingWindow, resetFloatingWindow, updateFloatingTranscription,
+ * updateFloatingRecordingState, updateFloatingModelPreparation, updateFloatingAudioLevel,
+ * showFloatingCoachResult, clearFloatingCoachResult
+ * @module floatingWindow
+ */
 const { BrowserWindow, screen, app } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -125,6 +133,9 @@ function createFloatingWindow() {
       preload: path.join(__dirname, "..", "preload", "floating.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: true,
+      sandbox: true,
+      allowRunningInsecureContent: false,
       offscreen: false
     }
   });

@@ -93,7 +93,12 @@ def test_model_catalog_mapping_uses_base_catalog_id() -> None:
 
 
 def test_system_profile_recommended_quality_uses_supported_labels() -> None:
-    from app.core.system_profiler import CPUProfile, GPUProfile, StorageProfile, SystemProfile
+    from app.core.profiling.system_profiler import (
+        CPUProfile,
+        GPUProfile,
+        StorageProfile,
+        SystemProfile,
+    )
 
     supported = {"maximum", "balanced", "fast", "low_memory"}
 

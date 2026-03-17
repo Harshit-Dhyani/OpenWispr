@@ -160,6 +160,26 @@
     .window.result .result-meta {
       display: block;
     }
+    .model-info {
+      display: flex;
+      gap: 16px;
+      padding: 8px 16px;
+      font-size: 10px;
+      color: rgba(195, 205, 220, 0.6);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .model-info-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .model-info-label {
+      color: rgba(139, 155, 180, 0.8);
+    }
+    .model-info-value {
+      color: rgba(74, 246, 38, 0.9);
+      font-weight: 600;
+    }
     .actions {
       display: flex;
       gap: 10px;
@@ -207,6 +227,16 @@
 
     <div class="transcript-shell">
       <div class="transcript-scroll" id="transcriptScroll" tabindex="0" role="log" aria-label="Live transcript">
+        <div class="model-info" id="modelInfo">
+          <div class="model-info-item">
+            <span class="model-info-label">STT:</span>
+            <span class="model-info-value" id="sttModel">-</span>
+          </div>
+          <div class="model-info-item">
+            <span class="model-info-label">LLM:</span>
+            <span class="model-info-value" id="llmModel">-</span>
+          </div>
+        </div>
         <div class="transcript-empty" id="transcriptEmpty"></div>
         <div class="transcript-committed" id="transcriptCommitted" hidden></div>
         <div class="transcript-partial" id="transcriptPartial" hidden></div>
@@ -279,6 +309,36 @@
     let amplitudeHistory = new Array(BAR_COUNT).fill(0);
     let targetHistory = new Array(BAR_COUNT).fill(0);
     let lastAmplitudePushAt = 0;
+
+    // Store model info persistently
+    let currentSttModel = null;
+    let currentLlmProvider = null;
+    let currentLlmModel = null;
+
+    const sttModelEl = document.getElementById('sttModel');
+    const llmModelEl = document.getElementById('llmModel');
+
+    function updateModelInfo(sttModel, llmProvider, llmModel) {
+      // Only update if explicitly provided
+      if (sttModel !== undefined && sttModel !== null) {
+        currentSttModel = sttModel;
+      }
+      if (llmProvider !== undefined && llmProvider !== null) {
+        currentLlmProvider = llmProvider;
+      }
+      if (llmModel !== undefined && llmModel !== null) {
+        currentLlmModel = llmModel;
+      }
+      
+      // Always display current values
+      if (sttModelEl) sttModelEl.textContent = currentSttModel || '-';
+      if (llmModelEl) {
+        const display = currentLlmProvider && currentLlmModel 
+          ? `${currentLlmProvider}: ${currentLlmModel}` 
+          : currentLlmModel || '-';
+        llmModelEl.textContent = display;
+      }
+    }
 
     statusText.textContent = floatingStrings.status.idle;
     transcriptEmpty.textContent = floatingStrings.waitingForSpeech;
@@ -569,6 +629,12 @@
           return;
         }
         setRecordingState('idle');
+      });
+
+      window.openwisprFloating.onModelPreparation((data) => {
+        if (data) {
+          updateModelInfo(data.sttModel, data.llmProvider, data.llmModel);
+        }
       });
 
       window.openwisprFloating.onTranscription((data) => {

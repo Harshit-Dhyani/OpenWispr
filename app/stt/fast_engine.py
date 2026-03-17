@@ -1,10 +1,10 @@
-"""Optimized transcription engine for real-time Hindi/English transcription.
+"""Optimized transcription engine for real-time Whisper transcription.
 
 This module provides backward-compatible API while using the new optimized
 streaming engine and model pool internally.
 
-Targets sub-300ms end-to-end latency with model caching, streaming transcription,
-language-specific optimizations, and CUDA stream support.
+Targets low end-to-end latency with model caching, streaming transcription,
+language-specific optimizations for Hindi/English, and GPU/CPU fallback support.
 """
 
 from __future__ import annotations
@@ -419,7 +419,9 @@ class FastWhisperBackend:
         try:
             # Create backend using factory
             self._backend = OptimizedWhisperFactory.create_backend(
-                mode="wispr" if self._is_hotkey_streaming or "tiny" in self.model_name else "system",
+                mode="wispr"
+                if self._is_hotkey_streaming or "tiny" in self.model_name
+                else "system",
                 model_pool=self.model_pool,
                 download_root=self.download_root,
                 device=actual_device,
@@ -427,7 +429,10 @@ class FastWhisperBackend:
                 model_name=self.model_name,
                 compute_type=actual_compute_type,
             )
-            if self._is_hotkey_streaming and getattr(self._backend, "prefix_manager", None) is not None:
+            if (
+                self._is_hotkey_streaming
+                and getattr(self._backend, "prefix_manager", None) is not None
+            ):
                 self._backend.prefix_manager = None
             if self.language_mode != "auto":
                 logger.debug("Hotkey decoder language fixed: %s", self.language_mode)
@@ -456,7 +461,9 @@ class FastWhisperBackend:
             logger.warning(self._warning)
 
             self._backend = OptimizedWhisperFactory.create_backend(
-                mode="wispr" if self._is_hotkey_streaming or "tiny" in self.model_name else "system",
+                mode="wispr"
+                if self._is_hotkey_streaming or "tiny" in self.model_name
+                else "system",
                 model_pool=self.model_pool,
                 download_root=self.download_root,
                 device="cpu",
@@ -747,11 +754,7 @@ class FastWhisperBackend:
             return True
         if repeat_score >= 0.82:
             return True
-        if (
-            no_speech_prob is not None
-            and no_speech_prob > 0.8
-            and repeated_phrase_count >= 2
-        ):
+        if no_speech_prob is not None and no_speech_prob > 0.8 and repeated_phrase_count >= 2:
             return True
         return False
 

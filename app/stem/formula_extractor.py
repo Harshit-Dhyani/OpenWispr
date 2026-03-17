@@ -1,3 +1,9 @@
+"""STEM formula extraction from transcripts.
+
+Provides detection and parsing of mathematical expressions, assignment formulas,
+trigonometric/logarithmic functions, and unit-valued expressions from transcript segments.
+"""
+
 from __future__ import annotations
 
 import ast

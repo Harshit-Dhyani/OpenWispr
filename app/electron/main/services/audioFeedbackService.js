@@ -1,4 +1,9 @@
-// Audio feedback service for transcription sounds
+/**
+ * Audio feedback service for transcription sounds
+ * Plays platform-specific sounds on recording start/stop. Windows uses renderer events,
+ * macOS uses system sounds. Exports: playStartSound, playStopSound
+ * @module audioFeedbackService
+ */
 const state = require("../shared/state");
 
 function playStartSound() {

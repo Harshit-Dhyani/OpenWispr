@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting Guide
 audience: operators
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/core/error_handler.py
   - app/core/recovery_strategies.py
@@ -38,7 +38,7 @@ nvidia-smi
 **Symptom:** Application uses excessive RAM, system becomes sluggish.
 
 **Causes:**
-- Default model size too large (medium)
+- Default model size may be too large for hardware (medium)
 - Compute type set to float16 instead of int8
 - Model cache TTL too long (30 minutes)
 - Chunk size too large (1.6 seconds)
@@ -58,7 +58,7 @@ $env:OPENWISPR_CHUNK_SECONDS="0.5"
 ```
 
 **Files to modify for permanent fix:**
-- `app/config/constants.py` lines 70-71, 28
+- `app/config/settings.py`
 - `app/stt/model_pool.py` line 179
 
 **Verify:**
@@ -103,8 +103,8 @@ Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
 **Verify:**
 ```powershell
 # Check latency
-$health = Invoke-RestMethod http://127.0.0.1:
-$health.health8765/api/health.avg_inter_word_latency_ms
+$health = Invoke-RestMethod http://127.0.0.1:8765/api/health
+$health.health.avg_inter_word_latency_ms
 
 # Should be 300-800ms instead of 500-2000ms
 ```
@@ -221,7 +221,7 @@ Restart-Service audiosrv -Force
 Invoke-RestMethod "http://127.0.0.1:8765/api/devices/default/probe?duration=5"
 
 # Check meter in health response
-(Invoke-RestMethod http://127.0.0.1:8765/api/health).meter_value
+(Invoke-RestMethod http://127.0.0.1:8765/api/health).health.meter_value
 ```
 
 ---
@@ -245,7 +245,7 @@ $env:OPENWISPR_DEVICE="cpu"
 $env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 3. Or reinstall PyTorch with CUDA
-pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install torch --index-url https://download.pytorch.org/whl/cu124
 ```
 
 **Verify:**
@@ -270,7 +270,7 @@ Invoke-RestMethod http://127.0.0.1:8765/api/health | Select-Object -ExpandProper
 **Fix:**
 ```powershell
 # 1. Use smaller model
-$env:OPENWISPR_DEFAULT_MODEL="small"  # or base, tiny
+$env:OPENWISPR_DEFAULT_MODEL="small"  # or tiny
 
 # 2. Reduce chunk duration
 $env:OPENWISPR_CHUNK_SECONDS="1.0"
@@ -419,7 +419,7 @@ $env:OPENWISPR_DEVICE="cpu"
 $env:OPENWISPR_COMPUTE_TYPE="int8"
 
 # 2. Use smaller model
-$env:OPENWISPR_DEFAULT_MODEL="base"
+$env:OPENWISPR_DEFAULT_MODEL="small"
 
 # 3. Clear model cache
 Invoke-RestMethod http://127.0.0.1:8765/api/models/cache -Method DELETE
@@ -449,11 +449,14 @@ Invoke-RestMethod http://127.0.0.1:8765/api/health | Select-Object -ExpandProper
 
 **Fix:**
 ```powershell
-# 1. Check hotkey status
-Invoke-RestMethod http://127.0.0.1:8765/modes/status
+# 1. Ensure app is running and not minimized to tray
+# Check system tray for OpenWispr icon
 
-# 2. Change hotkey in UI settings
+# 2. Try a different hotkey combination if conflict suspected
+# Some apps use Ctrl+Shift+T (e.g., Telegram, VS Code extensions)
+
 # 3. Run as administrator if needed
+Start-Process -FilePath "python" -ArgumentList "-m app.api_main" -Verb RunAs
 ```
 
 **Verify:**
@@ -532,8 +535,8 @@ echo "OPENWISPR_PORT=8766" >> .env
 # Check Python processes
 Get-Process python
 
-# Check logs
-Get-Content sessions/latest/logs/app.log -Tail 50
+# Check logs - use actual session slug from sessions/ folder
+Get-Content sessions/<session-slug>/logs/app.log -Tail 50
 ```
 
 ---
@@ -555,7 +558,7 @@ From `app/core/error_handler.py`:
 
 | Error Category | Trigger | User Message |
 |----------------|---------|--------------|
-| `MODEL_OOM` | GPU out of memory | "The transcription model ran out of memory. Switching to CPU mode." |
+| `MODEL_OOM` | GPU out of memory | "The transcription model ran out of memory." |
 | `MODEL_NOT_FOUND` | Model not downloaded | "The requested transcription model is not available. Downloading now." |
 | `MODEL_CORRUPTED` | Bad model file | "The transcription model file appears to be corrupted. Re-downloading." |
 | `MODEL_LOAD_FAILED` | Incompatible model | "Failed to load the transcription model. Trying fallback model." |
@@ -599,7 +602,7 @@ From `app/core/recovery_strategies.py`:
 | `audio_permission_guidance` | `AUDIO_PERMISSION_DENIED` | Shows platform-specific guidance (Windows/Mac/Linux) |
 | `model_oom_recovery` | `MODEL_OOM` | GPU→CPU fallback, batch size reduction (16→8→4→2→1) |
 | `model_auto_download` | `MODEL_NOT_FOUND`, `MODEL_CORRUPTED` | Downloads model with retry (max 2 attempts, 2s base delay) |
-| `model_size_fallback` | `MODEL_LOAD_FAILED` | Falls back to smaller model (large→turbo→medium→small→base→tiny) |
+| `model_size_fallback` | `MODEL_LOAD_FAILED` | Falls back to smaller model (large-v3→turbo→medium→small→tiny) |
 | `network_retry` | Network errors | Exponential backoff (1s, 2s, 4s, max 30s) |
 | `offline_mode_switch` | `NETWORK_BACKEND_UNAVAILABLE` | Switches to offline mode with periodic retry |
 | `disk_full_handler` | `SESSION_DISK_FULL` | Pauses recording, identifies cleanup candidates |
@@ -610,7 +613,7 @@ From `app/core/recovery_strategies.py`:
 | Chain | Options | When Activated |
 |-------|---------|----------------|
 | `compute_device` | cuda → cpu | GPU OOM detected |
-| `model_size` | large-v3 → turbo → medium → small → base → tiny | Model load failure |
+| `model_size` | large-v3 → turbo → medium → small → tiny | Model load failure |
 | `batch_size` | 16 → 8 → 4 → 2 → 1 | Memory pressure |
 
 ---
@@ -665,8 +668,8 @@ From `AGENTS.md` - These bugs must not be reintroduced:
 | Location | Description |
 |----------|-------------|
 | `sessions/<session_id>/logs/app.log` | Session-specific logs (JSON format) |
-| `~/.transcripta/reports/crash_*.json` | Crash dumps with full context |
-| `~/.transcripta/app.log` | Legacy global log (if configured) |
+| `~/.openwispr/reports/crash_*.json` | Crash dumps with full context |
+| `~/.openwispr/app.log` | Legacy global log (if configured) |
 | Console output | Real-time logs when running in terminal |
 
 ### Log Format
@@ -675,7 +678,7 @@ From `AGENTS.md` - These bugs must not be reintroduced:
 {
   "time": "2026-01-15T10:30:00",
   "level": "ERROR",
-  "logger": "transcripta.errors",
+  "logger": "openwispr.errors",
   "message": "Model load failed",
   "error_id": "abc123",
   "category": "model_load_failed"
@@ -705,10 +708,10 @@ Get-Content sessions\<session>\logs\app.log |
 taskkill /F /IM python.exe 2>$null
 
 # Clear cache
-Remove-Item -Recurse -Force ~/.transcripta/cache -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force ~/.openwispr/cache -ErrorAction SilentlyContinue
 
 # Clear temp files
-Remove-Item -Recurse -Force ~/.transcripta/temp -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force ~/.openwispr/temp -ErrorAction SilentlyContinue
 
 # Restart with fresh logs
 python run.py
@@ -765,7 +768,7 @@ Write-Host "Export complete: $exportDir.zip"
 | `OPENWISPR_DEFAULT_MODEL` | medium | Model size (tiny/base/small/medium/large-v3) |
 | `OPENWISPR_LOG_LEVEL` | INFO | Logging verbosity |
 | `OPENWISPR_CAPTURE_DEVICE_ID` | (auto) | Audio device to capture |
-| `OPENWISPR_CHUNK_SECONDS` | 3.2 | Processing chunk size |
+| `OPENWISPR_CHUNK_SECONDS` | 1.6 | Processing chunk size |
 | `OPENWISPR_MAX_QUEUE_ITEMS` | 16 | Backpressure threshold |
 | `OPENWISPR_AUTO_OPTIMIZE` | true | Auto performance tuning |
 | `OPENWISPR_HOST` | 127.0.0.1 | API bind address |
@@ -778,7 +781,7 @@ Write-Host "Export complete: $exportDir.zip"
 If issues persist:
 
 1. Run diagnostics and collect error IDs from logs
-2. Check crash dumps in `~/.transcripta/reports/`
+2. Check crash dumps in `~/.openwispr/reports/`
 3. Include error IDs (8-character codes) when reporting issues
 4. Verify against known issues in this guide
 

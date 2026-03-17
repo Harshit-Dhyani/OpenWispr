@@ -41,7 +41,8 @@ class SystemPipelineConfig(PipelineConfig):
     automatic segmentation.
     """
 
-    # Buffer settings - larger for stability
+    # Larger buffers (500ms) to handle variable system audio latency and
+    # prevent underruns during high system load
     buffer_duration_ms: float = 500.0  # 500ms buffers
     buffer_count: int = 8  # Number of buffers in ring
 
@@ -152,6 +153,9 @@ class RingBuffer:
             if len(data) < self.buffer_size:
                 data = np.pad(data, (0, self.buffer_size - len(data)))
             else:
+                logger.warning(
+                    f"Input data {len(data)} exceeds buffer {self.buffer_size}, truncating"
+                )
                 data = data[: self.buffer_size]
 
         async with self._lock:
@@ -244,6 +248,7 @@ class SystemPipeline(AudioPipeline):
 
         # Segment building
         self._current_segment: list[np.ndarray] = []
+        self._segment_lock = asyncio.Lock()
         self._segment_start_time = 0.0
         self._total_audio_duration = 0.0
 
@@ -283,7 +288,8 @@ class SystemPipeline(AudioPipeline):
         # Reset state
         await self._ring_buffer.clear()
         self._silence_detector.reset()
-        self._current_segment.clear()
+        async with self._segment_lock:
+            self._current_segment.clear()
         self._segment_start_time = time.monotonic()
         self._total_audio_duration = 0.0
         self._segments_emitted = 0
@@ -365,8 +371,11 @@ class SystemPipeline(AudioPipeline):
             is_silence, silence_duration = self._silence_detector.process(audio)
 
             # Add to current segment
-            self._current_segment.append(audio)
-            segment_duration = len(self._current_segment) * self.system_config.buffer_duration_ms
+            async with self._segment_lock:
+                self._current_segment.append(audio)
+                segment_duration = (
+                    len(self._current_segment) * self.system_config.buffer_duration_ms
+                )
 
             # Check for segment emission conditions
             should_emit = False
@@ -396,17 +405,19 @@ class SystemPipeline(AudioPipeline):
             await asyncio.sleep(0)
 
         # Emit final segment on stop
-        if self._current_segment:
-            await self._emit_segment(reason="shutdown")
+        async with self._segment_lock:
+            if self._current_segment:
+                await self._emit_segment(reason="shutdown")
 
     async def _emit_segment(self, reason: str) -> None:
         """Emit accumulated audio segment to output queue."""
-        if not self._current_segment:
-            return
+        async with self._segment_lock:
+            if not self._current_segment:
+                return
 
-        # Concatenate segment
-        combined = np.concatenate(self._current_segment)
-        self._current_segment.clear()
+            # Concatenate segment
+            combined = np.concatenate(self._current_segment)
+            self._current_segment.clear()
 
         segment_duration_ms = len(combined) / self.config.sample_rate * 1000
         self._total_audio_duration += segment_duration_ms / 1000.0

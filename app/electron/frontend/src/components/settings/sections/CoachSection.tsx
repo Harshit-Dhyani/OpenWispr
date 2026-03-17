@@ -47,7 +47,7 @@ export function CoachSection({
   const showRuntimeDisabledWarning =
     settings.coach.coach_enabled &&
     settings.coach.privacy_mode === 'allow_llm' &&
-    !settings.refiner.runtime_enabled;
+    !settings.coach.coach_runtime_enabled;
 
   useEffect(() => {
     let cancelled = false;

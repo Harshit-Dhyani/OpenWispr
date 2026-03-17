@@ -1,3 +1,9 @@
+"""STEM unit validation and dimension checking.
+
+Provides detection and validation of physical units (m, s, kg, N, J, etc.) in transcript
+segments with dimension contradiction detection.
+"""
+
 from __future__ import annotations
 
 import re

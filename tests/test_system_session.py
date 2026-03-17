@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 
 from app.core.models import SessionState, TranscriptSegment, utc_now
 from app.core.system_session import (

@@ -1,3 +1,32 @@
+"""Whisper transcription engine using faster-whisper for speech-to-text.
+
+This module provides the WhisperTranscriber class as the main transcription engine,
+wrapping the faster-whisper library to enable real-time speech transcription with
+GPU acceleration and automatic fallback to CPU when needed.
+
+The module provides:
+- WhisperTranscriber class - main transcription engine
+- SubmitStatus dataclass - flow control status returned from submit()
+- Helper functions for creating transcriber instances
+
+WhisperTranscriber works by:
+1. Loading a Whisper model (tiny/base/small/medium/large) via faster-whisper
+2. Running a worker thread that consumes audio chunks from a queue
+3. Transcribing each chunk and publishing TranscriptSegment results via callbacks
+4. Automatically falling back to CPU when GPU execution fails
+
+Key features:
+- GPU acceleration with CUDA support via faster-whisper
+- Automatic GPU-to-CPU fallback on runtime errors
+- Backpressure handling with queue depth monitoring and chunk dropping
+- Segment quality assessment and suppression
+- Health monitoring for session state
+- Thread-safe callback system for segment, error, health, and status events
+
+The faster-whisper library provides significant performance improvements over
+baseline Whisper implementations by using CTranslate2 for optimized inference.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +47,7 @@ try:
 except ImportError:
     torch = None
 
-from app.core.constants import GPU_FALLBACK_KEYWORDS, ModelConstants, QualityConstants
+from app.config.constants import GPU_FALLBACK_KEYWORDS, ModelConstants, QualityConstants
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.stt.chunker import AudioChunk
 from app.stt.quality import assess_segment_quality
@@ -37,6 +66,30 @@ class SubmitStatus:
 
 
 class WhisperTranscriber:
+    """Speech-to-text transcription engine using faster-whisper.
+
+    Wraps the faster-whisper library to provide real-time speech transcription
+    with GPU acceleration, automatic CPU fallback, and backpressure handling.
+
+    State owned:
+        - _model: Loaded WhisperModel instance (lazy-loaded on first transcription)
+        - _queue: Thread-safe audio chunk queue with configurable max size
+        - _thread: Background worker thread for transcription loop
+        - _gpu_mode: Current compute mode (cuda/*, cpu/int8, or unknown)
+        - _runtime_device: Actual device being used (cuda, cpu)
+        - _dropped_chunks: Counter for chunks dropped due to queue overflow
+
+    Lifecycle:
+        1. Construct with configuration parameters
+        2. Register callbacks for segments, errors, health, status
+        3. Call start() to spawn worker thread
+        4. Call submit() with AudioChunk instances for transcription
+        5. Call stop() to gracefully shutdown worker
+
+    Thread safety: All public methods are thread-safe. Callbacks are invoked
+    from the worker thread.
+    """
+
     def __init__(
         self,
         *,

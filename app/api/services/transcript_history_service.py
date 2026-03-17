@@ -1,6 +1,15 @@
+"""Transcript history service for session persistence and analytics.
+
+Provides TranscriptHistoryService for managing transcript session history
+including ingestion, retrieval, listing, analytics, retry pipelines, and
+retention cleanup. Integrates with dictionary, snippet, and style services
+for retry processing.
+"""
+
 from __future__ import annotations
 
 import json
+import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -12,6 +21,8 @@ from app.api.services.dictionary_service import DictionaryService
 from app.api.services.snippet_service import SnippetService
 from app.api.services.style_service import StyleService
 from app.storage.history_db import HistoryDatabase
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now_iso() -> str:
@@ -47,6 +58,21 @@ class DownloadAsset:
 
 
 class TranscriptHistoryService:
+    """Transcript session persistence and analytics service.
+
+    Manages transcript session history including ingestion, retrieval, listing,
+    analytics, retry pipelines, and retention cleanup. Integrates with dictionary,
+    snippet, and style services for retry processing.
+
+    State ownership:
+    - Owns transcript session state in the database
+    - ThreadPoolExecutor for async retry processing (max_workers=2)
+    - Lazy-initialized service dependencies (dictionary, snippet, style)
+
+    Lifecycle:
+    - close() must be called to shut down retry executor
+    """
+
     def __init__(
         self,
         db: HistoryDatabase,
@@ -300,7 +326,8 @@ class TranscriptHistoryService:
         )
         try:
             payload["settings_snapshot"] = json.loads(payload.get("settings_snapshot_json") or "{}")
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to decode settings_snapshot JSON for session {session_id}: {e}")
             payload["settings_snapshot"] = {}
         return payload
 

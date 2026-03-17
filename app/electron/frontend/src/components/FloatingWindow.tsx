@@ -1,3 +1,11 @@
+/**
+ * FloatingWindow - Overlay floating window for real-time dictation feedback
+ * 
+ * Displays audio visualization, live transcript, phase indicator, and model preparation status.
+ * Provides recording controls and integrates with hotkey-based dictation.
+ * 
+ * @component
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { HotkeyStopResponse } from '../types/api';
@@ -505,31 +513,31 @@ export function FloatingWindow() {
 
   const effectivePhase = showModelPreparationPanel ? 'preparing' : phase;
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const isActive =
-        effectivePhase === 'preparing' ||
-        effectivePhase === 'listening' ||
-        effectivePhase === 'transcribing' ||
-        effectivePhase === 'finalizing';
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (isActive) {
-          window.openwisprFloating?.cancelRecording?.();
-        } else {
-          window.openwisprFloating?.dismissResult?.();
-        }
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    const isActive =
+      effectivePhase === 'preparing' ||
+      effectivePhase === 'listening' ||
+      effectivePhase === 'transcribing' ||
+      effectivePhase === 'finalizing';
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (isActive) {
+        window.openwisprFloating?.cancelRecording?.();
+      } else {
+        window.openwisprFloating?.dismissResult?.();
       }
+    }
 
-      if (event.key === 'Enter' && (effectivePhase === 'listening' || effectivePhase === 'transcribing')) {
-        event.preventDefault();
-        window.openwisprFloating?.finishRecording?.();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    if (event.key === 'Enter' && (effectivePhase === 'listening' || effectivePhase === 'transcribing')) {
+      event.preventDefault();
+      window.openwisprFloating?.finishRecording?.();
+    }
   }, [effectivePhase]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const statusText = useMemo(() => {
     switch (effectivePhase) {

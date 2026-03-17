@@ -2,7 +2,9 @@
 
 > ⚠️ **Work in Progress** - This is an active development project. Not all features are implemented, there are known bugs, and the API may change.
 >
-> **Last Updated:** March 13, 2026
+> **Last Updated:** March 15, 2026
+>
+> ⚠️ **Docs may be outdated** - Documentation, guides, and some feature descriptions may not reflect the current state of the codebase.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Node 20+](https://img.shields.io/badge/node-20+-green.svg)](https://nodejs.org/)
@@ -72,7 +74,7 @@ OpenWispr is a desktop application for real-time speech-to-text transcription. I
 | small | 460 MB | 2 GB | Fast | Good | enabled |
 | medium | 1.5 GB | 5 GB | Balanced | Better | enabled (default) |
 | large-v3 | 3.1 GB | 10 GB | Slower | Excellent | enabled |
-| turbo | 1.6 GB | 6 GB | Fast | Very Good | disabled |
+| turbo | 1.6 GB | 6 GB | Fast | Very Good | enabled |
 
 *Sizes and VRAM from `app/core/model_catalog.py`*
 
@@ -137,7 +139,6 @@ OpenWispr is a desktop application for real-time speech-to-text transcription. I
 
 ### Advanced Configuration
 
-- **Transcription presets** - `wispr` (low latency) or `system` (high quality) modes
 - **Refinement modes** - `off`, `strict`, `polished` for different use cases
 - **Settings import/export** - JSON-based portability between installations
 - **Debug mode** - Detailed logging for troubleshooting
@@ -150,7 +151,7 @@ OpenWispr is a desktop application for real-time speech-to-text transcription. I
 - **Performance monitoring** - Latency, throughput, resource usage
 - **Health monitoring** - Real-time session health metrics
 - **Extensive logging** - JSON-structured logs per session
-- **80+ tests** - Unit, integration, and E2E coverage
+- **1000+ tests** - Unit, integration, and E2E coverage
 
 ---
 
@@ -169,7 +170,7 @@ This project is under active development. Before using, please note:
 
 | Component | Requirement |
 |-----------|-------------|
-| OS | Windows 11 |
+| OS | Windows 10/11 (primary), macOS (experimental), Linux (experimental) |
 | Python | 3.11+ |
 | Node.js | 20.x+ (for development) |
 | GPU | NVIDIA with 2GB+ VRAM (recommended) or CPU |
@@ -425,7 +426,7 @@ app/
 
 ## Privacy & Legal
 
-- **100% Local Processing** - No cloud upload, ever
+- **Local-first transcription** - No cloud upload, ever
 - **Local-Only Crash Reports** - Error reports stored locally in %APPDATA%\OpenWispr\reports
 - **Your Data** - You control all transcripts and models
 - **Offline Capable** - Works without internet connection
@@ -467,4 +468,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 ---
 
 **OpenWispr** - Local-first transcription for Windows 11
+
+> 🚧 **More features coming soon** - Additional transcription modes, provider integrations, and productivity features are under active development.
+
 

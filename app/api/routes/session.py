@@ -1,3 +1,9 @@
+"""Session management API endpoints.
+
+Provides APIs for starting, stopping, and managing active transcription sessions
+including audio source selection, device configuration, and session lifecycle.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -25,12 +31,24 @@ router = APIRouter()
 @router.get("/api/session")
 @log_route("GET", "/api/session")
 def session_snapshot(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    """
+    Get current session snapshot with all state.
+
+    Returns:
+        dict: Contains current session state including id, status, segments, etc.
+    """
     return svc.get_snapshot_payload()
 
 
 @router.get("/api/metrics/streaming")
 @log_route("GET", "/api/metrics/streaming")
 def streaming_metrics(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    """
+    Get streaming audio metrics.
+
+    Returns:
+        dict: Contains streaming performance metrics
+    """
     return svc.get_streaming_metrics()
 
 
@@ -40,6 +58,18 @@ def start_session(
     request: StartSessionRequest,
     svc: BackendService = Depends(get_service),
 ) -> dict[str, Any]:
+    """
+    Start a new transcription session.
+
+    Args:
+        request: StartSessionRequest containing title, model_name, device_id, live_mode, etc.
+
+    Returns:
+        dict: Contains 'session' object with started session data
+
+    Raises:
+        HTTPException: 409 if session cannot be started (e.g., already running)
+    """
     resolved_capture_source = resolve_capture_source_setting(request.capture_source)
     resolved_device_id = resolve_input_device_for_source(
         resolved_capture_source,
@@ -89,6 +119,12 @@ def stop_session(
     svc: BackendService = Depends(get_service),
     history: TranscriptHistoryService = Depends(get_history_service),
 ) -> dict[str, Any]:
+    """
+    Stop the current transcription session.
+
+    Returns:
+        dict: Contains 'session' object with stopped session data including transcript
+    """
     session = svc.stop_session()
     if session:
         segments = session.get("segments") or []
@@ -140,5 +176,23 @@ def attach_pdf(
     request: AttachPdfRequest,
     svc: BackendService = Depends(get_service),
 ) -> dict[str, Any]:
+    """
+    Attach a PDF document to the current session for reference.
+
+    Args:
+        request: AttachPdfRequest containing path to PDF file
+
+    Returns:
+        dict: Contains 'session' object with updated session data
+
+    Raises:
+        HTTPException: 400 if PDF cannot be attached, 500 on internal error
+    """
     logger.debug("Attach PDF: path=%s", request.path)
-    return {"session": svc.attach_pdf(request.path)}
+    try:
+        return {"session": svc.attach_pdf(request.path)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to attach PDF: %s", request.path)
+        raise HTTPException(status_code=500, detail="Failed to attach PDF") from exc

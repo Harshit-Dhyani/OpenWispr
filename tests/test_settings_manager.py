@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from app.core.settings_manager import SettingsManager
+from app.core.settings.manager import SettingsManager
 
 
 def test_settings_manager_applies_new_hotkey_defaults_when_fields_are_missing(tmp_path):
@@ -103,7 +103,9 @@ def test_settings_manager_persists_model_selections_and_refinement_mode(tmp_path
     assert settings.refiner.engine_preference == "llamacpp"
 
 
-def test_settings_manager_migrates_legacy_hotkey_model_name_into_source_specific_asr_fields(tmp_path):
+def test_settings_manager_migrates_legacy_hotkey_model_name_into_source_specific_asr_fields(
+    tmp_path,
+):
     settings_path = tmp_path / "user_settings.json"
     settings_path.write_text(
         json.dumps(
@@ -134,7 +136,9 @@ def test_settings_manager_migrates_legacy_hotkey_model_name_into_source_specific
     assert settings.transcription.system_asr_model_id == "whisper-large-v3"
 
 
-def test_settings_manager_import_persists_source_specific_asr_models_and_default_capture_source(tmp_path):
+def test_settings_manager_import_persists_source_specific_asr_models_and_default_capture_source(
+    tmp_path,
+):
     manager = SettingsManager(settings_dir=tmp_path)
 
     success = manager.import_settings(

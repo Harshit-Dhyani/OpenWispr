@@ -1,8 +1,13 @@
 /**
  * Settings Context
  *
+ * DEPRECATED: This context is not currently used in the application.
+ * App.tsx manages settings state locally with direct API calls instead.
+ *
  * Provides global settings state with bidirectional synchronization,
  * optimistic updates, conflict resolution, and offline support.
+ *
+ * @deprecated This component is unused. Consider removing if not needed in future.
  */
 
 import {
@@ -171,6 +176,7 @@ export function SettingsProvider({
   const syncConnectionRef = useRef<ReturnType<typeof createSettingsSyncConnection> | null>(null);
   const isProcessingRemoteChange = useRef(false);
   const optimisticUpdates = useRef<Map<string, unknown>>(new Map());
+  const resetProcessingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ============================================
   // Notification Helpers
@@ -600,11 +606,23 @@ export function SettingsProvider({
       }
     } finally {
       // Reset flag after a short delay to allow state to settle
-      setTimeout(() => {
+      if (resetProcessingTimeoutRef.current) {
+        clearTimeout(resetProcessingTimeoutRef.current);
+      }
+      resetProcessingTimeoutRef.current = setTimeout(() => {
         isProcessingRemoteChange.current = false;
       }, 50);
     }
   }, [settings, addNotification]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resetProcessingTimeoutRef.current) {
+        clearTimeout(resetProcessingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ============================================
   // Sync Connection

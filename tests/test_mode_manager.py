@@ -33,7 +33,7 @@ sys.modules["torch"].cuda.is_available = MagicMock(return_value=False)
 sys.modules["faster_whisper"] = MagicMock()
 
 from app.core.settings.config import AppSettings
-from app.core.settings_manager import SettingsManager
+from app.core.settings.manager import SettingsManager
 
 from app.core.mode_manager import (
     ModeLifecycleState,

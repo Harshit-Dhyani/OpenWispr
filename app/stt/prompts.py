@@ -1,3 +1,9 @@
+"""Prompt text exports for STT transcription and refinement.
+
+This module re-exports prompt constants from app.stt.refiner_prompts.
+Canonical prompt source is refiner_prompts.py.
+"""
+
 from __future__ import annotations
 
 from app.stt.refiner_prompts import (
@@ -17,4 +23,3 @@ __all__ = [
     "PROMPT_PREFIX",
     "build_refiner_prompt",
 ]
-

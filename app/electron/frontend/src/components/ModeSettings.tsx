@@ -1,3 +1,11 @@
+/**
+ * ModeSettings - Settings panel for configuring transcription modes
+ * 
+ * Provides UI for hotkey mode and system mode settings including model selection,
+ * language, audio source, export format, and session save location.
+ * 
+ * @component
+ */
 import { useState, useCallback, useEffect } from 'react';
 import {
   Mic,
@@ -173,7 +181,7 @@ interface SettingSectionProps {
 
 function SettingSection({ icon, title, children, className = '' }: SettingSectionProps) {
   return (
-    <div className={`border border-lawn-border bg-lawn-bg p-4 space-y-3 ${className}`}>
+    <div className={`border border-lawn-border bg-lawn-bg p-3 space-y-3 ${className}`}>
       <div className="flex items-center gap-2 text-lawn-border">
         {icon}
         <h5 className="text-xs font-black uppercase tracking-wide">{title}</h5>
@@ -546,7 +554,7 @@ export function ModeSettings({
   return (
     <div
       className={`
-        border-2 border-lawn-border bg-lawn-panel p-6
+        border-2 border-lawn-border bg-lawn-panel p-4
         transition-opacity duration-150
         ${isTransitioning ? 'opacity-50' : 'opacity-100'}
         ${className}
@@ -554,7 +562,7 @@ export function ModeSettings({
       data-testid="mode-settings"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         {mode === 'hotkey' ? (
           <Mic className="w-5 h-5 text-lawn-accent" />
         ) : (
@@ -581,7 +589,7 @@ export function ModeSettings({
       )}
 
       {/* Footer note */}
-      <div className="mt-6 pt-4 border-t border-lawn-border">
+      <div className="mt-4 pt-3 border-t border-lawn-border">
         <div className="flex items-start gap-2 text-xs text-stone-500">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <p>

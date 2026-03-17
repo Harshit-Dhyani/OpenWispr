@@ -150,11 +150,10 @@ class WisprPipeline(AudioPipeline):
         super().__init__(config)
         self.wispr_config = config
 
-        # Calculate frame size
         self.frame_size = int(config.sample_rate * config.frame_duration_ms / 1000.0)
         self.pre_buffer_frames = int(config.pre_buffer_duration_ms / config.frame_duration_ms)
 
-        # VAD
+        # Voice activity detection for speech activation
         self._vad = StreamingVAD(
             threshold_db=config.vad_threshold_db,
             hysteresis_ms=config.vad_hysteresis_ms,
@@ -162,13 +161,15 @@ class WisprPipeline(AudioPipeline):
             sample_rate=config.sample_rate,
         )
 
-        # Ring buffer for pre-buffering
         self._pre_buffer: list[np.ndarray] = []
         self._pre_buffer_lock = asyncio.Lock()
 
+        # Pending audio for emission
+        self._pending_audio: list[np.ndarray] = []
+        self._pending_audio_lock = asyncio.Lock()
+
         # Audio emission state
         self._speech_frame_count = 0
-        self._pending_audio: list[np.ndarray] = []
         self._last_emission_time = 0.0
 
         # Backend
@@ -244,7 +245,6 @@ class WisprPipeline(AudioPipeline):
         max_consecutive_empty = 10
 
         while not self._stop_event.is_set():
-            # Check pause state
             if self._pause_event.is_set():
                 await self._wait_while_paused()
                 continue
@@ -267,11 +267,9 @@ class WisprPipeline(AudioPipeline):
 
             consecutive_empty = 0
 
-            # Process audio
             audio = to_mono(data)
             audio = sanitize_audio(audio)
 
-            # Update health metrics
             self._health.frames_captured += 1
             rms = self._calculate_rms(audio)
 
@@ -300,10 +298,12 @@ class WisprPipeline(AudioPipeline):
                 # On speech start, prepend pre-buffer
                 if is_speech_start:
                     async with self._pre_buffer_lock:
-                        self._pending_audio.extend(self._pre_buffer)
-                    self._pre_buffer.clear()
+                        async with self._pending_audio_lock:
+                            self._pending_audio.extend(self._pre_buffer)
+                        self._pre_buffer.clear()
 
-                self._pending_audio.append(audio)
+                async with self._pending_audio_lock:
+                    self._pending_audio.append(audio)
 
                 # Early emission check
                 should_emit = (
@@ -311,11 +311,18 @@ class WisprPipeline(AudioPipeline):
                     or time.monotonic() - self._last_emission_time > 0.5
                 )
 
-                if should_emit and self._pending_audio:
+                async with self._pending_audio_lock:
+                    has_pending = bool(self._pending_audio)
+                    should_emit = should_emit and has_pending
+
+                if should_emit:
                     await self._emit_audio()
             else:
                 # Not speech - emit any pending audio
-                if self._pending_audio:
+                async with self._pending_audio_lock:
+                    has_pending = self._pending_audio
+
+                if has_pending:
                     await self._emit_audio()
                 self._speech_frame_count = 0
 
@@ -328,12 +335,13 @@ class WisprPipeline(AudioPipeline):
 
     async def _emit_audio(self) -> None:
         """Emit accumulated audio to output queue."""
-        if not self._pending_audio:
-            return
+        async with self._pending_audio_lock:
+            if not self._pending_audio:
+                return
 
-        # Concatenate pending audio
-        combined = np.concatenate(self._pending_audio)
-        self._pending_audio.clear()
+            # Concatenate pending audio
+            combined = np.concatenate(self._pending_audio)
+            self._pending_audio.clear()
 
         # Track first emission latency
         if self._first_speech_time is not None and self._first_emission_time is None:

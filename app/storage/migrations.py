@@ -1,3 +1,18 @@
+"""SQLite schema migrations for history database.
+
+Provides migration functions for evolving the history database schema from
+version 1 to the current version. Each migration creates required tables
+and indexes.
+
+Schema versions:
+    - v1: Core tables (transcript_sessions, dictionary, snippets, styles)
+    - v2: user_corrections table for learning from corrections
+
+Current schema version is defined by SCHEMA_VERSION constant.
+
+Key collaborators: app.storage.history_db.HistoryDatabase calls run_migrations on connect.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -5,18 +20,36 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+
+def _create_v2_schema(conn: sqlite3.Connection) -> None:
+    """Add user_corrections table for learning from user corrections."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_corrections (
+            id TEXT PRIMARY KEY,
+            original_text TEXT NOT NULL,
+            corrected_text TEXT NOT NULL,
+            context TEXT,
+            correction_type TEXT NOT NULL DEFAULT 'manual',
+            confidence REAL,
+            apply_count INTEGER NOT NULL DEFAULT 1,
+            last_applied_at TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_corrections_original ON user_corrections(original_text)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_corrections_type ON user_corrections(correction_type)"
+    )
 
 
 def _create_v1_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        CREATE TABLE IF NOT EXISTS app_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-        );
-
         CREATE TABLE IF NOT EXISTS transcript_sessions (
             session_id TEXT PRIMARY KEY,
             source_workflow TEXT NOT NULL,
@@ -127,7 +160,9 @@ def _create_v1_schema(conn: sqlite3.Connection) -> None:
 
 
 def run_migrations(conn: sqlite3.Connection) -> None:
-    conn.execute("CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))"
+    )
 
     row = conn.execute(
         "SELECT value FROM app_meta WHERE key = ?",
@@ -136,16 +171,42 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     current_version = int(row[0]) if row and row[0].isdigit() else 0
 
     if current_version < 1:
-        _create_v1_schema(conn)
-        conn.execute(
-            """
-            INSERT INTO app_meta(key, value, updated_at)
-            VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                updated_at = excluded.updated_at
-            """,
-            ("history_schema_version", str(SCHEMA_VERSION)),
-        )
-        conn.commit()
-        logger.info("History storage schema migrated to v%s", SCHEMA_VERSION)
+        conn.execute("BEGIN")
+        try:
+            _create_v1_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO app_meta(key, value, updated_at)
+                VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                ("history_schema_version", "1"),
+            )
+            conn.commit()
+            current_version = 1
+            logger.info("History storage schema migrated to v1")
+        except Exception:
+            conn.rollback()
+            raise
+
+    if current_version < 2:
+        conn.execute("BEGIN")
+        try:
+            _create_v2_schema(conn)
+            conn.execute(
+                """
+                INSERT INTO app_meta(key, value, updated_at)
+                VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                ("history_schema_version", str(SCHEMA_VERSION)),
+            )
+            conn.commit()
+            logger.info("History storage schema migrated to v2")
+        except Exception:
+            conn.rollback()
+            raise

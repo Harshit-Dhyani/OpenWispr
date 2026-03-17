@@ -1,3 +1,9 @@
+/**
+ * DictionaryPage - Phrase replacement dictionary management
+ * 
+ * Manages deterministic phrase replacement rules with scope filtering
+ * (all/personal/shared/team), search, add/delete, and preview functionality.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import type { DictionaryEntry } from '../types/api';
 import { RENDERER_STRINGS } from '../strings/en';
@@ -121,8 +127,8 @@ export function DictionaryPage({ request, enabled }: DictionaryPageProps) {
         </div>
       }
     >
-      <div className="grid h-full min-h-0 gap-2 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
+      <div className="grid h-full min-h-0 gap-2 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto custom-scrollbar xl:overflow-hidden">
           <section className="border-2 border-lawn-border bg-lawn-panel p-2 shadow-brutal-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-lawn-muted">{text.addTitle}</h3>
             <div className="mt-2 grid gap-2">
@@ -174,8 +180,8 @@ export function DictionaryPage({ request, enabled }: DictionaryPageProps) {
               {entries.map((entry) => (
                 <article key={entry.id} className="flex min-w-0 items-center justify-between gap-2 border-2 border-lawn-border bg-lawn-bg p-2 transition-all duration-200 hover:border-lawn-accent/50 hover:-translate-y-0.5 hover:shadow-brutal-sm">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-lawn-border break-all truncate">{entry.phrase} → {entry.replacement}</p>
-                    <p className="text-[11px] font-bold text-lawn-muted truncate">{entry.scope} · {entry.usage_count} {text.usesSuffix}</p>
+                    <p className="text-sm font-black text-lawn-border break-words">{entry.phrase} → {entry.replacement}</p>
+                    <p className="text-[11px] font-bold text-lawn-muted break-words">{entry.scope} · {entry.usage_count} {text.usesSuffix}</p>
                   </div>
                   <button
                     type="button"

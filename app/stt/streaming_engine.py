@@ -1,7 +1,7 @@
 """Optimized streaming-first transcription engine for dual-mode operation.
 
 Supports Wispr mode (fast, low-latency) and System mode (accurate, batched)
-with adaptive performance tuning and production-grade reliability.
+with adaptive beam sizing and production-grade reliability.
 """
 
 from __future__ import annotations
@@ -14,10 +14,12 @@ from collections import deque
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from itertools import islice
 from typing import Any
 
 import numpy as np
 
+from app.core.model_catalog import runtime_name_for_model
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.core.settings.manager import get_settings_manager
 from app.stt.chunker import AudioChunk
@@ -389,11 +391,13 @@ class StreamingInferenceEngine:
 
                 # Advance buffer
                 advance = min(step_samples, len(self._buffer) - overlap_samples)
-                for _ in range(advance):
-                    self._buffer.popleft()
+                if advance > 0:
+                    self._buffer = deque(
+                        islice(self._buffer, advance, None), maxlen=self._buffer.maxlen
+                    )
 
-                window_start = self._buffer_start_time
                 self._buffer_start_time += advance / self.sample_rate
+                window_start = self._buffer_start_time
 
             # Get adaptive parameters
             beam_size = self.beam_controller.current_beam_size
@@ -636,15 +640,30 @@ class DualModeTranscriptionEngine:
     def __init__(
         self,
         model_pool: ModelPool | None = None,
-        wispr_model: str = "tiny",
-        system_model: str = "medium",
+        wispr_model: str | None = None,
+        system_model: str | None = None,
         download_root: str = "./models",
         device: str = "auto",
         warmup_on_init: bool = True,
     ) -> None:
         self.model_pool = model_pool or ModelPool()
-        self.wispr_model_name = wispr_model
-        self.system_model_name = system_model
+        settings = get_settings_manager().get_settings()
+
+        resolved_wispr = self._resolve_model(
+            wispr_model,
+            settings.transcription.microphone_asr_model_id,
+            settings.transcription.default_asr_model_id,
+            settings.transcription.model_name,
+        )
+        resolved_system = self._resolve_model(
+            system_model,
+            settings.transcription.system_asr_model_id,
+            settings.transcription.default_asr_model_id,
+            settings.transcription.model_name,
+        )
+
+        self.wispr_model_name = resolved_wispr
+        self.system_model_name = resolved_system
         self.download_root = download_root
         self.device = device
 
@@ -681,6 +700,28 @@ class DualModeTranscriptionEngine:
 
         if warmup_on_init:
             self._initialize()
+
+    def _resolve_model(
+        self,
+        explicit_model: str | None,
+        source_setting: str,
+        default_setting: str,
+        fallback: str,
+    ) -> str:
+        """Resolve model using explicit value, source-specific settings, or fallbacks."""
+        if explicit_model:
+            resolved = runtime_name_for_model(explicit_model)
+            return resolved or explicit_model
+
+        if source_setting:
+            resolved = runtime_name_for_model(source_setting)
+            return resolved or source_setting
+
+        if default_setting:
+            resolved = runtime_name_for_model(default_setting)
+            return resolved or default_setting
+
+        return fallback
 
     def _initialize(self) -> None:
         """Initialize models and engines."""
@@ -997,9 +1038,15 @@ class DualModeTranscriptionEngine:
 
     def get_health(self) -> SessionHealth:
         """Get current health status."""
+        gpu_mode = "cpu"
+        if self._current_mode == TranscriptionMode.WISPR and self._wispr_slot:
+            gpu_mode = self._wispr_slot.device
+        elif self._current_mode == TranscriptionMode.SYSTEM and self._system_slot:
+            gpu_mode = self._system_slot.device
+
         return SessionHealth(
             audio_stream_active=self.state == EngineState.PROCESSING,
-            gpu_mode="cuda" if self._has_gpu() else "cpu",
+            gpu_mode=gpu_mode,
             model_runtime_device=self._resolve_device(self._current_mode.name.lower()),
             queue_depth=self._metrics.queue_depth,
             last_transcript_at=utc_now() if self._metrics.chunks_processed > 0 else None,

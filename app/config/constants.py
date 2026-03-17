@@ -1,7 +1,26 @@
 """Centralized constants for OpenWispr backend.
 
-This module contains all hardcoded values that were previously scattered
-across the codebase. All modules should import from here.
+Contains all hardcoded values organized into constant classes:
+- AppConstants: Application branding and metadata
+- AudioConstants: Audio capture and processing parameters
+- VADConstants: Voice Activity Detection thresholds
+- ModelConstants: Whisper model sizes and transcription parameters
+- PerformanceConstants: Threading, queue, and latency settings
+- SessionConstants: Session management and timeout values
+- UIConstants: Themes, languages, and UI-related defaults
+- QualityConstants: Transcription quality filtering thresholds
+- FastChunkerConstants: Audio chunking parameters
+- RefinerConstants: LLM refiner configuration
+- ProviderConstants: Local LLM provider URLs
+
+Also exports:
+- COMMON_FILLER_WORDS: Set of filler words to filter
+- HALLUCINATION_PHRASES: Phrases indicating model hallucination
+- COMMON_SHORT_FORMS: Dictionary of abbreviations to expand
+- GPU_FALLBACK_KEYWORDS: Error keywords for GPU fallback logic
+- LIVE_MODE_PROFILES: Predefined latency/accuracy profiles
+
+All modules should import constants from here to avoid scattered magic numbers.
 """
 
 
@@ -83,7 +102,7 @@ class ModelConstants:
     # Model catalog IDs mapping
     MODEL_CATALOG_MAPPING = {
         "tiny": "whisper-tiny",
-        "base": "whisper-base",
+        "base": "whisper-tiny",
         "small": "whisper-small",
         "medium": "whisper-medium",
         "large-v3": "whisper-large-v3",
@@ -152,7 +171,7 @@ class UIConstants:
 
     DEFAULT_THEME = "light"
     DEFAULT_LANGUAGE = "auto"
-    SETTINGS_VERSION = 5
+    SETTINGS_VERSION = 7
     AUTO_SAVE_INTERVAL_SECONDS = 30
     MAX_LOG_FILES = 10
 
@@ -258,6 +277,210 @@ HALLUCINATION_PHRASES = {
     "thank you very much",
     "bye",
     "goodbye",
+}
+
+# Common short forms/abbreviations that get expanded in real-time
+# These are applied BEFORE dictionary/snippet expansion
+COMMON_SHORT_FORMS: dict[str, str] = {
+    # Business & Professional
+    "asap": "as soon as possible",
+    "btw": "by the way",
+    "fyi": "for your information",
+    "eta": "estimated time of arrival",
+    "eod": "end of day",
+    "tod": "today",
+    "tom": "tomorrow",
+    "wfh": "work from home",
+    "ot": "overtime",
+    "pto": "paid time off",
+    "loa": "leave of absence",
+    "nda": "non-disclosure agreement",
+    "pua": "personal use agreement",
+    "sla": "service level agreement",
+    "roi": "return on investment",
+    "kpi": "key performance indicator",
+    "okr": "objectives and key results",
+    "mbo": "management by objectives",
+    "ceo": "chief executive officer",
+    "cto": "chief technology officer",
+    "cfo": "chief financial officer",
+    "coo": "chief operating officer",
+    "cmo": "chief marketing officer",
+    "hr": "human resources",
+    "it": "information technology",
+    "qa": "quality assurance",
+    "r&d": "research and development",
+    "b2b": "business to business",
+    "b2c": "business to consumer",
+    "p&l": "profit and loss",
+    "ytd": "year to date",
+    "mtd": "month to date",
+    "qtd": "quarter to date",
+    # Technical & Development
+    "api": "application programming interface",
+    "sdk": "software development kit",
+    "ide": "integrated development environment",
+    "ci": "continuous integration",
+    "cd": "continuous deployment",
+    "devops": "development operations",
+    "sql": "structured query language",
+    "nosql": "not only sql",
+    "html": "hypertext markup language",
+    "css": "cascading style sheets",
+    "js": "JavaScript",
+    "ts": "TypeScript",
+    "json": "JavaScript Object Notation",
+    "xml": "extensible markup language",
+    "yaml": "yaml ain't markup language",
+    "url": "uniform resource locator",
+    "uri": "uniform resource identifier",
+    "dns": "domain name system",
+    "tcp": "transmission control protocol",
+    "udp": "user datagram protocol",
+    "http": "hypertext transfer protocol",
+    "https": "hypertext transfer protocol secure",
+    "ftp": "file transfer protocol",
+    "ssh": "secure shell",
+    "vpn": "virtual private network",
+    "lan": "local area network",
+    "wan": "wide area network",
+    "ram": "random access memory",
+    "rom": "read only memory",
+    "cpu": "central processing unit",
+    "gpu": "graphics processing unit",
+    "ai": "artificial intelligence",
+    "ml": "machine learning",
+    "dl": "deep learning",
+    "nlp": "natural language processing",
+    "cv": "computer vision",
+    "ar": "augmented reality",
+    "vr": "virtual reality",
+    "mr": "mixed reality",
+    "saas": "software as a service",
+    "paas": "platform as a service",
+    "iaas": "infrastructure as a service",
+    "db": "database",
+    "repo": "repository",
+    "pr": "pull request",
+    "mr": "merge request",
+    "issue": "issue",
+    "bug": "bug",
+    "feat": "feature",
+    "fix": "fix",
+    "docs": "documentation",
+    "refactor": "refactor",
+    "test": "test",
+    "chore": "chore",
+    "wip": "work in progress",
+    "tbd": "to be determined",
+    "tbc": "to be confirmed",
+    # Communication
+    "imo": "in my opinion",
+    "imho": "in my humble opinion",
+    "tbh": "to be honest",
+    "idk": "I don't know",
+    "idc": "I don't care",
+    "idgaf": "I don't give a f***",
+    "idc": "I don't care",
+    "smh": "shaking my head",
+    "fomo": "fear of missing out",
+    "yolo": "you only live once",
+    "lol": "laughing out loud",
+    "lmao": "laughing my a** off",
+    "rofl": "rolling on the floor laughing",
+    "btw": "by the way",
+    "omg": "oh my god",
+    "omfg": "oh my f***ing god",
+    "wtf": "what the f***",
+    "wth": "what the heck",
+    "brb": "be right back",
+    "bbl": "be back later",
+    "ttyl": "talk to you later",
+    "gn": "good night",
+    "gm": "good morning",
+    "gd": "good day",
+    "thx": "thanks",
+    "thnx": "thanks",
+    "pls": "please",
+    "plz": "please",
+    "rly": "really",
+    "msg": "message",
+    "pic": "picture",
+    "info": "information",
+    "def": "definitely",
+    "probs": "probably",
+    "gonna": "going to",
+    "wanna": "want to",
+    "gotta": "got to",
+    "kinda": "kind of",
+    "sorta": "sort of",
+    "dunno": "don't know",
+    "lemme": "let me",
+    "gimme": "give me",
+    "coulda": "could have",
+    "woulda": "would have",
+    "shoulda": "should have",
+    "aint": "isn't",
+    "cant": "cannot",
+    "wont": "will not",
+    "dont": "do not",
+    "doesnt": "does not",
+    "isnt": "is not",
+    "arent": "are not",
+    "wasnt": "was not",
+    "werent": "were not",
+    "hasnt": "has not",
+    "havent": "have not",
+    "hadnt": "had not",
+    "isnt": "is not",
+    "ive": "I have",
+    "im": "I am",
+    "id": "I would",
+    "ill": "I will",
+    "youre": "you are",
+    "youve": "you have",
+    "youll": "you will",
+    "weve": "we have",
+    "were": "we are",
+    "well": "we will",
+    "theyre": "they are",
+    "theyve": "they have",
+    "theyll": "they will",
+    "hes": "he is",
+    "shes": "she is",
+    "its": "it is",
+    "thats": "that is",
+    "whats": "what is",
+    "wheres": "where is",
+    "whens": "when is",
+    "hows": "how is",
+    "lets": "let us",
+    # Time & Dates
+    "1d": "1 day",
+    "2d": "2 days",
+    "1w": "1 week",
+    "2w": "2 weeks",
+    "1mo": "1 month",
+    "2mo": "2 months",
+    "1yr": "1 year",
+    "1h": "1 hour",
+    "2h": "2 hours",
+    "1m": "1 minute",
+    "2m": "2 minutes",
+    "1s": "1 second",
+    "2s": "2 seconds",
+    # Money & Numbers
+    "$1": "one dollar",
+    "$2": "two dollars",
+    "$5": "five dollars",
+    "$10": "ten dollars",
+    "$20": "twenty dollars",
+    "$50": "fifty dollars",
+    "$100": "one hundred dollars",
+    "k": "thousand",
+    "m": "million",
+    "b": "billion",
+    "t": "trillion",
 }
 
 HALLUCINATION_CONFIDENCE_THRESHOLD = 0.80
@@ -371,7 +594,7 @@ class RefinerConstants:
     DEFAULT_MODEL_ID = "qwen2.5-3b-instruct"
     DEFAULT_ENGINE_PREFERENCE = "llamacpp"
     VALID_ENGINES = {"llamacpp", "ollama", "lm_studio"}
-    DEFAULT_REFINEMENT_MODE = "off"
+    DEFAULT_REFINEMENT_MODE = "strict"
     VALID_REFINEMENT_MODES = {"off", "strict", "polished"}
     DEFAULT_REFINEMENT_PROFILE = "clean_dictation"
     VALID_REFINEMENT_PROFILES = {

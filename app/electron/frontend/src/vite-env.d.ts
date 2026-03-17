@@ -6,6 +6,7 @@ declare global {
       // File system APIs
       chooseDirectory: () => Promise<string | null>;
       choosePdf: () => Promise<string | null>;
+      openPath: (path: string) => Promise<void>;
 
       // Backend lifecycle
       onBackendExit: (callback: () => void) => () => void;
@@ -35,6 +36,7 @@ declare global {
         stop: () => Promise<unknown>;
         register: (accelerator: string) => Promise<{ success: boolean; error?: string }>;
         unregister: () => Promise<{ success: boolean; error?: string }>;
+        getDefault: () => Promise<{ accelerator: string; platform: string; note: string }>;
         getState: () => Promise<{
           config: import('./config/settingsSchema').HotkeySettings;
           session: import('./types/api').HotkeySession | null;

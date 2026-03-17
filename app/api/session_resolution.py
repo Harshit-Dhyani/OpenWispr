@@ -1,3 +1,10 @@
+"""Session parameter resolution utilities.
+
+Provides functions to resolve session parameters from settings, user input,
+and device capabilities. Handles fallback logic for capture source, input
+device, and model selection based on availability.
+"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -49,8 +56,9 @@ def resolve_input_device_for_source(
     if not microphones:
         return normalized_device_id
     if normalized_device_id:
-        selected = next((device for device in microphones if device.id == normalized_device_id), None)
+        selected = next(
+            (device for device in microphones if device.id == normalized_device_id), None
+        )
         if selected is not None:
             return selected.id
     return microphones[0].id
-

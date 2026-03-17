@@ -1,3 +1,19 @@
+"""SQLite-based persistence for history, dictionary, snippets, and styles.
+
+Provides HistoryDatabase class - a thread-safe SQLite wrapper using WAL mode
+for concurrent reads/writes. Handles schema migrations automatically on connect.
+
+Tables:
+    - transcript_sessions: Completed transcription sessions with metadata
+    - transcript_revisions: Version history for session transcripts
+    - dictionary_entries: User dictionary entries for correction
+    - snippets: Reusable text snippets with trigger expansion
+    - style_profiles: Named text style profiles
+    - user_corrections: Learned user corrections
+
+Key collaborators: app.storage.migrations for schema evolution.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -22,8 +38,8 @@ class HistoryDatabase:
             if path.exists():
                 try:
                     path.unlink()
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.warning(f"Failed to clean up stale WAL file {path}: {e}")
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = Path(db_path)

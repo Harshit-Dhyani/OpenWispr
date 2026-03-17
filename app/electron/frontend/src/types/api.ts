@@ -1,3 +1,9 @@
+/**
+ * API Types - Type definitions for backend communication
+ * 
+ * Defines types for sessions, transcripts, models, hotkeys, settings,
+ * hardware profiles, history, and other API request/response payloads.
+ */
 export type Device = {
   id: string;
   name: string;
@@ -685,4 +691,12 @@ export type StyleAssignments = Record<string, string>;
 // Import them from there to use Zod-inferred types as the single source of truth.
 //
 // Example: import type { SettingsState } from '../config/settingsSchema';
+
+export type StoragePaths = {
+  download_root: string;
+  models_path: string;
+  refiner_models_path: string;
+  app_data: string;
+  settings_file: string;
+};
 

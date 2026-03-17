@@ -1,3 +1,13 @@
+"""Audio capture module for system loopback and microphone input.
+
+Provides LoopbackAudioSource class for capturing system audio via
+WASAPI loopback or alternative audio backends. Handles device discovery,
+audio backend selection, level metering, and frame dropping.
+
+This module is the canonical location for audio capture. Legacy imports
+from app.audio.capture are redirected here with deprecation warnings.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +28,28 @@ logger = logging.getLogger(__name__)
 
 
 class LoopbackAudioSource:
+    """Captures system audio via loopback (WASAPI) or microphone input.
+
+    Thread-safe audio source that runs a background capture thread, pushes
+    audio frames to a bounded queue, and provides level metering. Supports
+    automatic backend fallback and device discovery.
+
+    Lifecycle:
+        1. Create instance with desired audio parameters
+        2. Call start() to begin capture thread
+        3. Call read() to retrieve audio frames (blocks up to timeout)
+        4. Call stop() to terminate capture (blocks up to 3s)
+
+    Thread Safety:
+        - All public methods are thread-safe via internal locking
+        - Single producer (capture thread) -> single consumer pattern
+
+    Error Handling:
+        - Backend errors trigger on_error callback if set
+        - Dropped frames are tracked in dropped_frames counter
+        - Queue full causes oldest frame drop with logged warning
+    """
+
     def __init__(
         self,
         *,

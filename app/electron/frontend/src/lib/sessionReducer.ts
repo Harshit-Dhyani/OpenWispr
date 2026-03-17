@@ -1,3 +1,9 @@
+/**
+ * Session Reducer - Session state reducer functions
+ * 
+ * Provides pure functions to apply transcript, health, formula, and snapshot
+ * events to the session state with automatic count synchronization.
+ */
 import type { Formula, Health, Segment, SnapshotPayload } from '../types/api';
 
 const MAX_TRANSCRIPT_SEGMENTS = 500;

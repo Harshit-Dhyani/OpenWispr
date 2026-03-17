@@ -1,3 +1,18 @@
+"""Repetition detection and filtering for transcribed text.
+
+Provides comprehensive tools for detecting and handling repetitive patterns in
+transcribed speech to filter out low-quality transcripts caused by STT model
+hallucinations or audio artifacts.
+
+Features:
+- Text normalization and tokenization utilities
+- Sentence-level repetition detection
+- N-gram analysis for phrase repetition patterns
+- Repetition scoring for transcript quality assessment
+- Segment trimming and deduplication
+- Boundary handling for overlapping text segments
+"""
+
 from __future__ import annotations
 
 import re
@@ -9,15 +24,67 @@ _SENTENCE_RE = re.compile(r"[^.!?]+[.!?]?")
 
 
 def normalize_guard_text(text: str) -> str:
+    """Normalize text by collapsing whitespace and trimming.
+
+    Removes extra spaces, newlines, and tabs, converting them to single
+    spaces, then strips leading and trailing whitespace.
+
+    Args:
+        text: Input text to normalize.
+
+    Returns:
+        Normalized text with collapsed whitespace.
+
+    Example:
+        >>> normalize_guard_text("  hello   world  ")
+        'hello world'
+        >>> normalize_guard_text("one\n\ttwo")
+        'one two'
+    """
     return " ".join((text or "").split()).strip()
 
 
 def tokenize_guard_text(text: str) -> list[str]:
+    """Tokenize text into lowercase word tokens.
+
+    Extracts alphanumeric tokens from the text and converts them to lowercase.
+    Handles contractions by preserving apostrophes within tokens.
+
+    Args:
+        text: Input text to tokenize.
+
+    Returns:
+        List of lowercase tokens in order of appearance.
+
+    Example:
+        >>> tokenize_guard_text("Hello World! It's fine.")
+        ['hello', 'world', "it's", 'fine']
+    """
     return [token.lower() for token in _TOKEN_RE.findall(normalize_guard_text(text))]
 
 
 def repeated_sentence_count(text: str) -> int:
-    sentences = [normalize_guard_text(part).lower().rstrip(".!?") for part in _extract_sentences(text)]
+    """Find the longest run of consecutive repeated sentences.
+
+    Analyzes text for consecutive identical sentences and returns the length
+    of the longest such run. Sentences are compared case-insensitively with
+    punctuation stripped.
+
+    Args:
+        text: Input text to analyze.
+
+    Returns:
+        Maximum count of consecutive identical sentences (1 if no repetition).
+
+    Example:
+        >>> repeated_sentence_count("Hello world. Hello world. Hello world.")
+        3
+        >>> repeated_sentence_count("Hello world. Goodbye world.")
+        1
+    """
+    sentences = [
+        normalize_guard_text(part).lower().rstrip(".!?") for part in _extract_sentences(text)
+    ]
     if not sentences:
         return 0
 
@@ -33,6 +100,23 @@ def repeated_sentence_count(text: str) -> int:
 
 
 def unique_token_ratio(text: str) -> float:
+    """Calculate ratio of unique tokens to total tokens.
+
+    Computes the proportion of unique tokens in the text. Lower values indicate
+    more repetitive text.
+
+    Args:
+        text: Input text to analyze.
+
+    Returns:
+        Ratio of unique tokens to total tokens (1.0 for empty text).
+
+    Example:
+        >>> unique_token_ratio("hello world hello world")
+        0.5
+        >>> unique_token_ratio("hello world")
+        1.0
+    """
     tokens = tokenize_guard_text(text)
     if not tokens:
         return 1.0
@@ -40,6 +124,26 @@ def unique_token_ratio(text: str) -> float:
 
 
 def repeated_ngram_run(text: str, *, min_size: int = 2, max_size: int = 5) -> int:
+    """Find the longest run of consecutive repeated n-grams.
+
+    Analyzes tokenized text for consecutive repeated n-grams of varying sizes.
+    Checks for repeated sequences of 2-5 tokens (configurable) and returns
+    the longest run found.
+
+    Args:
+        text: Input text to analyze.
+        min_size: Minimum n-gram size to check (default: 2).
+        max_size: Maximum n-gram size to check (default: 5).
+
+    Returns:
+        Maximum count of consecutive identical n-grams (0 if insufficient tokens).
+
+    Example:
+        >>> repeated_ngram_run("the quick brown the quick brown fox")
+        2
+        >>> repeated_ngram_run("hello world foo bar")
+        0
+    """
     tokens = tokenize_guard_text(text)
     if len(tokens) < min_size * 2:
         return 0
@@ -62,6 +166,24 @@ def repeated_ngram_run(text: str, *, min_size: int = 2, max_size: int = 5) -> in
 
 
 def repetition_score(text: str) -> float:
+    """Calculate repetition score for text quality assessment.
+
+    Computes a score between 0.0 and 1.0 indicating repetition severity.
+    Considers both token uniqueness and end-of-text repetition patterns.
+    Scores above 0.8 typically indicate poor quality transcripts.
+
+    Args:
+        text: Input text to score.
+
+    Returns:
+        Repetition score (0.0 for texts under 4 tokens).
+
+    Example:
+        >>> repetition_score("hello hello hello hello hello")
+        0.9
+        >>> repetition_score("the quick brown fox jumps")
+        0.0
+    """
     tokens = tokenize_guard_text(text)
     if len(tokens) < 4:
         return 0.0
@@ -80,6 +202,30 @@ def is_repetitive_segment(
     compression_ratio: float | None = None,
     avg_logprob: float | None = None,
 ) -> bool:
+    """Determine if a text segment contains excessive repetition.
+
+    Uses multiple heuristics to detect repetitive transcripts that should
+    be filtered out:
+    - Sentence repetition (3+ identical sentences)
+    - N-gram repetition (3+ identical phrases)
+    - Low token diversity (<=35% unique for 10+ tokens)
+    - High repetition score (>=0.82)
+    - Combined metrics with compression ratio and log probability
+
+    Args:
+        text: Input text to evaluate.
+        compression_ratio: Optional compression ratio for additional analysis.
+        avg_logprob: Optional average log probability for additional analysis.
+
+    Returns:
+        True if text shows excessive repetition, False otherwise.
+
+    Example:
+        >>> is_repetitive_segment("hello world hello world hello world")
+        True
+        >>> is_repetitive_segment("the quick brown fox jumps over")
+        False
+    """
     normalized = normalize_guard_text(text)
     if not normalized:
         return False
@@ -105,6 +251,28 @@ def is_repetitive_segment(
 
 
 def trim_repetitive_segment(text: str) -> str:
+    """Trim repetitive content from a text segment.
+
+    Removes repeated sentences at the start and filters out segments with
+    excessive token repetition. Keeps a short prefix of repetitive content
+    rather than discarding entirely.
+
+    Operations performed:
+    1. Deduplicate consecutive identical sentences
+    2. For excessive single-token repetition, keep first 6 tokens
+
+    Args:
+        text: Input text to trim.
+
+    Returns:
+        Trimmed text with repetition removed, empty string if invalid.
+
+    Example:
+        >>> trim_repetitive_segment("hello world hello world hello world")
+        'hello world'
+        >>> trim_repetitive_segment("test. test. unique content here.")
+        'test. unique content here.'
+    """
     normalized = normalize_guard_text(text)
     if not normalized:
         return ""
@@ -125,7 +293,6 @@ def trim_repetitive_segment(text: str) -> str:
 
     counts = Counter(tokens)
     if len(tokens) >= 8 and counts.most_common(1)[0][1] >= max(4, len(tokens) // 2):
-        # Keep the first short span rather than passing obvious loop spam through cleanup.
         kept = normalize_guard_text(" ".join(tokens[: min(6, len(tokens))]))
         return kept
 
@@ -139,6 +306,28 @@ def dedupe_boundary(
     min_overlap_words: int = 2,
     max_overlap_words: int = 12,
 ) -> str:
+    """Deduplicate overlapping text at segment boundaries.
+
+    Detects when new text starts with content that already exists at the
+    end of existing text and removes the overlap to prevent duplication.
+    This is essential for handling streaming transcripts where boundaries
+    may contain repeated words.
+
+    Args:
+        existing_text: Preceding text segment.
+        new_text: New text segment to append.
+        min_overlap_words: Minimum word overlap to trigger deduplication (default: 2).
+        max_overlap_words: Maximum word overlap to consider (default: 12).
+
+    Returns:
+        Combined text with overlapping content removed.
+
+    Example:
+        >>> dedupe_boundary("hello world", "world test")
+        'hello world test'
+        >>> dedupe_boundary("hello world", "completely different")
+        'hello world completely different'
+    """
     existing = normalize_guard_text(existing_text)
     candidate = normalize_guard_text(new_text)
     if not candidate:
@@ -168,6 +357,17 @@ def dedupe_boundary(
 
 
 def _extract_sentences(text: str) -> list[str]:
+    """Extract sentences from text using punctuation delimiters.
+
+    Splits text into sentences based on period, exclamation, and question
+    mark delimiters while preserving the delimiters in the output.
+
+    Args:
+        text: Input text to split.
+
+    Returns:
+        List of sentence strings in order of appearance.
+    """
     sentences: list[str] = []
     for match in _SENTENCE_RE.findall(normalize_guard_text(text)):
         sentence = normalize_guard_text(match)

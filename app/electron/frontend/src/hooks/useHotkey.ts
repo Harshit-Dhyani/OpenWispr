@@ -1,3 +1,9 @@
+/**
+ * useHotkey - Hook for hotkey state management
+ * 
+ * Manages hotkey enable/disable, state changes, and floating window interaction
+ * via IPC to the Electron main process.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { HotkeyState, HotkeyStatus } from '../types/api';
 import type { HotkeySettings } from '../config/settingsSchema';

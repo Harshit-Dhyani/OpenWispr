@@ -1,3 +1,11 @@
+/**
+ * DictationView - Top-level view container for dictation mode
+ * 
+ * Manages dictation lifecycle, recording state, hotkey handling, and coordinates
+ * MainContent and ActivityFeed components. Handles coach integration and live draft state.
+ * 
+ * @component
+ */
 import type { CoachResult, Device, SessionSummary, Segment, Formula, Health } from '../types/api';
 import { MainContent } from './MainContent';
 import { ActivityFeed } from './ActivityFeed';
@@ -142,7 +150,7 @@ export function DictationView({
             </button>
           </div>
         </div>
-        <div className="mt-4 border-2 border-lawn-border bg-lawn-bg p-3">
+        <div className="mt-4">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <div className="border border-lawn-border bg-lawn-panel px-3 py-2">
               <span className="text-[9px] font-black uppercase tracking-[0.14em] text-lawn-muted">Language</span>
@@ -190,7 +198,7 @@ export function DictationView({
           </div>
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 gap-4 p-4 2xl:grid-cols-[minmax(0,1.1fr)_340px]">
+      <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_minmax(0,340px)] 2xl:grid-cols-[minmax(0,1.1fr)_340px]">
         <div className="min-h-0 overflow-hidden">
           <MainContent
             scope="dictation"

@@ -1,3 +1,9 @@
+/**
+ * useWebSocket - Hook for WebSocket connection management
+ * 
+ * Provides reactive WebSocket connection with auto-reconnect, heartbeat,
+ * and message buffering capabilities.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type WebSocketStatus = 'connecting' | 'open' | 'closing' | 'closed' | 'reconnecting' | 'error';

@@ -1,11 +1,11 @@
 ---
 title: Deployment Guide
 audience: operators
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - tools/setup/
+  - pyproject.toml
   - package.json
-  - requirements.txt
 ---
 
 # OpenWispr Deployment Guide
@@ -109,6 +109,9 @@ Development dependencies (`[dev]` extras):
 - `mypy>=1.14` - Type checking
 - `pyinstaller>=6.11` - Executable packaging
 - `psutil>=6.0` - System utilities
+- `mkdocs>=1.6` - Documentation site generator
+- `mkdocs-material>=9.0` - Material theme for docs
+- `mkdocstrings[python]>=0.25` - API reference extraction
 
 ### Node.js Dependencies (from package.json)
 
@@ -251,6 +254,14 @@ OPENWISPR_OPTIMIZATION_MODE=balanced
 OPENWISPR_ENABLE_FILLER_FILTER=true
 OPENWISPR_ENABLE_HALLUCINATION_FILTER=true
 OPENWISPR_MIN_SEGMENT_LENGTH=0.5
+
+# Hotkey timing (seconds)
+OPENWISPR_HOTKEY_REFINER_TIMEOUT_SECONDS=0.75
+OPENWISPR_HOTKEY_COACH_TIMEOUT_SECONDS=0.5
+OPENWISPR_HOTKEY_STOP_PROCESSING_WAIT_SECONDS=0.9
+OPENWISPR_HOTKEY_STOP_DRAIN_WAIT_SECONDS=0.45
+OPENWISPR_HOTKEY_STOP_PROCESSING_WAIT_EMPTY_SECONDS=0.2
+OPENWISPR_HOTKEY_STOP_DRAIN_WAIT_EMPTY_SECONDS=0.1
 ```
 
 ### Per-Environment Presets
@@ -343,10 +354,9 @@ npm run dev:frontend
 
 ## Packaging for Distribution
 
-Build targets (from root `package.json`):
+Build targets (from `app/electron/package.json`):
 - `nsis` - Windows installer
 - `portable` - Standalone executable
-- `msi` - Windows MSI package
 
 ### Portable Build
 
@@ -426,7 +436,7 @@ npm run tree:generate    # Generate project tree
 
 ### Build Configuration
 
-The root `package.json` controls packaging:
+The actual build is controlled by `app/electron/package.json`:
 
 ```json
 {
@@ -434,13 +444,13 @@ The root `package.json` controls packaging:
     "appId": "com.openwispr.desktop",
     "productName": "OpenWispr",
     "directories": {
-      "output": "release"
+      "output": "dist",
+      "buildResources": "../../build"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64", "ia32"] },
         { "target": "portable", "arch": ["x64"] },
-        { "target": "msi", "arch": ["x64"] }
+        { "target": "nsis", "arch": ["x64", "ia32"] }
       ]
     }
   }
@@ -625,7 +635,7 @@ curl http://127.0.0.1:8765/api/health
 # Test transcription pipeline
 python -c "
 from app.stt import get_transcription_service
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 settings = AppSettings()
 print(f'Device: {settings.device}, Model: {settings.default_model}')
 "
@@ -647,23 +657,15 @@ npm run pack
 - [ ] Clean build tested on Windows 11
 - [ ] GPU and CPU paths both tested
 - [ ] Portable and installer builds produced (`npm run dist`)
-- [ ] Artifacts in `release/` directory
+- [ ] Artifacts in `app/electron/dist/` directory
 - [ ] Virus scan completed on artifacts
 - [ ] Digital signature applied (if available)
 
 ## Build Output Structure
 
 ```
-release/
-├── OpenWispr-<version>-setup.exe     # NSIS installer
-├── OpenWispr-<version>-portable.exe  # Portable executable
-└── win-unpacked/                       # Unpacked directory (npm run pack)
-```
-
-Or from `app/electron/dist/`:
-```
 app/electron/dist/
-├── OpenWispr-<version>.exe           # Portable
-├── OpenWispr Setup-<version>.exe     # Installer
-└── win-unpacked/                       # Unpacked files
+├── OpenWispr-<version>-setup.exe     # NSIS installer
+├── OpenWispr-<version>-portable.exe   # Portable executable
+└── win-unpacked/                      # Unpacked directory (npm run pack)
 ```

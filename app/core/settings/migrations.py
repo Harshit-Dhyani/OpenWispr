@@ -62,7 +62,7 @@ def _v1_to_v2(settings: dict[str, Any]) -> dict[str, Any]:
     transcription.setdefault("refinement_mode", "off")
     transcription.setdefault("refinement_profile", "clean_dictation")
     refiner.setdefault("selected_model_id", "qwen2.5-3b-instruct")
-    refiner.setdefault("runtime_enabled", False)
+    refiner.setdefault("runtime_enabled", True)
     refiner.setdefault("engine_preference", "llamacpp")
 
     result["transcription"] = transcription
@@ -135,6 +135,60 @@ def _v4_to_v5(settings: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _v5_to_v6(settings: dict[str, Any]) -> dict[str, Any]:
+    """Migration from v5 to v6.
+
+    - Migrates whisper-turbo to whisper-medium (turbo was disabled by default)
+    - Adds microphone_asr_model_id and system_asr_model_id defaults
+    """
+    result = dict(settings)
+
+    transcription = dict(result.get("transcription", {}))
+
+    # Migrate whisper-turbo to whisper-medium
+    turbo_to_medium = "whisper-medium"
+    model_keys_to_migrate = [
+        "default_asr_model_id",
+        "microphone_asr_model_id",
+        "system_asr_model_id",
+    ]
+    for key in model_keys_to_migrate:
+        if transcription.get(key) == "whisper-turbo":
+            transcription[key] = turbo_to_medium
+
+    # Ensure new model ID fields exist
+    transcription.setdefault("microphone_asr_model_id", "whisper-medium")
+    transcription.setdefault("system_asr_model_id", "whisper-medium")
+
+    result["transcription"] = transcription
+    return result
+
+
+def _v6_to_v7(settings: dict[str, Any]) -> dict[str, Any]:
+    """Migration from v6 to v7.
+
+    - Migrates whisper-medium to whisper-turbo (turbo is now the recommended default)
+    - Faster and still accurate
+    """
+    result = dict(settings)
+
+    transcription = dict(result.get("transcription", {}))
+
+    # Migrate whisper-medium to whisper-turbo for faster performance
+    medium_to_turbo = "whisper-turbo"
+    model_keys = [
+        "default_asr_model_id",
+        "microphone_asr_model_id",
+        "system_asr_model_id",
+    ]
+    for key in model_keys:
+        if transcription.get(key) == "whisper-medium":
+            transcription[key] = medium_to_turbo
+
+    result["transcription"] = transcription
+    return result
+
+
 # ============================================
 # Migration Registry
 # ============================================
@@ -144,6 +198,8 @@ MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     3: _v2_to_v3,
     4: _v3_to_v4,
     5: _v4_to_v5,
+    6: _v5_to_v6,
+    7: _v6_to_v7,
 }
 
 

@@ -1,7 +1,7 @@
 ---
 title: Model Runtime and Routing
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/core/model_catalog.py
   - app/api/model_service.py
@@ -56,7 +56,7 @@ class ModelCatalogEntry:
 | `whisper-small` | 0.46 GB | 2 GB | fast | `small` | Enabled |
 | `whisper-medium` | 1.5 GB | 5 GB | balanced | `medium` | Enabled |
 | `whisper-large-v3` | 3.1 GB | 10 GB | quality | `large-v3` | Enabled |
-| `whisper-turbo` | 1.6 GB | 6 GB | fast | `turbo` | Disabled |
+| `whisper-turbo` | 1.6 GB | 6 GB | fast | `turbo` | Enabled |
 
 ### Refiner Models
 
@@ -201,7 +201,6 @@ class GPUMemoryPool:
 | Model | int8 | float16 | float32 |
 |-------|------|---------|---------|
 | tiny | 0.24 GB | 0.4 GB | 0.8 GB |
-| base | 0.30 GB | 0.50 GB | 1.00 GB |
 | small | 0.60 GB | 1.0 GB | 2.0 GB |
 | medium | 1.80 GB | 3.0 GB | 6.0 GB |
 | large-v3 | 3.00 GB | 5.0 GB | 10.0 GB |
@@ -408,7 +407,7 @@ def get_recommendations(self) -> list[str]:
 
 ## Source-Aware ASR Selection
 
-Source: `app/api/server.py` (`_resolve_model_name_for_hotkey` method)
+Source: `app/api/services/hotkey_transcription_service.py` (`_resolve_hotkey_model_name` method, line 1148)
 
 Settings control ASR model selection by capture source:
 

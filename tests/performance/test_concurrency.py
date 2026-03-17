@@ -18,13 +18,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.performance
+
 
 class TestThreadSafety:
     """Tests for thread safety."""
 
     def test_settings_manager_thread_safety(self, temp_dir) -> None:
         """Test SettingsManager is thread-safe."""
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         manager = SettingsManager(settings_dir=temp_dir)
         errors = []
@@ -147,7 +149,7 @@ class TestLockContention:
         """Test settings manager has low lock contention."""
         import tempfile
 
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = temp_dir
@@ -256,6 +258,7 @@ class TestResourcePooling:
 
     def test_thread_pool_reuse(self) -> None:
         """Test thread pool reuse efficiency."""
+
         def worker(n):
             return n * n
 
@@ -316,7 +319,7 @@ class TestConcurrencyLimits:
 
     def test_max_concurrent_settings_access(self, temp_dir) -> None:
         """Test maximum concurrent settings access."""
-        from app.core.settings_manager import SettingsManager
+        from app.core.settings.manager import SettingsManager
 
         manager = SettingsManager(settings_dir=temp_dir)
 
@@ -341,6 +344,7 @@ class TestAsyncConcurrency:
     @pytest.mark.asyncio
     async def test_concurrent_websocket_simulation(self) -> None:
         """Test concurrent WebSocket-like operations."""
+
         async def simulated_websocket_client(client_id: int):
             messages = []
             for i in range(10):

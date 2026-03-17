@@ -1,3 +1,9 @@
+/**
+ * Tray icon and menu management for OpenWispr
+ * Creates system tray icon with context menu for recent transcripts, settings access,
+ * recording controls, and app quit. Exports: createTray, refreshTrayMenu
+ * @module tray
+ */
 // Tray icon and menu management
 const { Tray, Menu, shell, dialog, app } = require("electron");
 const path = require("path");

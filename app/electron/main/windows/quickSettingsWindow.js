@@ -1,4 +1,9 @@
-// Quick settings window for tray menu
+/**
+ * Quick settings popup window for OpenWispr
+ * Creates and manages a frameless always-on-top window for quick configuration
+ * access from the system tray. Exports: createQuickSettingsWindow, showQuickSettingsWindow
+ * @module quickSettingsWindow
+ */
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
@@ -27,6 +32,9 @@ function createQuickSettingsWindow() {
       preload: path.join(__dirname, "..", "preload", "quickSettings.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: true,
+      sandbox: true,
+      allowRunningInsecureContent: false,
     },
   });
 

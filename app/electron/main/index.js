@@ -1,4 +1,9 @@
-// Main entry point for Electron
+/**
+ * Electron main process entry point for OpenWispr
+ * Initializes app, backend, windows, tray, hotkeys, and IPC handlers.
+ * Coordinates startup sequence and manages app lifecycle events.
+ * @module electronMain
+ */
 const { app, ipcMain, globalShortcut } = require("electron");
 const { APP_NAME, APP_SLUG } = require("./shared/generated/appMeta");
 if (process.env.OPENWISPR_DISABLE_GPU === "1") {
@@ -23,9 +28,9 @@ const {
   applyHotkeyConfig, toggleRecording
 } = require("./ipc/hotkeyHandlers");
 
-// Import IPC setup
 require("./ipc/handlers");
 
+// Global exception handlers
 process.on("uncaughtException", (error) => {
   console.error("[main] Uncaught exception", error);
 });

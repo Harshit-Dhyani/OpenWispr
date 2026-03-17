@@ -1,3 +1,8 @@
+"""Audio preprocessing module.
+
+Re-exports audio preprocessing components from app.audio.processing.audio_processing.
+"""
+
 from app.audio.processing.audio_processing import (
     AudioPreprocessor,
     ProcessingConfig,

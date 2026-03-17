@@ -28,6 +28,7 @@
     "watch": "pnpm run build:frontend && pnpm run dev:electron",
     "watch:frontend": "pnpm --dir app/electron/frontend run dev",
     "test": "pnpm run test:frontend && pnpm run test:backend",
+    "skills:sync": "node scripts/sync-skills.js",
     "test:frontend": "pnpm --dir app/electron/frontend run test",
     "test:backend": "pytest",
     "test:e2e": "playwright test",

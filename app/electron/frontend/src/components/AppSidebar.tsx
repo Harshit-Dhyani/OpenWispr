@@ -1,3 +1,12 @@
+/**
+ * AppSidebar - Primary navigation sidebar for the OpenWispr application
+ * 
+ * Provides navigation between main sections (home, microphone, system audio, dictionary, 
+ * snippets, settings), displays connection status, GPU status, session info, and device 
+ * refresh controls.
+ * 
+ * @component
+ */
 import { Activity, BookText, Cpu, Home, Mic, RefreshCw, ScissorsSquareDashedBottom, Settings, Volume2, Wifi, WifiOff } from 'lucide-react';
 import { RENDERER_STRINGS } from '../strings/en';
 import openWisprLogo from '../assets/openwispr-logo.png';

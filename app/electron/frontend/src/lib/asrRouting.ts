@@ -1,3 +1,9 @@
+/**
+ * ASR Routing - Model selection utilities for capture sources
+ * 
+ * Provides functions to resolve and sync ASR model IDs between system audio
+ * and microphone capture sources.
+ */
 import type { SettingsState } from '../config/settingsSchema';
 
 export type CaptureSource = 'system' | 'microphone';

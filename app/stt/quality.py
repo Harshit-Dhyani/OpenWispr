@@ -1,10 +1,23 @@
+"""Transcript segment quality assessment with multi-stage filtering.
+
+Provides comprehensive quality control for transcribed speech segments with:
+- Confidence-based filtering using Whisper confidence scores
+- Hallucination detection for common false positive patterns
+- Repetition detection for repetitive/low-information content
+- Script mismatch detection for Hindi/English language boundaries
+- Low-entropy content filtering for garbled output
+- Punctuation ratio checks for stuttering/garbage detection
+- Filler word suppression for low-value utterances
+- No-speech and logprob-based uncertainty detection
+"""
+
 from __future__ import annotations
 
 import logging
 import re
 from dataclasses import dataclass
 
-from app.core.constants import (
+from app.config.constants import (
     COMMON_FILLER_WORDS,
     HALLUCINATION_CONFIDENCE_THRESHOLD,
     HALLUCINATION_PHRASES,
@@ -19,6 +32,16 @@ COMMON_FILLERS = COMMON_FILLER_WORDS | {"thanks", "thank you", "bye", "goodbye"}
 
 @dataclass(slots=True)
 class SegmentQuality:
+    """Quality assessment result for a transcript segment.
+
+    Attributes:
+        display_text: Cleaned and normalized text for display
+        suppressed: Whether the segment should be suppressed from output
+        suppression_reasons: List of reasons why the segment was suppressed
+        quality_label: Quality classification (JUNK, WEAK, or OK)
+        script_mismatch: Whether script mismatch was detected
+    """
+
     display_text: str
     suppressed: bool
     suppression_reasons: list[str]
@@ -36,6 +59,37 @@ def assess_segment_quality(
     no_speech_prob: float | None = None,
     compression_ratio: float | None = None,
 ) -> SegmentQuality:
+    """Assess the quality of a transcript segment using multiple heuristics.
+
+    Performs multi-stage quality assessment combining confidence scoring with
+    pattern-based detection for hallucinations, repetitions, fillers, and
+    script mismatches. Returns a structured quality assessment with suppression
+    decision and detailed reasons.
+
+    Args:
+        text: Raw transcript text to assess
+        confidence: Whisper confidence score (0.0 to 1.0)
+        language_mode: Expected language mode ("en", "hi", "auto")
+        detected_language: Language detected by Whisper
+        avg_logprob: Average log probability from Whisper (optional)
+        no_speech_prob: Probability that segment contains no speech (optional)
+        compression_ratio: Compression ratio from Whisper (optional)
+
+    Returns:
+        SegmentQuality object containing assessment results
+
+    Example:
+        >>> quality = assess_segment_quality(
+        ...     text="Hello world this is a test",
+        ...     confidence=0.95,
+        ...     language_mode="en",
+        ...     detected_language="en"
+        ... )
+        >>> print(quality.quality_label)
+        'OK'
+        >>> print(quality.suppressed)
+        False
+    """
     # Single structured debug log instead of verbose per-check logging
     logger.debug(
         "Quality assessment: text_len=%d, confidence=%.3f, lang_mode=%s, detected=%s",
@@ -136,6 +190,18 @@ def assess_segment_quality(
 
 
 def _punctuation_ratio(text: str) -> float:
+    """Calculate the ratio of punctuation characters to total text length.
+
+    Args:
+        text: Input text to analyze
+
+    Returns:
+        Ratio of punctuation to total characters (0.0 to 1.0)
+
+    Example:
+        >>> _punctuation_ratio("Hello, world!")
+        0.14285714285714285
+    """
     if not text:
         return 0.0
     punctuation = sum(1 for char in text if not char.isalnum() and not char.isspace())
@@ -143,6 +209,20 @@ def _punctuation_ratio(text: str) -> float:
 
 
 def _max_repeated_char_run(text: str) -> int:
+    """Find the longest run of repeated characters in the text.
+
+    Detects hallucinations and speech artifacts like "aaaaaa" or "ummmmm".
+
+    Args:
+        text: Input text to analyze
+
+    Returns:
+        Length of the longest consecutive repeated character sequence
+
+    Example:
+        >>> _max_repeated_char_run("hellooooo")
+        5
+    """
     longest = 0
     current = 0
     previous = ""
@@ -157,6 +237,23 @@ def _max_repeated_char_run(text: str) -> int:
 
 
 def _low_entropy(text: str) -> bool:
+    """Detect low-entropy content indicating repetitive or garbled text.
+
+    Uses multiple heuristics:
+    - Character uniqueness ratio (unique chars / total chars)
+    - Token repetition count
+    - Short text with low uniqueness
+
+    Args:
+        text: Input text to analyze
+
+    Returns:
+        True if text appears to be low-entropy/repetitive
+
+    Example:
+        >>> _low_entropy("the the the the the")
+        True
+    """
     compact = re.sub(r"\s+", "", text)
     if len(compact) < 12:
         return False
@@ -174,6 +271,18 @@ def _low_entropy(text: str) -> bool:
 
 
 def _repeated_token(text: str) -> int:
+    """Find the maximum count of consecutive identical tokens.
+
+    Args:
+        text: Input text to analyze
+
+    Returns:
+        Maximum count of consecutive repeated tokens
+
+    Example:
+        >>> _repeated_token("yes yes yes okay")
+        3
+    """
     tokens = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
     if not tokens:
         return 0
@@ -193,7 +302,18 @@ HALLUCINATION_PHRASES = HALLUCINATION_PHRASES
 
 
 def _is_likely_hallucination(text: str, confidence: float) -> bool:
-    """Check if text matches common hallucination patterns."""
+    """Check if text matches common hallucination patterns from Whisper.
+
+    Compares normalized text against known hallucination phrases and
+    considers confidence threshold for suppression decision.
+
+    Args:
+        text: Normalized text to check
+        confidence: Whisper confidence score
+
+    Returns:
+        True if text appears to be a hallucination
+    """
     normalized = text.lower().strip()
     for phrase in HALLUCINATION_PHRASES:
         if phrase in normalized and confidence < HALLUCINATION_CONFIDENCE_THRESHOLD:
@@ -202,7 +322,23 @@ def _is_likely_hallucination(text: str, confidence: float) -> bool:
 
 
 def _looks_like_filler(text: str, confidence: float) -> bool:
-    normalized = text.lower().strip(" .,!?:;-'\"")
+    """Detect filler words and low-value utterances.
+
+    Checks for known filler words and short uncertain utterances that
+    provide minimal value to the transcript.
+
+    Args:
+        text: Input text to analyze
+        confidence: Whisper confidence score
+
+    Returns:
+        True if text appears to be a filler or low-value utterance
+
+    Example:
+        >>> _looks_like_filler("um", 0.5)
+        True
+    """
+    normalized = text.lower().strip(" .,!?:;-'")
 
     # Check if the text is a known filler word with low confidence
     # Threshold 0.72: Only suppress fillers if confidence is below this level
@@ -222,6 +358,23 @@ def _looks_like_filler(text: str, confidence: float) -> bool:
 
 
 def _script_mismatch(text: str, language_mode: str, detected_language: str) -> bool:
+    """Detect script mismatch between expected and detected language.
+
+    For English mode: detects presence of non-Latin scripts
+    For Hindi mode: detects English text when Hindi is expected
+
+    Args:
+        text: Input text to analyze
+        language_mode: Expected language mode ("en", "hi", "auto")
+        detected_language: Language detected by Whisper
+
+    Returns:
+        True if there's a script mismatch
+
+    Example:
+        >>> _script_mismatch("हिंदी टेक्स्ट", "en", "hi")
+        True
+    """
     if language_mode == "auto":
         return False
     if not text:
@@ -236,10 +389,38 @@ def _script_mismatch(text: str, language_mode: str, detected_language: str) -> b
 
 
 def _contains_non_latin_letters(text: str) -> bool:
+    """Check if text contains non-Latin alphabetic characters.
+
+    Args:
+        text: Input text to check
+
+    Returns:
+        True if text contains non-Latin letters
+
+    Example:
+        >>> _contains_non_latin_letters("hello")
+        False
+        >>> _contains_non_latin_letters("नमस्ते")
+        True
+    """
     return any(char.isalpha() and ord(char) > 0x024F for char in text)
 
 
 def _latin_letter_ratio(text: str) -> float:
+    """Calculate the ratio of Latin letters to total letters in text.
+
+    Args:
+        text: Input text to analyze
+
+    Returns:
+        Ratio of Latin letters to total letters (0.0 to 1.0)
+
+    Example:
+        >>> _latin_letter_ratio("hello world")
+        1.0
+        >>> _latin_letter_ratio("hello दुनिया")
+        0.5384615384615384
+    """
     letters = [char for char in text if char.isalpha()]
     if not letters:
         return 0.0

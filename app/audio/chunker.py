@@ -1,8 +1,18 @@
+"""Backward compatibility shim - redirects to app.stt.chunker.
+
+This module exists for backwards compatibility during the audio/STT
+reorganization. The canonical source is app.stt.chunker.
+
+Provides audio chunking classes and functions for segmenting audio data.
+"""
+
 from app.stt.chunker import AudioChunk, RollingChunker, chunk_segments
 
 
 class Chunker:
-    def __init__(self, *, max_chars: int = 400, chunk_size: int | None = None, overlap: int = 0) -> None:
+    def __init__(
+        self, *, max_chars: int = 400, chunk_size: int | None = None, overlap: int = 0
+    ) -> None:
         self.max_chars = chunk_size or max_chars
         self.overlap = overlap
 

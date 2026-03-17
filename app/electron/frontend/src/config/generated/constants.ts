@@ -61,10 +61,10 @@ export const ModelConstants = {
   MIN_SEGMENT_LENGTH: 0.5,
 } as const;
 
-export const VALID_MODEL_NAMES = ["medium", "turbo", "tiny", "small", "base", "large-v3"] as const;
+export const VALID_MODEL_NAMES = ["turbo", "small", "medium", "base", "large-v3", "tiny"] as const;
 export const VALID_COMPUTE_TYPES = ['float16', 'int8', 'int8_float16'] as const;
 
-export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-base", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;
+export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-tiny", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;
 
 // ============================================
 // Performance Constants
@@ -105,7 +105,7 @@ export const SessionConstants = {
 export const UIConstants = {
   DEFAULT_THEME: 'light' as const,
   DEFAULT_LANGUAGE: 'auto' as const,
-  SETTINGS_VERSION: 5,
+  SETTINGS_VERSION: 7,
   AUTO_SAVE_INTERVAL_SECONDS: 30,
   MAX_LOG_FILES: 10,
   DEFAULT_HOTKEY: 'Ctrl+Shift+T',
@@ -163,6 +163,11 @@ export const COMMON_FILLER_WORDS = ["ah", "ahh", "er", "erm", "hmm", "uh", "uhh"
 // ============================================
 export const HALLUCINATION_PHRASES = ["bye", "check the description", "click the link", "don't forget to like", "goodbye", "like and subscribe", "please subscribe", "see you next time", "thank you", "thank you for watching", "thank you very much", "thanks", "thanks a lot", "thanks for watching"] as const;
 export const HALLUCINATION_CONFIDENCE_THRESHOLD = 0.8;
+
+// ============================================
+// Short Form Expansions
+// ============================================
+export const COMMON_SHORT_FORMS = {"$1": "one dollar", "$10": "ten dollars", "$100": "one hundred dollars", "$2": "two dollars", "$20": "twenty dollars", "$5": "five dollars", "$50": "fifty dollars", "1d": "1 day", "1h": "1 hour", "1m": "1 minute", "1mo": "1 month", "1s": "1 second", "1w": "1 week", "1yr": "1 year", "2d": "2 days", "2h": "2 hours", "2m": "2 minutes", "2mo": "2 months", "2s": "2 seconds", "2w": "2 weeks", "ai": "artificial intelligence", "aint": "isn't", "api": "application programming interface", "ar": "augmented reality", "arent": "are not", "asap": "as soon as possible", "b": "billion", "b2b": "business to business", "b2c": "business to consumer", "bbl": "be back later", "brb": "be right back", "btw": "by the way", "bug": "bug", "cant": "cannot", "cd": "continuous deployment", "ceo": "chief executive officer", "cfo": "chief financial officer", "chore": "chore", "ci": "continuous integration", "cmo": "chief marketing officer", "coo": "chief operating officer", "coulda": "could have", "cpu": "central processing unit", "css": "cascading style sheets", "cto": "chief technology officer", "cv": "computer vision", "db": "database", "def": "definitely", "devops": "development operations", "dl": "deep learning", "dns": "domain name system", "docs": "documentation", "doesnt": "does not", "dont": "do not", "dunno": "don't know", "eod": "end of day", "eta": "estimated time of arrival", "feat": "feature", "fix": "fix", "fomo": "fear of missing out", "ftp": "file transfer protocol", "fyi": "for your information", "gd": "good day", "gimme": "give me", "gm": "good morning", "gn": "good night", "gonna": "going to", "gotta": "got to", "gpu": "graphics processing unit", "hadnt": "had not", "hasnt": "has not", "havent": "have not", "hes": "he is", "hows": "how is", "hr": "human resources", "html": "hypertext markup language", "http": "hypertext transfer protocol", "https": "hypertext transfer protocol secure", "iaas": "infrastructure as a service", "id": "I would", "idc": "I don't care", "ide": "integrated development environment", "idgaf": "I don't give a f***", "idk": "I don't know", "ill": "I will", "im": "I am", "imho": "in my humble opinion", "imo": "in my opinion", "info": "information", "isnt": "is not", "issue": "issue", "it": "information technology", "its": "it is", "ive": "I have", "js": "JavaScript", "json": "JavaScript Object Notation", "k": "thousand", "kinda": "kind of", "kpi": "key performance indicator", "lan": "local area network", "lemme": "let me", "lets": "let us", "lmao": "laughing my a** off", "loa": "leave of absence", "lol": "laughing out loud", "m": "million", "mbo": "management by objectives", "ml": "machine learning", "mr": "merge request", "msg": "message", "mtd": "month to date", "nda": "non-disclosure agreement", "nlp": "natural language processing", "nosql": "not only sql", "okr": "objectives and key results", "omfg": "oh my f***ing god", "omg": "oh my god", "ot": "overtime", "p&l": "profit and loss", "paas": "platform as a service", "pic": "picture", "pls": "please", "plz": "please", "pr": "pull request", "probs": "probably", "pto": "paid time off", "pua": "personal use agreement", "qa": "quality assurance", "qtd": "quarter to date", "r&d": "research and development", "ram": "random access memory", "refactor": "refactor", "repo": "repository", "rly": "really", "rofl": "rolling on the floor laughing", "roi": "return on investment", "rom": "read only memory", "saas": "software as a service", "sdk": "software development kit", "shes": "she is", "shoulda": "should have", "sla": "service level agreement", "smh": "shaking my head", "sorta": "sort of", "sql": "structured query language", "ssh": "secure shell", "t": "trillion", "tbc": "to be confirmed", "tbd": "to be determined", "tbh": "to be honest", "tcp": "transmission control protocol", "test": "test", "thats": "that is", "theyll": "they will", "theyre": "they are", "theyve": "they have", "thnx": "thanks", "thx": "thanks", "tod": "today", "tom": "tomorrow", "ts": "TypeScript", "ttyl": "talk to you later", "udp": "user datagram protocol", "uri": "uniform resource identifier", "url": "uniform resource locator", "vpn": "virtual private network", "vr": "virtual reality", "wan": "wide area network", "wanna": "want to", "wasnt": "was not", "well": "we will", "were": "we are", "werent": "were not", "weve": "we have", "wfh": "work from home", "whats": "what is", "whens": "when is", "wheres": "where is", "wip": "work in progress", "wont": "will not", "woulda": "would have", "wtf": "what the f***", "wth": "what the heck", "xml": "extensible markup language", "yaml": "yaml ain't markup language", "yolo": "you only live once", "youll": "you will", "youre": "you are", "youve": "you have", "ytd": "year to date"} as const;
 
 // ============================================
 // Server/API Constants
@@ -235,11 +240,12 @@ export const VALID_OPTIMIZATION_MODES = ['maximum', 'balanced', 'speed', 'low_me
 export const RefinerConstants = {
   DEFAULT_MODEL_ID: 'qwen2.5-3b-instruct',
   DEFAULT_ENGINE_PREFERENCE: 'llamacpp' as const,
-  DEFAULT_REFINEMENT_MODE: 'off' as const,
+  DEFAULT_REFINEMENT_MODE: 'strict' as const,
+  DEFAULT_REFINEMENT_PROFILE: 'clean_dictation' as const,
 } as const;
-
 export const VALID_REFINER_ENGINES = ["llamacpp", "lm_studio", "ollama"] as const;
 export const VALID_REFINEMENT_MODES = ['off', 'strict', 'polished'] as const;
+export const VALID_REFINEMENT_PROFILES = ["clean_dictation", "code_logs", "professional", "raw", "student_notes"] as const;
 
 // ============================================
 // GPU Fallback Keywords
@@ -283,6 +289,8 @@ export const SettingsBounds = {
 // ============================================
 export const FAKE_SETTINGS = new Set([
   'autoGainControl',
+  'backend',
+  'coach_show_live_hints',
   'echoCancellation',
   'experimentalGpuAccel',
   'experimentalStem',

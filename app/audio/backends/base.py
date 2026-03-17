@@ -1,3 +1,15 @@
+"""Audio backend abstraction layer.
+
+Provides abstract base class for audio capture implementations (WASAPI, PyAudio, etc.)
+and common utilities like audio sanitization. Allows runtime backend selection
+with fallback chain for cross-platform compatibility.
+
+Backend Priority (Windows):
+    1. wasapi (preferred - lowest latency)
+    2. pyaudio_wasapi (WASAPI via PyAudio)
+    3. soundcard (cross-platform fallback)
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

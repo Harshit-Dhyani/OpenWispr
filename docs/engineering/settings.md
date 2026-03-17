@@ -2,10 +2,10 @@
 title: Settings System
 description: Persistent settings management with sync and migration support
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
-  - app/core/settings_manager.py
-  - app/api/settings_sync.py
+  - app/core/settings/manager.py
+  - app/api/routes/settings.py
   - app/config/settings.py
 ---
 
@@ -461,7 +461,7 @@ def _normalize_settings_payload(data: dict[str, Any]) -> dict[str, Any]:
 ```python
 RUNTIME_TO_CATALOG_MODEL = {
     "tiny": "whisper-tiny",
-    "base": "whisper-small",
+    "base": "whisper-tiny",
     "small": "whisper-small",
     "medium": "whisper-medium",
     "large-v3": "whisper-large-v3",

@@ -1,0 +1,94 @@
+site_name: OpenWispr Documentation
+site_description: Local privacy-first real-time system-audio transcription with STEM verification for Windows 11.
+site_url: https://github.com/Harshit-Dhyani/openwispr
+site_author: OpenWispr Team
+
+repo_name: Harshit-Dhyani/openwispr
+repo_url: https://github.com/Harshit-Dhyani/openwispr
+edit_uri: blob/main/docs/
+
+copyright: "Copyright © 2024-2026 OpenWispr Team"
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    primary: deep purple
+    accent: deep purple
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.share
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            members_order: source
+            docstring_style: google
+  - search:
+      lang: en
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+nav:
+  - Home: README.md
+  - Getting Started:
+      - deployment/DEPLOYMENT.md
+  - Engineering:
+      - engineering/architecture-overview.md
+      - engineering/audio-capture.md
+      - engineering/dictation-pipeline.md
+      - engineering/english-coach.md
+      - engineering/events-streaming.md
+      - engineering/latency-playbook.md
+      - engineering/model-runtime.md
+      - engineering/performance.md
+      - engineering/security.md
+      - engineering/settings.md
+      - engineering/testing.md
+      - engineering/architecture-electron-backend-contract.md
+  - Architecture:
+      - architecture/MODEL_SYSTEM.md
+  - API:
+      - api/endpoints.md
+  - Reference:
+      - reference/config.md
+      - reference/features.md
+      - reference/python-api.md
+  - Troubleshooting: troubleshooting.md
+  - Operations: operations/OPERATIONS.md
+  - Project:
+      - _style.md
+      - project/folder-ownership.md
+      - project/project-structure.md
+      - engineering/contributing-docs.md
+      - branding/brand-assets.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Harshit-Dhyani/openwispr
+  copyright: "Copyright © 2024-2026 OpenWispr Team"
+

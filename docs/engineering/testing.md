@@ -1,7 +1,7 @@
 ---
 title: Testing Guide
 audience: developers
-last_verified: 2026-03-08  # Verified by Sub-Agent 16
+last_verified: 2026-03-15  # Verified by Sub-Agent 16
 source_of_truth:
   - tests/conftest.py
   - tests/unit/
@@ -19,6 +19,7 @@ OpenWispr uses a multi-layered testing strategy covering Python backend tests (u
 ```
 tests/
 ├── conftest.py              # Shared pytest fixtures
+├── _contracts.py            # Shared contract test helpers
 ├── unit/                    # Unit tests
 │   ├── test_vad.py
 │   ├── test_audio_pipeline.py
@@ -33,26 +34,39 @@ tests/
 │   ├── test_file_io.py
 │   └── test_serialization.py
 ├── performance/             # Performance benchmarks
-├── test_*.py                # 35 regression & contract tests (root level)
+│   ├── test_concurrency.py
+│   ├── test_latency.py
+│   ├── test_memory.py
+│   └── test_throughput.py
+├── support/                 # Test support utilities
+├── test_*.py                # 55+ regression & contract tests (root level)
 │   # Key test files include:
 │   # - test_hotkey_service_lifecycle.py, test_hotkey_session.py
-│   # - test_system_session.py, test_system_pipeline.py
+│   # - test_hotkey_lifecycle_full.py
+│   # - test_system_session.py, test_audio_pipelines.py
 │   # - test_refiner_service.py, test_refinement_queue.py
-│   # - test_audio_pipelines.py, test_vad_optimized.py
+│   # - test_vad_optimized.py, test_vad_config.py
 │   # - test_sse_events.py, test_stream_event_contract.py
 │   # - test_server_serialization.py, test_deterministic_postprocess.py
 │   # - test_coach_service.py, test_mode_manager.py
-│   # - test_model_catalog.py, test_gpu_fallback.py
+│   # - test_model_catalog.py, test_model_routing.py, test_gpu_fallback.py
 │   # - test_error_handling.py, test_stability.py
+│   # - test_settings_wiring.py, test_settings_migration.py
+│   # - test_transcript_contract.py, test_transcript_aggregation.py
+│   # - test_injection_contract.py, test_session_writer_contract.py
+│   # - test_audio_capture_contract.py, test_chunking_contract.py
 │   # - test_fixes.py (regression tests), test_windows_mvp_sanity.py
-│   # And 17 more contract/integration tests...
+│   # And many more contract/integration tests...
 └── README.md                # Backend test documentation
 
 e2e/                         # End-to-end tests
 ├── conftest.py              # E2E fixtures (Electron, audio gen)
-├── test_hotkey_mode.py
-├── test_system_mode.py
-└── test_models_flow.py
+├── test_hotkey_mode.py      # Hotkey mode E2E tests
+├── test_system_mode.py     # System mode E2E tests
+├── test_models_flow.py     # Model selection flow tests
+├── test_models.py          # Model management tests
+├── test_settings.py        # Settings E2E tests
+└── test_coach_regression.py # Coach feature regression tests
 
 app/electron/frontend/
 ├── src/components/__tests__/ # Component tests
@@ -61,7 +75,16 @@ app/electron/frontend/
 │   ├── Sidebar.test.tsx
 │   ├── FloatingWindow.test.tsx
 │   ├── ActivityFeed.test.tsx
-│   └── MainContentCoach.test.tsx
+│   ├── ActivityFeedLayout.test.tsx
+│   ├── MainContentCoach.test.tsx
+│   └── settings/
+│       ├── HotkeySection.test.tsx
+│       ├── HotkeyRecorder.test.tsx
+│       └── SettingCard.test.tsx
+├── src/pages/__tests__/
+│   └── HomePage.test.tsx
+├── src/hooks/__tests__/
+│   └── useHotkey.test.tsx
 ├── src/test/
 │   ├── setup.ts              # Test setup
 │   └── factories.ts          # Mock factories
@@ -124,6 +147,9 @@ E2E_KEEP_DATA=true pytest e2e/test_hotkey_mode.py -v
 
 # Parallel execution
 E2E_PARALLEL=true pytest e2e/ -v -n auto
+
+# Disable video/screenshots for speed
+E2E_RECORD_VIDEO=false E2E_SCREENSHOTS=false pytest e2e/ -v
 ```
 
 ### Frontend Tests
@@ -169,6 +195,8 @@ npm run test:unit
 | `@pytest.mark.flaky` | Potentially flaky tests |
 | `@pytest.mark.hotkey` | Hotkey mode E2E tests |
 | `@pytest.mark.system` | System mode E2E tests |
+| `@pytest.mark.models` | Model-related E2E tests |
+| `@pytest.mark.settings` | Settings E2E tests |
 
 ## Key Fixtures
 
@@ -249,6 +277,7 @@ audio_generator      # AudioTestDataGenerator
 test_audio_files     # Dict of generated WAV files
 test_session         # TestSession (temp dir, metrics)
 electron_app         # Running ElectronAppController
+test_data_dir        # E2E test data directory
 mock_stt_engine      # MockSTTEngine for injection
 api_client           # APIClient for HTTP requests
 ```
@@ -328,7 +357,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 describe('ComponentName', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.transcriptaDesktop.fetchJson.mockResolvedValue({});
+    window.openwisprDesktop.fetchJson.mockResolvedValue({});
   });
 
   it('renders correctly', async () => {

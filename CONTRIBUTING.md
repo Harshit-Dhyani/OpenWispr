@@ -26,8 +26,7 @@ Contributing to documentation follows the same process as code contributions.
 
 1. Edit docs in the `docs/` directory
 2. Add required YAML frontmatter to new files (see [docs/_style.md](./docs/_style.md))
-3. Update `docs/_inventory.yml` for new files
-4. Run `python tools/ci/verify-docs.py` to validate
+3. Run `python tools/ci/verify-docs.py` to validate
 5. Include doc changes in your PR
 
 ### Detailed Guide
@@ -39,6 +38,62 @@ See [docs/engineering/contributing-docs.md](./docs/engineering/contributing-docs
 - Terminology standards
 - Review checklist
 
+### MkDocs Documentation
+
+The documentation site is built with MkDocs from Markdown files in `docs/`.
+
+#### Structure
+```
+docs/
+├── index.md              # Home page
+├── getting-started.md    # User guide
+├── api/
+│   └── endpoints.md      # API reference
+├── engineering/
+│   └── architecture.md   # Technical docs
+└── mkdocs.yml           # Navigation config
+```
+
+#### Writing Good Docs
+
+1. **File organization**: One topic per file
+2. **Frontmatter**: Each file can have metadata
+   ```markdown
+   ---
+   title: My Page
+   description: Brief description
+   ---
+   ```
+3. **Navigation**: Edit `mkdocs.yml` to add pages
+4. **Code blocks**: Use fenced blocks with language
+   ```python
+   def hello():
+       pass
+   ```
+5. **Links**: Use relative links `[Page](api/endpoints.md)`
+6. **Images**: Put in `docs/img/` and reference as `img/screenshot.png`
+
+#### MkDocs Commands
+
+```powershell
+# Local preview (dev)
+mkdocs serve
+
+# Build to site/ (output, never commit)
+mkdocs build
+
+# Deploy to GitHub Pages
+mkdocs gh-deploy
+```
+
+#### Rules
+
+- `site/` is generated output - never commit it (added to .gitignore)
+- Source of truth is `docs/` folder
+- Don't overclaim features - verify with code
+- Keep in sync with code changes
+- See AGENTS.md for full documentation standards
+
 ### Pull Request Template
 
 When submitting PRs with documentation changes, please use this template:
@@ -49,7 +104,6 @@ Brief description of changes
 
 ## Documentation Changes
 - [ ] Added/updated frontmatter
-- [ ] Updated inventory (docs/_inventory.yml)
 - [ ] Cross-links validated
 - [ ] verify-docs.py passes
 
@@ -91,14 +145,14 @@ pip install -e ".[dev]"
 
 ```powershell
 cd app/electron
-npm install
+pnpm install
 cd ../..
 ```
 
 Or use the root-level convenience command:
 
 ```powershell
-npm run install:all
+pnpm run install:all
 ```
 
 ### 4. Verify Installation
@@ -130,8 +184,7 @@ OpenWispr/
 │   └── config/        # Shared constants
 ├── tests/             # Test suite
 ├── tools/             # Development tools
-├── docs/              # Documentation
-└── config/            # Shared Python/TypeScript config
+└── docs/              # Documentation
 ```
 
 ## Development Workflow
@@ -148,7 +201,7 @@ Or start individually:
 ```powershell
 # Terminal 1: Backend
 .\.venv\Scripts\Activate.ps1
-python -m app.api_main
+python -m uvicorn app.api.server:app --port 8765
 
 # Terminal 2: Electron frontend
 cd app/electron
@@ -261,10 +314,10 @@ npm run test
 ```powershell
 # Enable debug logging
 $env:OPENWISPR_DEBUG=1
-python -m app.api_main
+python -m uvicorn app.api.server:app --port 8765
 
 # Or use Python debugger
-python -m pdb -m app.api_main
+python -m pdb -m uvicorn app.api.server:app --port 8765
 ```
 
 ### Frontend Debugging

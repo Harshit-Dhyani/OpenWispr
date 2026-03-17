@@ -175,6 +175,7 @@ export function useSettingsSync(options: UseSettingsSyncOptions = {}): UseSettin
   const isProcessingRemoteChange = useRef(false);
   const syncConnectionRef = useRef<ReturnType<typeof createSettingsSyncConnection> | null>(null);
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const resetProcessingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync with external store
   const settingsFromStore = useSyncExternalStore(
@@ -448,11 +449,23 @@ export function useSettingsSync(options: UseSettingsSyncOptions = {}): UseSettin
           break;
       }
     } finally {
-      setTimeout(() => {
+      if (resetProcessingTimeoutRef.current) {
+        clearTimeout(resetProcessingTimeoutRef.current);
+      }
+      resetProcessingTimeoutRef.current = setTimeout(() => {
         isProcessingRemoteChange.current = false;
       }, 50);
     }
   }, [settings, onRemoteChange, onConflict]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resetProcessingTimeoutRef.current) {
+        clearTimeout(resetProcessingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ============================================
   // Real-time Sync Connection

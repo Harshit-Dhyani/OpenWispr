@@ -1,4 +1,11 @@
-from __future__ import annotations
+"""Soundcard audio backend using soundcard library.
+
+Cross-platform audio capture backend that uses the soundcard library
+for loopback audio capture. Falls back gracefully when WASAPI is unavailable.
+
+Key class:
+    SoundcardBackend: AudioBackend implementation for soundcard library
+"""
 
 import logging
 import time
@@ -21,6 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 class SoundcardBackend(AudioBackend):
+    """Cross-platform audio capture backend using soundcard library.
+
+    Uses the soundcard library for loopback audio capture. Tries device
+    candidates with multiple channel/sample rate combinations. Falls back
+    gracefully when specific configurations are unavailable.
+
+    State:
+        - Manages recorder context and lifecycle
+        - Tracks runtime sample rate and channel count
+        - Resolved device name stored after successful initialization
+    """
+
     backend_name = "soundcard"
 
     def __init__(
@@ -45,6 +64,11 @@ class SoundcardBackend(AudioBackend):
         self.attempts: list[BackendAttempt] = []
 
     def start(self) -> None:
+        """Initialize and open a recorder for the target device.
+
+        Attempts multiple device candidates, channel counts, and sample rates
+        until one succeeds. Collects failed attempts for diagnostics.
+        """
         fallback_rates = [48000, 44100, 16000]
         sample_rates_to_try = [self.sample_rate] + [
             r for r in fallback_rates if r != self.sample_rate
@@ -98,6 +122,7 @@ class SoundcardBackend(AudioBackend):
         ) from last_exc
 
     def stop(self) -> None:
+        """Stop recording and exit the recorder context."""
         if self._recorder_context is not None:
             try:
                 self._recorder_context.__exit__(None, None, None)
@@ -107,6 +132,14 @@ class SoundcardBackend(AudioBackend):
         self._running = False
 
     def read(self, timeout: float = 0.25) -> np.ndarray | None:
+        """Read audio data from the recorder.
+
+        Args:
+            timeout: Maximum time to wait for data in seconds.
+
+        Returns:
+            Mono audio array at target sample rate, or None on timeout.
+        """
         if self._recorder is None:
             return None
         start = time.monotonic()
@@ -125,6 +158,15 @@ class SoundcardBackend(AudioBackend):
         return None
 
     def probe(self, *, duration: float, output_dir) -> DeviceProbeResult:
+        """Probe device by recording audio for specified duration.
+
+        Args:
+            duration: Recording duration in seconds.
+            output_dir: Directory to write probe WAV file.
+
+        Returns:
+            DeviceProbeResult with audio metrics and path to recorded file.
+        """
         if output_dir is None:
             raise ValueError("output_dir must not be None")
         started_here = False

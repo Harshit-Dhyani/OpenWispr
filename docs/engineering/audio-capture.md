@@ -1,11 +1,11 @@
 ---
 title: Audio Capture System
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
-  - app/audio/capture.py
+  - app/audio/capture/capture.py
   - app/audio/backends/
-  - app/audio/devices.py
+  - app/audio/devices/devices.py
 ---
 
 # Audio Capture System
@@ -15,275 +15,153 @@ The audio capture system provides a unified interface for recording audio from b
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    LoopbackAudioSource                           │
-│              (app/audio/capture.py:20)                          │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Threading: Daemon thread runs _run() loop               │  │
-│  │  Queue: thread-safe audio buffer (max_queue_items)       │  │
-│  │  Metrics: level_rms, dropped_frames tracking             │  │
-│  └───────────────────────┬──────────────────────────────────┘  │
-└──────────────────────────┼─────────────────────────────────────┘
-                           │ open_audio_backend()
-┌──────────────────────────┼─────────────────────────────────────┐
-│              Backend Factory (app/audio/backends/factory.py)    │
-│  ┌───────────────────────┴──────────────────────────────────┐  │
-│  │  Preference: "auto" → pyaudio → soundcard (optional)      │  │
-│  │  Fallback: Tracks failed backends with detailed errors    │  │
-│  └───────────────────────┬──────────────────────────────────┘  │
-└──────────────────────────┼─────────────────────────────────────┘
-           ┌───────────────┴───────────────┐
-           ▼                               ▼
-┌──────────────────────┐      ┌──────────────────────┐
-│ PyAudioWasapiBackend │      │  SoundcardBackend    │
-│ (pyaudio_wasapi.py)  │      │ (soundcard_backend.py)│
-│ - WASAPI loopback    │      │ - Direct WASAPI      │
-│ - Format negotiation │      │ - Format negotiation │
-│ - Device ranking     │      │ - Context manager    │
-└──────────────────────┘      └──────────────────────┘
+LoopbackAudioSource (app/audio/capture/capture.py:30)
+- Threading: Daemon thread runs _run() loop
+- Queue: thread-safe audio buffer (max_queue_items)
+- Metrics: level_rms, dropped_frames tracking
+
+Backend Factory (app/audio/backends/factory.py)
+- Preference: "auto" -> pyaudio -> soundcard
+- Fallback: Tracks failed backends with detailed errors
+
+PyAudioWasapiBackend (pyaudio_wasapi.py)
+- WASAPI loopback, Format negotiation, Device ranking
+
+SoundcardBackend (soundcard_backend.py)
+- Direct WASAPI, Format negotiation, Context manager
 ```
+
+## Transitional Structure Note
+
+The audio module has undergone structural reorganization. Legacy shims exist at the root level but are deprecated:
+
+- `app/audio/capture.py` -> Use `app/audio/capture/capture.py` (canonical)
+- `app/audio/devices.py` -> Use `app/audio/devices/devices.py` (canonical)
+- `app/audio/vad_optimized.py` -> Use `app/audio/vad/vad_optimized.py` (canonical)
+
+All new code should import from the canonical paths. The shims exist only for backward compatibility.
 
 ## LoopbackAudioSource
 
-The main capture class at `app/audio/capture.py:20` that manages audio capture in a background thread.
-
-### Initialization
-
-```python
-source = LoopbackAudioSource(
-    device_id="CABLE Output (VB-Audio Virtual Cable)",
-    sample_rate=16000,
-    channels=1,
-    block_size=1024,
-    max_queue_items=10,
-    audio_backend="auto"  # "auto", "pyaudio", "soundcard"
-)
-```
+The main capture class at `app/audio/capture/capture.py:30` that manages audio capture in a background thread.
 
 ### Threading Model
 
-- **Thread**: Daemon thread spawned on `start()` (line 62)
-- **Queue**: `queue.Queue` with `maxsize=max_queue_items` (line 38)
-- **Stop Event**: `threading.Event` for graceful shutdown (line 42)
-- **Timeout**: 3-second join timeout on stop (line 79)
+- **Thread**: Daemon thread spawned on `start()` (line 89)
+- **Queue**: `queue.Queue` with `maxsize=max_queue_items` (line 70)
+- **Stop Event**: `threading.Event` for graceful shutdown (line 74)
+- **Timeout**: 3-second join timeout on stop (line 111)
 
 ### Error Handling
 
-The capture loop implements consecutive error tracking (lines 127-142):
+The capture loop implements consecutive error tracking (lines 159-222):
 - `max_consecutive_errors = 5`: Threshold before giving up
 - Calls `on_error` callback when threshold exceeded
 - Graceful degradation with fallback device suggestions
 
 ### Device Probing
 
-Static method for testing devices before capture (lines 239-291):
-
-```python
-result = LoopbackAudioSource.probe_device(
-    device_id="device_name",
-    sample_rate=16000,
-    channels=1,
-    duration=3.0,
-    output_dir=Path("./probes"),
-    audio_backend="auto"
-)
-# Returns: DeviceProbeResult with rms_mean, rms_peak, has_signal, wav_path
-```
+Static method for testing devices before capture (lines 280-341).
 
 ## Backend Architecture
 
 ### Base Backend (app/audio/backends/base.py)
 
-Abstract base class defining the backend interface:
-
-```python
-class AudioBackend(ABC):
-    backend_name: str
-    resolved_name: str | None
-    runtime_sample_rate: int  # May differ from requested
-    runtime_channels: int     # May differ from requested
-
-    @abstractmethod
-    def start(self) -> None: ...
-    
-    @abstractmethod
-    def stop(self) -> None: ...
-    
-    @abstractmethod
-    def read(self, timeout: float = 0.25) -> np.ndarray | None: ...
-    
-    @abstractmethod
-    def probe(self, *, duration: float, output_dir: Path) -> DeviceProbeResult: ...
-```
+Abstract base class: `start()`, `stop()`, `read()`, `probe()`
 
 ### Audio Processing Utilities
 
-- `sanitize_audio()`: Clips to [-1.0, 1.0], removes NaN/Inf (line 39-45)
-- `to_mono()`: Intelligent channel mixing with energy-based selection (line 48-72)
-- `resample_audio()`: Linear interpolation resampling (line 75-90)
+- `sanitize_audio()`: Clips to [-1.0, 1.0], removes NaN/Inf (base.py:62)
+- `to_mono()`: Intelligent channel mixing (base.py:71)
+- `resample_audio()`: Linear interpolation resampling (base.py:98)
 
 ### Backend Factory (app/audio/backends/factory.py)
 
-Entry point for backend selection (line 34-83):
-
-```python
-selection = open_audio_backend(
-    device_id="device",
-    sample_rate=16000,
-    channels=1,
-    block_size=1024,
-    preferred_backend="auto"  # or "pyaudio", "soundcard"
-)
-# Returns: AudioBackendSelection(backend, failed_backends, failed_details)
-```
-
-**Backend Priority**:
-1. If `preferred_backend="pyaudio"`: PyAudio only
-2. If `preferred_backend="soundcard"`: Soundcard only (if available)
-3. If `preferred_backend="auto"`: PyAudio first, then Soundcard
+Entry point: `open_audio_backend()` (lines 43-92)
+Backend Priority: auto -> pyaudio -> soundcard
 
 ## Available Backends
 
 ### PyAudioWasapiBackend (app/audio/backends/pyaudio_wasapi.py)
 
-Uses `pyaudiowpatch` for WASAPI loopback capture on Windows.
-
-**Features**:
-- Device enumeration with ranking by name hints (lines 54-88)
-- Format negotiation: `paFloat32` preferred, `paInt16` fallback (lines 100-103)
-- Sample rate fallback: requested → device default → 48000 → 44100 → 16000
-- Channel fallback: requested → 2 → 1 → max available
-- Buffer overflow detection and logging (lines 194-199)
-
-**Device Ranking** (lines 63-88):
-```python
-priority = (
-    0 if exact_hint else 1,      # Exact name match
-    0 if partial_hint else 1,    # Partial name match
-    0 if virtual_cable else 1,   # VB-Cable preferred
-    0 if loopback else 1,        # Loopback preferred
-    normalized_name              # Alphabetical
-)
-```
+Uses pyaudiowpatch for WASAPI loopback capture on Windows.
+Features: Device ranking (lines 83-109), format negotiation (lines 132-160), buffer overflow detection (lines 246-250)
 
 ### SoundcardBackend (app/audio/backends/soundcard_backend.py)
 
-Uses the `soundcard` library for direct WASAPI capture.
+Uses soundcard library. Features: Context manager lifecycle (lines 66-122), sample rate fallback (lines 73-79), resampling (lines 134)
 
-**Features**:
-- Context manager-based recorder lifecycle (lines 44-101)
-- Sample rate fallback chain (lines 45-48)
-- Channel count negotiation via `candidate_channel_counts()` (lines 52-53)
-- Resampling if runtime rate differs from target (lines 112-117)
-
-**Optional Dependency**: Not all environments have `soundcard` installed. The factory gracefully handles this.
-
-## Device Enumeration (app/audio/devices.py)
+## Device Enumeration (app/audio/devices/devices.py)
 
 ### Device Listing
 
-```python
-devices = list_audio_devices()  # Returns list[AudioDeviceInfo]
-```
-
-**Device Types**:
-- **Speakers**: Exposed as WASAPI loopback devices (lines 82-93)
-- **Microphones**: Including loopback microphones (lines 96-107)
-
-**Deduplication** (lines 114-129):
-- Normalizes names (removes "(WASAPI loopback)", "[REC]" markers)
-- Prefers loopback over non-loopback
-- Prefers VB-Cable/virtual devices
-- Prefers microphones over speakers for same physical device
+`list_audio_devices()` returns list[AudioDeviceInfo]
 
 ### Device Resolution
 
-```python
-device, name = resolve_capture_device("device_id")
-# Returns: (soundcard device object, resolved name)
-```
+`resolve_capture_device(device_id)` returns (soundcard device, resolved name)
+Resolution Logic (lines 264-268): exact match -> speaker loopback -> any loopback -> default mic
 
-**Resolution Logic** (lines 252-256):
-1. Exact match by ID
-2. Speaker selection → find matching loopback microphone
-3. Fallback to any available loopback microphone
-4. Final fallback to default microphone
+### Name Hints
 
-**Name Hints** (lines 156-194):
-```python
-hints = resolve_capture_name_hints("device_id")
-# Returns: List of candidate device names for backend matching
-```
+`resolve_capture_name_hints(device_id)` returns candidate device names (lines 168-206)
 
 ## Configuration
 
 ### Backend Selection
 
-Set in settings or per-source initialization:
-
-```python
-# Global default
-settings.audio_backend = "auto"  # "auto", "pyaudio", "soundcard"
-
-# Per-source override
-source = LoopbackAudioSource(
-    device_id="device",
-    audio_backend="soundcard"  # Force specific backend
-)
-```
+`settings.audio_backend` or per-source: `audio_backend="soundcard"`
 
 ### Capture Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `sample_rate` | 16000 | Target sample rate (Hz) |
-| `channels` | 1 | Target channels (1=mono, 2=stereo) |
-| `block_size` | 1024 | Samples per read operation |
-| `max_queue_items` | 10 | Maximum queued audio buffers |
+| sample_rate | 16000 | Target sample rate (Hz) |
+| channels | 1 | Target channels (1=mono, 2=stereo) |
+| block_size | 1024 | Samples per read |
+| max_queue_items | 16 | Max queued buffers |
 
 ### Runtime Properties
 
-After `start()`, these reflect actual negotiated values:
-
-```python
-source.backend_name          # "pyaudio" or "soundcard"
-source.backend_fallbacks     # List of backends that failed
-backend.runtime_sample_rate  # Actual sample rate
-backend.runtime_channels     # Actual channel count
-```
+source.backend_name, source.backend_fallbacks, backend.runtime_sample_rate, backend.runtime_channels
 
 ## Error Handling
 
-### AudioBackendError (app/audio/backends/base.py:22-36)
+### AudioBackendError (app/audio/backends/base.py:39-59)
 
-Detailed error information when backends fail:
-
-```python
-except AudioBackendError as e:
-    print(e.backend)          # "pyaudio"
-    print(e.attempts)         # List[BackendAttempt] with per-attempt details
-    print(e.describe_attempts())  # Formatted error report
-```
+Exception with .backend, .attempts, .describe_attempts()
 
 ### Recovery Strategies
 
-1. **Backend Fallback**: Automatic try-next-backend on failure
-2. **Device Fallback**: Suggests alternate devices based on naming
-3. **Format Fallback**: Automatic sample rate/channel negotiation
-4. **Runtime Errors**: Consecutive error tracking with callback notification
+1. Backend Fallback: try-next-backend
+2. Device Fallback: suggest alternate devices
+3. Format Fallback: sample rate/channel negotiation
+4. Runtime Errors: consecutive error tracking with callback
 
 ## Integration with Transcription
 
-The capture system feeds audio to `FastTranscriber` via:
+The capture system feeds audio to FastTranscriber via executor-based read in the hotkey service.
+
+## Voice Activity Detection (VAD)
+
+The VAD implementation is at `app/audio/vad/vad_optimized.py` (canonical).
+
+The root-level `app/audio/vad_optimized.py` is a backward-compatibility shim re-exporting from canonical path. All new code should import from `app.audio.vad`:
 
 ```python
-# Audio flow in hotkey service (app/api/server.py:1184-1277)
-chunk = await asyncio.wait_for(
-    asyncio.get_event_loop().run_in_executor(None, audio_source.read),
-    timeout=0.1
+from app.audio.vad import (
+    OptimizedVAD,
+    VADConfig,
+    VADMode,
+    VADState,
+    create_vad,
 )
-if chunk is not None:
-    session.transcriber.submit(AudioChunk(...))
 ```
 
-The audio source runs in a separate thread, decoupling capture from processing to prevent dropouts.
+VAD Features:
+- Mode-specific configurations (HOTKEY vs SYSTEM)
+- Adaptive thresholding based on ambient noise
+- Hysteresis to prevent rapid switching
+- Pre/post speech padding
+- Numba-optimized processing
+- Comprehensive metrics and profiling

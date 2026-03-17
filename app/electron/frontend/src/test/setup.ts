@@ -22,6 +22,7 @@ export type MockElectronAPI = {
   fetchJson: ReturnType<typeof vi.fn>;
   chooseDirectory: ReturnType<typeof vi.fn>;
   choosePdf: ReturnType<typeof vi.fn>;
+  openPath: ReturnType<typeof vi.fn>;
   onBackendExit: ReturnType<typeof vi.fn>;
   onOpenSettings: ReturnType<typeof vi.fn>;
   onSettingsUpdated: ReturnType<typeof vi.fn>;
@@ -79,6 +80,7 @@ function createMockElectronAPI(): MockElectronAPI {
     fetchJson: vi.fn(),
     chooseDirectory: vi.fn(),
     choosePdf: vi.fn(),
+    openPath: vi.fn(),
     onBackendExit: vi.fn(() => vi.fn()),
     onOpenSettings: vi.fn(() => vi.fn()),
     onSettingsUpdated: vi.fn(() => vi.fn()),

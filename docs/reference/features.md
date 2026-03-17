@@ -1,10 +1,10 @@
 ---
 title: Features Documentation
 audience: all
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
-  - app/audio/capture.py
-  - app/api/service.py
+  - app/audio/capture/capture.py
+  - app/api/services/backend_service.py
   - app/core/mode_manager.py
   - app/core/modes.py
   - app/stt/fast_engine.py
@@ -21,6 +21,7 @@ Comprehensive documentation of OpenWispr's features, capabilities, and implement
 1. [Transcription Modes](#transcription-modes)
    - [Hotkey Mode (Wispr)](#1-hotkey-mode-wispr)
    - [System Mode](#2-system-mode)
+   - [Transcription Output Modes](#transcription-output-modes)
 2. [Audio Pipeline](#audio-pipeline)
 3. [STT Engine](#stt-engine)
 4. [Models](#models)
@@ -110,6 +111,20 @@ System Mode captures full system audio for transcribing videos, meetings, podcas
 - `ChapterDetector` - Silence-based chapter boundaries
 - `ExportManager` - Background export tasks
 - `SessionWriter` - JSONL persistence
+
+---
+
+### Transcription Output Modes
+
+The API supports three transcription output modes that control how the final transcript is formatted. These are specified via the `transcription_mode` parameter in API requests.
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **dictation** | Standard dictation output with punctuation | General voice input, emails, messages |
+| **literal** | Word-for-word output with minimal processing | Technical content, verbatim transcripts |
+| **session_paragraph** | Paragraph-structured output | Meeting notes, documentation |
+
+**Default**: `dictation`
 
 ---
 
@@ -524,29 +539,41 @@ session/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/hotkey/start` | POST | Begin hotkey session |
-| `/hotkey/stop` | POST | End session and return text |
-| `/hotkey/status` | GET | Current session status |
-| `/hotkey/inject` | POST | Manually inject text |
-| `/hotkey/config` | GET/POST | Get/update configuration |
+| `/api/transcription/hotkey/start` | POST | Begin hotkey session |
+| `/api/transcription/hotkey/stop` | POST | End session and return text |
+| `/api/transcription/hotkey/status` | GET | Current session status |
+| `/api/transcription/hotkey/inject` | POST | Manually inject text |
+| `/api/hotkey/config` | GET/POST | Get/update configuration |
+| `/api/transcription/hotkey/ws` | WebSocket | Real-time transcription stream |
 
 ### System Mode Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/session/start` | POST | Begin system session |
-| `/session/stop` | POST | End session with export |
-| `/session/pause` | POST | Pause recording |
-| `/session/resume` | POST | Resume recording |
-| `/session/export` | POST | Export to formats |
+| `/api/session/start` | POST | Begin system session |
+| `/api/session/stop` | POST | End session |
+| `/api/session` | GET | Get session info |
+| `/api/session/attach-pdf` | POST | Attach PDF document for context |
 
 ### Settings Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/settings` | GET/POST | Get/update all settings |
-| `/settings/mode/{mode}` | GET/POST | Mode-specific settings |
-| `/settings/sync` | WebSocket | Real-time sync channel |
+| `/api/settings` | GET/POST | Get/update all settings |
+| `/api/settings/reset` | POST | Reset settings to defaults |
+| `/api/ws/settings` | WebSocket | Real-time bidirectional sync channel |
+
+### Refiner Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/refiner/status` | GET | Get refiner runtime status |
+
+### Coach Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/coach/prompt-preview` | POST | Preview coach prompt output |
 
 ---
 

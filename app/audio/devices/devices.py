@@ -1,4 +1,16 @@
-from __future__ import annotations
+"""Audio device discovery and resolution.
+
+Provides device enumeration, candidate resolution, and device selection
+for audio capture. Supports both WASAPI and soundcard backends with
+automatic device detection and fallback.
+
+Key functions:
+    list_audio_devices: Enumerate available audio devices
+    resolve_capture_device: Find best capture device
+    resolve_capture_device_candidates: Get ranked device candidates
+    candidate_channel_counts: Get supported channel counts
+    resolve_capture_name_hints: Match device by name hints
+"""
 
 import logging
 from collections.abc import Iterable

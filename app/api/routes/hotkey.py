@@ -1,14 +1,29 @@
+"""Hotkey transcription push-to-talk endpoints.
+
+Provides hotkey-triggered transcription start/stop, status, and text injection.
+"""
+
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_hotkey_service, get_history_service
 from app.api.route_utils import log_endpoint
-from app.api.services.coach_service import CoachRequestContext
+from app.api.schemas import (
+    CoachPromptPreviewRequest,
+    HotkeyConfig,
+    HotkeyInjectRequest,
+    HotkeyInjectResponse,
+    HotkeyStartRequest,
+    HotkeyStartResponse,
+    HotkeyStatusResponse,
+    HotkeyStopRequest,
+)
+from app.api.services.coach_service import CoachResult, CoachRequestContext
 from app.api.services.refiner_service import RefinerService, is_llama_cpp_available
 from app.core.settings.config import AppSettings
 from app.core.settings.manager import get_settings_manager
@@ -18,76 +33,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class HotkeyStartRequest(BaseModel):
-    capture_source: Literal["microphone", "system"] | None = None
-    device_id: str | None = None
-    model_name: str | None = None
-    language_mode: str = "auto"
-    execution_mode: str = "auto"
-    transcription_mode: Literal["dictation", "literal", "session_paragraph"] = "dictation"
-
-
-class HotkeyStartResponse(BaseModel):
-    session_id: str
-    status: str
-    message: str = ""
-
-
-class HotkeyStopRequest(BaseModel):
-    mode: Literal["finish", "finish_and_paste", "cancel"] = "finish_and_paste"
-
-
-class HotkeyStatusResponse(BaseModel):
-    state: str = "idle"
-    is_recording: bool
-    partial_text: str
-    raw_partial_text: str = ""
-    display_partial_text: str = ""
-    audio_level: float
-    session_id: str | None = None
-    correlation_id: str | None = None
-    duration_ms: int = 0
-    levels: list[float] | None = None
-
-
-class HotkeyInjectRequest(BaseModel):
-    text: str
-
-
-class HotkeyInjectResponse(BaseModel):
-    success: bool
-    message: str = ""
-
-
-class CoachPromptPreviewRequest(BaseModel):
-    capture_source: Literal["microphone", "system"] = "microphone"
-    original_text: str = ""
-    language_mode: str = "auto"
-    detail_level: Literal["compact", "standard", "deep"] = "compact"
-    template_id: str = "default_english_coach"
-    custom_user_template: str = ""
-    overrides: dict[str, Any] = Field(default_factory=dict)
-    privacy_mode: Literal["local_only", "allow_llm"] = "local_only"
-    templates: list[dict[str, Any]] = Field(default_factory=list)
-
-
-class HotkeyConfig(BaseModel):
-    chunk_seconds: float = 2.4
-    overlap_seconds: float = 0.32
-    vad_threshold_db: float = -40.0
-    vad_min_silence_ms: int = 250
-    vad_speech_pad_ms: int = 240
-    confidence_threshold: float = 0.35
-    enable_filler_filter: bool = False
-
-
 class HotkeyConfigRequest(BaseModel):
-    chunk_seconds: float | None = None
-    overlap_seconds: float | None = None
+    chunk_seconds: float | None = Field(None, ge=0)
+    overlap_seconds: float | None = Field(None, ge=0)
     vad_threshold_db: float | None = None
-    vad_min_silence_ms: int | None = None
-    vad_speech_pad_ms: int | None = None
-    confidence_threshold: float | None = None
+    vad_min_silence_ms: int | None = Field(None, ge=0)
+    vad_speech_pad_ms: int | None = Field(None, ge=0)
+    confidence_threshold: float | None = Field(None, ge=0)
     enable_filler_filter: bool | None = None
 
 
@@ -103,7 +55,18 @@ async def hotkey_start(
     request: HotkeyStartRequest,
     svc: Any = Depends(get_hotkey_service),
 ) -> HotkeyStartResponse:
-    """Start hotkey push-to-talk transcription."""
+    """Start hotkey push-to-talk transcription session.
+
+    Initiates a new hotkey-triggered transcription session with specified
+    capture source, device, model, and transcription mode.
+
+    Args:
+        request: HotkeyStartRequest containing capture_source, device_id,
+            model_name, language_mode, execution_mode, and transcription_mode
+
+    Returns:
+        HotkeyStartResponse: Contains session_id, status, and message
+    """
     hotkey_start.__endpoint_path__ = "/api/transcription/hotkey/start"
     hotkey_start.__http_method__ = "POST"
 
@@ -134,7 +97,18 @@ async def hotkey_stop(
     svc: Any = Depends(get_hotkey_service),
     history_svc: Any = Depends(get_history_service),
 ) -> dict[str, Any]:
-    """Stop hotkey transcription and return final transcription."""
+    """Stop hotkey transcription and return final transcription.
+
+    Stops the active hotkey transcription session and returns the composed
+    text. Optionally ingests the result into transcript history.
+
+    Args:
+        request: Optional HotkeyStopRequest with mode (finish, finish_and_paste, cancel)
+
+    Returns:
+        dict: Contains session_id, status, composed_text, final_transcription,
+            aggregated_clean_text, coach_result, duration_ms, and other metadata
+    """
     hotkey_stop.__endpoint_path__ = "/api/transcription/hotkey/stop"
     hotkey_stop.__http_method__ = "POST"
 
@@ -194,7 +168,18 @@ async def coach_prompt_preview(
     request: CoachPromptPreviewRequest,
     svc: Any = Depends(get_hotkey_service),
 ) -> dict[str, Any]:
-    """Compile the effective coach prompt for preview in settings."""
+    """Compile the effective coach prompt for preview in settings.
+
+    Generates a preview of what the coach prompt will look like with the
+    current configuration, without executing the coach service.
+
+    Args:
+        request: CoachPromptPreviewRequest containing original_text,
+            language_mode, detail_level, capture_source, template_id, etc.
+
+    Returns:
+        dict: Contains the compiled prompt preview with template variables resolved
+    """
     coach_prompt_preview.__endpoint_path__ = "/api/coach/prompt-preview"
     coach_prompt_preview.__http_method__ = "POST"
 
@@ -219,7 +204,15 @@ async def coach_prompt_preview(
 def hotkey_status(
     svc: Any = Depends(get_hotkey_service),
 ) -> HotkeyStatusResponse:
-    """Get current hotkey session status."""
+    """Get current hotkey session status.
+
+    Returns the current state of any active hotkey transcription, including
+    recording status, partial text, audio level, and session info.
+
+    Returns:
+        HotkeyStatusResponse: Contains state, is_recording, partial_text,
+            audio_level, session_id, duration_ms, and other live status data
+    """
     hotkey_status.__endpoint_path__ = "/api/transcription/hotkey/status"
     hotkey_status.__http_method__ = "GET"
 
@@ -230,7 +223,16 @@ def hotkey_status(
 @router.get("/api/refiner/status")
 @log_endpoint
 def get_refiner_status() -> dict[str, Any]:
-    """Get refiner runtime status."""
+    """Get refiner runtime status and availability.
+
+    Checks the current state of the refiner service including whether
+    the runtime is enabled, llama.cpp is available, a model is selected,
+    and if the model is installed.
+
+    Returns:
+        dict: Contains runtime_enabled, import_available, selected_model_id,
+            model_installed, available, and reason (if unavailable)
+    """
     settings = get_settings_manager().get_settings()
     selected_model_id = settings.refiner.selected_model_id
     runtime_enabled = settings.refiner.runtime_enabled
@@ -266,7 +268,17 @@ def hotkey_inject(
     request: HotkeyInjectRequest,
     svc: Any = Depends(get_hotkey_service),
 ) -> HotkeyInjectResponse:
-    """Inject text into active window."""
+    """Inject text into active window via clipboard and paste.
+
+    Copies the provided text to the system clipboard and triggers a paste
+    action to inject it into the currently focused application.
+
+    Args:
+        request: HotkeyInjectRequest containing the text to inject
+
+    Returns:
+        HotkeyInjectResponse: Contains success status and message
+    """
     hotkey_inject.__endpoint_path__ = "/api/transcription/hotkey/inject"
     hotkey_inject.__http_method__ = "POST"
 
@@ -286,7 +298,17 @@ def update_hotkey_config(
     request: HotkeyConfigRequest,
     svc: Any = Depends(get_hotkey_service),
 ) -> HotkeyConfigResponse:
-    """Update hotkey transcription configuration."""
+    """Update hotkey transcription configuration.
+
+    Modifies runtime hotkey transcription parameters including chunk size,
+    overlap, VAD thresholds, and confidence thresholds.
+
+    Args:
+        request: HotkeyConfigRequest containing optional config overrides
+
+    Returns:
+        HotkeyConfigResponse: Contains success status, updated config, and message
+    """
     update_hotkey_config.__endpoint_path__ = "/api/hotkey/config"
     update_hotkey_config.__http_method__ = "POST"
 

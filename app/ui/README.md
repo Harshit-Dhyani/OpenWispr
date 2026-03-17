@@ -70,7 +70,7 @@ To run the Qt UI instead of Electron:
 ```python
 from PySide6.QtWidgets import QApplication
 from app.ui.main_window import MainWindow
-from app.core.config import AppSettings
+from app.core.settings.config import AppSettings
 
 app = QApplication([])
 settings = AppSettings()
@@ -82,7 +82,7 @@ app.exec()
 Or via command line:
 
 ```bash
-python -c "from PySide6.QtWidgets import QApplication; from app.ui.main_window import MainWindow; from app.core.config import AppSettings; app = QApplication([]); settings = AppSettings(); window = MainWindow(settings=settings); window.show(); app.exec()"
+python -c "from PySide6.QtWidgets import QApplication; from app.ui.main_window import MainWindow; from app.core.settings.config import AppSettings; app = QApplication([]); settings = AppSettings(); window = MainWindow(settings=settings); window.show(); app.exec()"
 ```
 
 ---

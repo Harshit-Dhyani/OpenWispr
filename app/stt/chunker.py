@@ -18,6 +18,17 @@ import numpy as np
 
 @dataclass(slots=True, init=False)
 class AudioChunk:
+    """Audio chunk with timestamps and samples.
+
+    Represents a fixed-size window of audio data with timing information.
+    Used by RollingChunker for sliding window chunking.
+
+    Attributes:
+        started_at: Start timestamp in seconds.
+        ended_at: End timestamp in seconds.
+        samples: Audio samples as float32 numpy array.
+    """
+
     started_at: float
     ended_at: float
     samples: np.ndarray
@@ -44,6 +55,18 @@ class AudioChunk:
 
 
 class RollingChunker:
+    """Simple fixed-size sliding window chunker without VAD.
+
+    Chunks incoming audio into fixed-size windows with overlap. Does not
+    perform voice activity detection - emits chunks purely on size.
+
+    State: Owns buffer, buffer_start_time, next_chunk_start. Reset on new stream.
+
+    Example:
+        >>> chunker = RollingChunker(sample_rate=16000, chunk_seconds=0.2, overlap_seconds=0.05)
+        >>> chunks = chunker.push(samples, stream_time_seconds=1.0)
+    """
+
     def __init__(self, *, sample_rate: int, chunk_seconds: float, overlap_seconds: float) -> None:
         self.sample_rate = sample_rate
         self.chunk_size = int(sample_rate * chunk_seconds)
@@ -102,6 +125,19 @@ def chunk_segments(
     max_chars: int = 400,
     overlap: int = 0,
 ) -> list[dict[str, object]]:
+    """Split transcript segments into chunks by character count.
+
+    Groups transcript segments into chunks not exceeding max_chars while
+    optionally preserving overlap between chunks for continuity.
+
+    Args:
+        transcript: List of segment dicts with "text" key.
+        max_chars: Maximum characters per output chunk (default: 400).
+        overlap: Number of segments to include from previous chunk (default: 0).
+
+    Returns:
+        List of chunk dicts with "text" and "segments" keys.
+    """
     chunks: list[dict[str, object]] = []
     current: list[dict[str, object]] = []
     current_len = 0

@@ -1,7 +1,8 @@
 ---
 title: Project Structure
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
+note: Some sections may be outdated. See folder-ownership.md for current ownership.
 source_of_truth:
   - app/
   - tests/
@@ -180,22 +181,27 @@ The main process is organized into modules:
 ```
 app/electron/main/
 ├── index.js                    # Entry point (use this)
-├── main.js                     # Legacy monolithic entry (deprecated)
-├── preload.js                  # Main window preload
-├── preload-floating.js         # Floating window preload
-├── preload-quick-settings.js   # Quick settings preload
-├── model-download-manager.js   # Model download logic
 ├── config.js                   # Main process configuration
+├── preload/
+│   ├── main.js                # Main window preload
+│   ├── floating.js            # Floating window preload
+│   └── quickSettings.js       # Quick settings preload
+├── services/
+│   ├── modelDownloadManager.js # Model download logic
+│   ├── backendSpawn.js        # Backend process management
+│   ├── hotkeyService.js       # Hotkey registration
+│   ├── windowManager.js       # Window management
+│   └── ...
 ├── shared/
-│   ├── state.js                # Shared state between modules
-│   └── generated/appMeta.js    # Build metadata
+│   ├── state.js               # Shared state between modules
+│   └── generated/appMeta.js   # Build metadata
 ├── utils/
-│   └── api.js                  # Backend API communication
+│   └── api.js                 # Backend API communication
 ├── windows/
-│   ├── mainWindow.js           # Main application window
-│   ├── floatingWindow.js       # Floating transcription window
-│   ├── quickSettingsWindow.js  # Quick settings panel
-│   ├── tray.js                 # System tray icon
+│   ├── mainWindow.js          # Main application window
+│   ├── floatingWindow.js      # Floating transcription window
+│   ├── quickSettingsWindow.js # Quick settings panel
+│   ├── tray.js                # System tray icon
 │   └── trayUtils.js            # Tray utilities
 ├── ipc/
 │   ├── handlers.js             # IPC event handlers

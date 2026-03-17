@@ -2,11 +2,12 @@
 title: Dictation Pipeline
 description: Speech-to-Text pipeline flow and streaming transcription architecture
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/stt/streaming_engine.py
   - app/stt/utterance_aggregator.py
   - app/stt/quality.py
+  - app/api/routes/hotkey.py
 ---
 
 # Dictation Pipeline
@@ -54,7 +55,7 @@ The dictation pipeline consists of three main components:
 
 ## Streaming Engine
 
-The `DualModeTranscriptionEngine` (`app/stt/streaming_engine.py:632`) supports two transcription modes optimized for different use cases:
+The `DualModeTranscriptionEngine` (`app/stt/streaming_engine.py:637`) supports two transcription modes optimized for different use cases:
 
 ### Transcription Modes
 
@@ -65,7 +66,7 @@ The `DualModeTranscriptionEngine` (`app/stt/streaming_engine.py:632`) supports t
 
 ### StreamingInferenceEngine
 
-Core streaming transcription logic at `app/stt/streaming_engine.py:309`:
+Core streaming transcription logic at `app/stt/streaming_engine.py:312`:
 
 ```python
 class StreamingInferenceEngine:
@@ -76,7 +77,7 @@ class StreamingInferenceEngine:
 
 ### Window Processing
 
-Audio is processed in overlapping windows (`app/stt/streaming_engine.py:365`):
+Audio is processed in overlapping windows (`app/stt/streaming_engine.py:368`):
 
 ```
 Window Configuration:
@@ -88,7 +89,7 @@ Window Configuration:
 
 ### Adaptive Beam Control
 
-The `AdaptiveBeamController` (`app/stt/streaming_engine.py:202`) dynamically adjusts beam size:
+The `AdaptiveBeamController` (`app/stt/streaming_engine.py:205`) dynamically adjusts beam size:
 
 ```python
 # Latency targets
@@ -104,7 +105,7 @@ elif avg < target * 0.6:
 
 ### Context Carryover
 
-Prefix context from previous chunks improves continuity (`app/stt/streaming_engine.py:264`):
+Prefix context from previous chunks improves continuity (`app/stt/streaming_engine.py:267`):
 
 ```python
 class ContextCarryoverManager:
@@ -115,7 +116,7 @@ class ContextCarryoverManager:
 
 ## Quality Assessment
 
-The `assess_segment_quality` function (`app/stt/quality.py:30`) validates transcription segments:
+The `assess_segment_quality` function (`app/stt/quality.py:52`) validates transcription segments:
 
 ### Quality Checks
 
@@ -149,7 +150,7 @@ seg_confidence -= no_speech_prob * 0.25
 
 ## Utterance Aggregation
 
-The `UtteranceAggregator` (`app/stt/utterance_aggregator.py:29`) combines segments into complete utterances:
+The `UtteranceAggregator` (`app/stt/utterance_aggregator.py:65`) combines segments into complete utterances:
 
 ### Aggregation Flow
 
@@ -189,7 +190,7 @@ def finalize(self) -> AggregatedUtterance:
 
 ## Configuration Options
 
-### StreamingConfig (`app/stt/streaming_engine.py:119`)
+### StreamingConfig (`app/stt/streaming_engine.py:122`)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -208,19 +209,19 @@ def finalize(self) -> AggregatedUtterance:
 
 ### Mode-Specific Configurations
 
-WISPR mode (`streaming_engine.py:720-726`):
+WISPR mode (`streaming_engine.py:762-768`):
 ```python
 window_ms=400, overlap_ms=80, target_latency_ms=200.0,
 min_beam_size=1, max_beam_size=3
 ```
 
-SYSTEM mode (`streaming_engine.py:728-734`):
+SYSTEM mode (`streaming_engine.py:770-776`):
 ```python
 window_ms=1000, overlap_ms=200, target_latency_ms=1000.0,
 min_beam_size=1, max_beam_size=5
 ```
 
-### VAD Parameters (`app/stt/streaming_engine.py:469`)
+### VAD Parameters (`app/stt/streaming_engine.py:474`)
 
 ```python
 vad_parameters = {
@@ -250,7 +251,7 @@ inference_time_ms = (time.perf_counter() - inference_start) * 1000
 
 ### Metrics Collection
 
-The engine collects detailed metrics (`app/stt/streaming_engine.py:49`):
+The engine collects detailed metrics (`app/stt/streaming_engine.py:53`):
 
 ```python
 class PerformanceMetrics:
@@ -285,7 +286,7 @@ Dictation UI / Hotkey Output
 
 ## Error Handling
 
-### Engine States (`app/stt/streaming_engine.py:37`)
+### Engine States (`app/stt/streaming_engine.py:40`)
 
 ```python
 class EngineState(Enum):
@@ -300,7 +301,7 @@ class EngineState(Enum):
 
 ### Backpressure
 
-The async queue has maxsize=64 (`app/stt/streaming_engine.py:666`):
+The async queue has maxsize=64 (`app/stt/streaming_engine.py:686`):
 
 ```python
 async def submit(self, chunk: AudioChunk) -> bool:
@@ -316,12 +317,12 @@ async def submit(self, chunk: AudioChunk) -> bool:
 
 | Function | File | Line | Purpose |
 |----------|------|------|---------|
-| `DualModeTranscriptionEngine.__init__` | streaming_engine.py | 635 | Initialize dual-mode engine |
-| `StreamingInferenceEngine.process_stream` | streaming_engine.py | 365 | Main processing loop |
-| `_transcribe_window` | streaming_engine.py | 449 | Single window transcription |
-| `assess_segment_quality` | quality.py | 30 | Quality validation |
-| `UtteranceAggregator.add_segment` | utterance_aggregator.py | 36 | Segment aggregation |
-| `UtteranceAggregator.finalize` | utterance_aggregator.py | 80 | Final utterance build |
+| `DualModeTranscriptionEngine.__init__` | streaming_engine.py | 640 | Initialize dual-mode engine |
+| `StreamingInferenceEngine.process_stream` | streaming_engine.py | 368 | Main processing loop |
+| `_transcribe_window` | streaming_engine.py | 454 | Single window transcription |
+| `assess_segment_quality` | quality.py | 52 | Quality validation |
+| `UtteranceAggregator.add_segment` | utterance_aggregator.py | 103 | Segment aggregation |
+| `UtteranceAggregator.finalize` | utterance_aggregator.py | 196 | Final utterance build |
 
 ## Related Documentation
 

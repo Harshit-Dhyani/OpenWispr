@@ -1,7 +1,7 @@
 ---
 title: Electron-Backend Contract
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/electron/main/preload/main.js
   - app/api/websocket_server.py
@@ -20,7 +20,7 @@ This document defines the contract between the Electron main process and the Pyt
 | API Origin | `http://127.0.0.1:8765` |
 | WebSocket URL | `ws://127.0.0.1:8765/api/transcription/hotkey/ws` |
 | SSE Endpoint | `/api/transcription/hotkey/events` |
-| CORS Policy | Allow all origins (`*`) |
+| CORS Policy | Localhost origins only (`http://localhost:5173`, `http://localhost:3000`, `http://127.0.0.1:5173`, `http://127.0.0.1:3000`) |
 
 ## IPC Channels
 
@@ -186,53 +186,7 @@ const unsubscribe = window.openwisprDesktop.models.onDownloadEvent((data) => {
 
 ### Quick Settings
 
-**Note**: Quick Settings APIs are exposed via a separate preload script (`preload-quick-settings.js`) under `window.transcriptaQuickSettings`, not `window.openwisprDesktop`.
-
-#### `quick-settings:get-data`
-**Direction**: Renderer → Main (invoke)  
-**Returns**: 
-```typescript
-{
-  appName: string;
-  settings: UserSettings;
-  devices: AudioDevice[];
-  languages: Array<{ code: string; label: string }>;
-  hotkeyState: {
-    enabled: boolean;
-    accelerator: string;
-    isRecording: boolean;
-  };
-}
-```
-
-```javascript
-const data = await window.transcriptaQuickSettings.getData();
-```
-
-#### `quick-settings:update`
-**Direction**: Renderer → Main (invoke)  
-**Payload**: `UserSettings`  
-**Returns**: `{ success: boolean }`
-
-```javascript
-await window.transcriptaQuickSettings.update({ language: "en", ... });
-```
-
-#### `quick-settings:open-full`
-**Direction**: Renderer → Main (invoke)  
-**Returns**: `{ success: boolean }`
-
-```javascript
-await window.transcriptaQuickSettings.openFullSettings();
-```
-
-#### `quick-settings:close`
-**Direction**: Renderer → Main (invoke)  
-**Returns**: `{ success: boolean }`
-
-```javascript
-await window.transcriptaQuickSettings.close();
-```
+**Note**: Quick Settings APIs were previously exposed via a separate preload script. These APIs are currently not available in the OpenWispr release.
 
 ### Main-to-Renderer Events
 

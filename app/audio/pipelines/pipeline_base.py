@@ -1,7 +1,17 @@
 """Abstract base class for audio pipelines.
 
-Provides a common interface for all audio capture pipelines with support for
-async/await, health monitoring, pause/resume, and graceful shutdown.
+Provides a common interface for all audio capture pipelines with support for:
+- Async/await throughout the entire pipeline lifecycle
+- State management with lifecycle states (IDLE, INITIALIZING, RUNNING, PAUSED, STOPPING, STOPPED, ERROR)
+- Health metrics reporting (frames captured, dropped, buffer events, latency, RMS)
+- Pause/resume capability for temporary capture suspension
+- Graceful shutdown with resource cleanup
+- Device change handling and reconnection
+- Error recovery with automatic reconnection attempts
+- Ring buffer management for audio data
+
+Subclasses (wispr_pipeline, system_pipeline) inherit this base class and implement
+device-specific initialization, capture loops, and cleanup logic.
 """
 
 from __future__ import annotations
@@ -27,7 +37,17 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineState(Enum):
-    """Pipeline lifecycle states."""
+    """Pipeline lifecycle states.
+
+    Represents the possible states in the pipeline lifecycle:
+    - IDLE: Initial state, no resources allocated
+    - INITIALIZING: Device is being opened and configured
+    - RUNNING: Actively capturing audio
+    - PAUSED: Capture suspended but device remains open
+    - STOPPING: Shutdown in progress
+    - STOPPED: Clean shutdown complete
+    - ERROR: Failure state requiring intervention
+    """
 
     IDLE = auto()
     INITIALIZING = auto()
@@ -39,7 +59,12 @@ class PipelineState(Enum):
 
 
 class PipelineMode(Enum):
-    """Pipeline operation modes."""
+    """Pipeline operation modes.
+
+    Defines the two primary pipeline modes:
+    - WISPR: Hotkey/microphone mode optimized for low-latency real-time capture
+    - SYSTEM: System audio mode with buffer-based batch processing
+    """
 
     WISPR = "wispr"  # Hotkey/mic mode - low latency
     SYSTEM = "system"  # System audio - buffer-based
@@ -47,7 +72,26 @@ class PipelineMode(Enum):
 
 @dataclass(slots=True)
 class PipelineHealth:
-    """Health metrics for audio pipeline."""
+    """Health metrics for audio pipeline.
+
+    Tracks runtime metrics for monitoring pipeline health and diagnosing issues.
+
+    Attributes:
+        state: Current pipeline state
+        frames_captured: Total number of audio frames successfully captured
+        frames_dropped: Number of frames lost due to buffer overflow or errors
+        buffer_underruns: Number of times read operation found empty buffer
+        buffer_overruns: Number of times write operation filled buffer completely
+        device_errors: Total count of device-level errors encountered
+        device_reconnects: Number of successful automatic reconnection attempts
+        average_latency_ms: Rolling average capture-to-output latency in milliseconds
+        current_rms: Current RMS energy level of audio data
+        peak_rms: Maximum RMS energy observed since last reset
+        is_speech_active: Whether voice activity is currently detected
+        last_error: Description of most recent error (None if no errors)
+        last_warning: Description of most recent warning (None if no warnings)
+        updated_at: Timestamp of last health metric update
+    """
 
     state: PipelineState = PipelineState.IDLE
     frames_captured: int = 0
@@ -65,6 +109,11 @@ class PipelineHealth:
     updated_at: float = field(default_factory=time.monotonic)
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert health metrics to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of health metrics with rounded numeric values
+        """
         return {
             "state": self.state.name,
             "frames_captured": self.frames_captured,
@@ -85,7 +134,24 @@ class PipelineHealth:
 
 @dataclass(slots=True)
 class PipelineConfig:
-    """Base configuration for audio pipelines."""
+    """Base configuration for audio pipelines.
+
+    Defines settings for device selection, audio format, buffer behavior,
+    health monitoring, error recovery, and event callbacks.
+
+    Attributes:
+        device_id: Specific device identifier or None for default device
+        sample_rate: Audio sample rate in Hz (default: 16000)
+        channels: Number of audio channels (default: 1 for mono)
+        dtype: numpy dtype for audio data (default: float32)
+        max_buffer_size: Maximum samples to buffer (default: 5 seconds at 16kHz)
+        health_report_interval_ms: Interval between health metric updates (default: 1000ms)
+        max_consecutive_errors: Errors before triggering reconnection (default: 5)
+        reconnect_cooldown_seconds: Minimum time between reconnection attempts (default: 1.0)
+        on_error: Callback invoked when error threshold is exceeded
+        on_health_update: Callback invoked on each health report interval
+        on_state_change: Callback invoked when pipeline state changes
+    """
 
     device_id: str | None = None
     sample_rate: int = 16000
@@ -113,15 +179,35 @@ class AudioPipeline(ABC):
 
     Provides a common interface for all audio capture pipelines with:
     - Async/await support throughout
-    - State management (IDLE, RUNNING, PAUSED, STOPPED, ERROR)
+    - State management (IDLE, INITIALIZING, RUNNING, PAUSED, STOPPED, ERROR)
     - Health metrics reporting
     - Pause/resume capability
     - Graceful shutdown
     - Device change handling
     - Error recovery (disconnect/reconnect)
+
+    Subclasses must implement:
+    - _get_mode(): Return the pipeline mode (WISPR or SYSTEM)
+    - _initialize_device(): Open and configure the audio device
+    - _capture_loop(): Main capture loop that checks stop/pause events
+    - _cleanup_device(): Release device resources
+    - probe_device(): Test device and return metrics
+
+    Example:
+        >>> config = PipelineConfig(device_id="default", sample_rate=16000)
+        >>> pipeline = MicrophonePipeline(config)
+        >>>
+        >>> await pipeline.start()
+        >>> audio = await pipeline.read(timeout=5.0)
+        >>> await pipeline.stop()
     """
 
     def __init__(self, config: PipelineConfig) -> None:
+        """Initialize pipeline with configuration.
+
+        Args:
+            config: Pipeline configuration with device and behavior settings
+        """
         self.config = config
         self._state = PipelineState.IDLE
         self._health = PipelineHealth()
@@ -156,27 +242,36 @@ class AudioPipeline(ABC):
 
     @property
     def state(self) -> PipelineState:
+        """Current pipeline state."""
         return self._state
 
     @property
     def health(self) -> PipelineHealth:
+        """Current health metrics snapshot."""
         return self._health
 
     @property
     def is_running(self) -> bool:
+        """Whether pipeline is actively capturing."""
         return self._state == PipelineState.RUNNING
 
     @property
     def is_paused(self) -> bool:
+        """Whether pipeline is paused."""
         return self._state == PipelineState.PAUSED
 
     @property
     def is_stopped(self) -> bool:
+        """Whether pipeline has stopped or encountered error."""
         return self._state in (PipelineState.STOPPED, PipelineState.ERROR)
 
     @abstractmethod
     def _get_mode(self) -> PipelineMode:
-        """Return the pipeline mode (WISPR or SYSTEM)."""
+        """Return the pipeline mode (WISPR or SYSTEM).
+
+        Returns:
+            Pipeline mode enum value
+        """
         pass
 
     @abstractmethod
@@ -186,23 +281,42 @@ class AudioPipeline(ABC):
 
     @abstractmethod
     async def _capture_loop(self) -> None:
-        """Main capture loop implementation. Must check _stop_event and _pause_event."""
+        """Main capture loop implementation.
+
+        Must check _stop_event and _pause_event to handle graceful shutdown
+        and pause/resume. Should push captured audio to _output_queue.
+        """
         pass
 
     @abstractmethod
     async def _cleanup_device(self) -> None:
-        """Cleanup audio device resources."""
+        """Cleanup audio device resources.
+
+        Called during stop or recovery to release device handle.
+        """
         pass
 
     @abstractmethod
     def probe_device(self, *, duration: float, output_dir: Path) -> DeviceProbeResult:
-        """Probe the audio device and return metrics."""
+        """Probe the audio device and return metrics.
+
+        Args:
+            duration: Probe test duration in seconds
+            output_dir: Directory to write test audio files
+
+        Returns:
+            DeviceProbeResult with test metrics
+        """
         pass
 
     async def start(self) -> None:
         """Start the audio pipeline.
 
         Transitions from IDLE -> INITIALIZING -> RUNNING.
+        Initializes device, starts capture and health monitoring tasks.
+
+        Raises:
+            RuntimeError: If pipeline is not in IDLE, STOPPED, or ERROR state
         """
         if self._state not in (PipelineState.IDLE, PipelineState.STOPPED, PipelineState.ERROR):
             raise RuntimeError(f"Cannot start from state {self._state.name}")
@@ -233,7 +347,8 @@ class AudioPipeline(ABC):
     async def stop(self) -> None:
         """Stop the audio pipeline gracefully.
 
-        Transitions to STOPPED state and cleans up resources.
+        Transitions to STOPPING then STOPPED state, cancels tasks,
+        and cleans up device resources. Timeout-safe cancellation.
         """
         if self._state in (PipelineState.STOPPED, PipelineState.IDLE):
             return
@@ -267,8 +382,11 @@ class AudioPipeline(ABC):
     async def pause(self) -> None:
         """Pause audio capture.
 
-        Transitions from RUNNING -> PAUSED.
-        Device remains open but capture is suspended.
+        Transitions from RUNNING to PAUSED state.
+        Device remains open but capture is suspended via _pause_event.
+
+        Raises:
+            RuntimeError: If pipeline is not in RUNNING state
         """
         if self._state != PipelineState.RUNNING:
             raise RuntimeError(f"Cannot pause from state {self._state.name}")
@@ -280,7 +398,11 @@ class AudioPipeline(ABC):
     async def resume(self) -> None:
         """Resume audio capture.
 
-        Transitions from PAUSED -> RUNNING.
+        Transitions from PAUSED to RUNNING state.
+        Clears _pause_event to resume capture loop.
+
+        Raises:
+            RuntimeError: If pipeline is not in PAUSED state
         """
         if self._state != PipelineState.PAUSED:
             raise RuntimeError(f"Cannot resume from state {self._state.name}")
@@ -293,10 +415,10 @@ class AudioPipeline(ABC):
         """Read audio data from the pipeline output queue.
 
         Args:
-            timeout: Maximum time to wait for data (None = wait forever)
+            timeout: Maximum time to wait for data in seconds (None = wait forever)
 
         Returns:
-            Audio data as numpy array or None if timeout/no data
+            Audio data as numpy array or None if timeout occurred/no data available
         """
         try:
             return await asyncio.wait_for(self._output_queue.get(), timeout=timeout)
@@ -306,7 +428,11 @@ class AudioPipeline(ABC):
     async def change_device(self, device_id: str | None) -> None:
         """Change the audio device.
 
-        Triggers a reconnection to the new device.
+        Updates device configuration and triggers reconnection by setting
+        error count to threshold, forcing the capture loop to reconnect.
+
+        Args:
+            device_id: New device identifier or None for system default
         """
         logger.info(f"Changing device from {self._current_device_id} to {device_id}")
         self._current_device_id = device_id
@@ -316,11 +442,22 @@ class AudioPipeline(ABC):
         self._consecutive_errors = self.config.max_consecutive_errors
 
     def get_health(self) -> PipelineHealth:
-        """Get current health metrics."""
+        """Get current health metrics snapshot.
+
+        Returns:
+            Current PipelineHealth metrics
+        """
         return self._health
 
     async def _transition_state(self, new_state: PipelineState) -> None:
-        """Transition to a new state with optional callback."""
+        """Transition to a new state with optional callback.
+
+        Updates internal state, health metrics, and invokes state change callback
+        if configured.
+
+        Args:
+            new_state: Target state to transition to
+        """
         old_state = self._state
         self._state = new_state
         self._health.state = new_state
@@ -334,7 +471,12 @@ class AudioPipeline(ABC):
         logger.debug(f"State transition: {old_state.name} -> {new_state.name}")
 
     async def _run_capture_with_recovery(self) -> None:
-        """Run capture loop with error recovery."""
+        """Run capture loop with error recovery.
+
+        Wraps _capture_loop to handle exceptions, track error counts,
+        trigger recovery attempts, and transition to ERROR state when
+        max consecutive errors is exceeded.
+        """
         while not self._stop_event.is_set():
             try:
                 await self._capture_loop()
@@ -361,7 +503,12 @@ class AudioPipeline(ABC):
                 await self._attempt_recovery()
 
     async def _attempt_recovery(self) -> None:
-        """Attempt to recover from an error."""
+        """Attempt to recover from an error.
+
+        Implements reconnection cooldown to prevent rapid retry cycles.
+        Cleans up existing device, waits briefly, then reinitializes.
+        Updates health metrics with reconnection result.
+        """
         now = time.monotonic()
         if now - self._last_reconnect_time < self.config.reconnect_cooldown_seconds:
             await asyncio.sleep(0.1)
@@ -380,7 +527,11 @@ class AudioPipeline(ABC):
             logger.error(f"Device recovery failed: {exc}")
 
     async def _health_monitoring_loop(self) -> None:
-        """Periodically report health metrics."""
+        """Periodically report health metrics.
+
+        Runs on configurable interval, updates health metrics and invokes
+        on_health_update callback if configured. Continues until stop event is set.
+        """
         while not self._stop_event.is_set():
             try:
                 await asyncio.wait_for(
@@ -401,18 +552,34 @@ class AudioPipeline(ABC):
                     logger.warning(f"Health callback failed: {exc}")
 
     def _update_health_metrics(self) -> None:
-        """Update health metrics."""
+        """Update health metrics.
+
+        Updates timestamp and computes rolling average latency from latency window.
+        """
         self._health.updated_at = time.monotonic()
 
         if self._latency_window:
             self._health.average_latency_ms = sum(self._latency_window) / len(self._latency_window)
 
     def _record_latency(self, latency_ms: float) -> None:
-        """Record a latency measurement."""
+        """Record a latency measurement.
+
+        Args:
+            latency_ms: Latency in milliseconds to add to rolling window
+        """
         self._latency_window.append(latency_ms)
 
     def _calculate_rms(self, audio: np.ndarray) -> float:
-        """Calculate RMS of audio data."""
+        """Calculate RMS energy of audio data.
+
+        Updates current_rms and peak_rms in health metrics.
+
+        Args:
+            audio: Audio samples as numpy array
+
+        Returns:
+            RMS energy value
+        """
         if audio.size == 0:
             return 0.0
         rms = float(np.sqrt(np.mean(np.square(audio)) + 1e-12))
@@ -421,7 +588,11 @@ class AudioPipeline(ABC):
         return rms
 
     def _config_to_dict(self) -> dict[str, Any]:
-        """Convert config to dict for logging."""
+        """Convert config to dict for logging.
+
+        Returns:
+            Dictionary with non-sensitive configuration values
+        """
         return {
             "device_id": self.config.device_id,
             "sample_rate": self.config.sample_rate,
@@ -431,6 +602,10 @@ class AudioPipeline(ABC):
         }
 
     async def _wait_while_paused(self) -> None:
-        """Wait while paused, returns when resumed or stopped."""
+        """Wait while paused, returns when resumed or stopped.
+
+        Used by subclasses in capture loop to efficiently wait during pause state
+        without busy-waiting.
+        """
         while self._pause_event.is_set() and not self._stop_event.is_set():
             await asyncio.sleep(0.01)

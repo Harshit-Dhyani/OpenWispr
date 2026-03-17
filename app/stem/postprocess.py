@@ -1,3 +1,9 @@
+"""STEM note processing and bundle generation.
+
+Provides StemNoteProcessor which orchestrates formula extraction, unit checking, and
+review flagging to produce notes bundles with formulas, highlights, and flagged segments.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -152,9 +158,7 @@ class StemNoteProcessor:
                 if segment.start in timestamps:
                     new_reason = f"contradictory-definition:{variable}"
                     if new_reason not in segment.review_reasons:
-                        segment.review_reasons = sorted(
-                            set([*segment.review_reasons, new_reason])
-                        )
+                        segment.review_reasons = sorted(set([*segment.review_reasons, new_reason]))
                         segment.review_flag = True
                         if segment not in needs_review:
                             needs_review.append(segment)

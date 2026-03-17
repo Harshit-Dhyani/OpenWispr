@@ -1,4 +1,20 @@
-"""Audio capture, processing, and device discovery."""
+"""Audio capture, processing, and voice activity detection.
+
+Provides high-level audio pipeline components for speech recognition:
+- VAD: Voice activity detection, noise profiling, speech segmentation
+- Processing: Audio preprocessing, normalization, resampling
+
+Key exports:
+    OptimizedVAD, VADConfig, VADMode, VADState - Voice activity detection
+    NoiseProfiler - Background noise analysis
+    SpeechSegmenter - Speech region detection
+    AudioPreprocessor, ProcessingConfig, ProcessingMode - Audio preprocessing
+
+Key collaborators:
+    app/audio/backends/ - Audio capture implementations
+    app/audio/devices/ - Device discovery and resolution
+    app/core/models.py - AudioDeviceInfo, DeviceProbeResult
+"""
 
 from app.audio.processing import (
     AudioPreprocessor,

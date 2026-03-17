@@ -1,3 +1,11 @@
+/**
+ * TranscriptPanels - Collection of panel components for transcript display
+ * 
+ * Exports CombinedPanel, CoachPanel, ReviewPanel, FormulasPanel, SuppressedPanel,
+ * ErrorsPanel, SessionPanel, and EmptyState for rendering different transcript views.
+ * 
+ * @component
+ */
 import { AlertCircle, Filter, Sigma, Sparkles, TriangleAlert } from 'lucide-react';
 import type { CoachResult, Formula, Segment, SessionSummary } from '../types/api';
 import { RENDERER_STRINGS } from '../strings/en';
@@ -184,9 +192,9 @@ export function ReviewPanel({ segments }: { segments: Segment[] }) {
               {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
             </span>
           </div>
-          <p className="text-sm font-bold text-lawn-border break-words line-clamp-3">{segment.display_text || segment.text}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{segment.display_text || segment.text}</p>
           {segment.review_reasons.length > 0 && (
-            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-theme-warning break-words line-clamp-2">
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-theme-warning break-words">
               {segment.review_reasons.join(' · ')}
             </p>
           )}
@@ -219,7 +227,7 @@ export function FormulasPanel({ formulas }: { formulas: Formula[] }) {
               {formula.timestamp_start.toFixed(1)}s
             </span>
           </div>
-          <p className="text-[11px] leading-5 opacity-80 break-words line-clamp-2">{formula.context || 'Context unavailable.'}</p>
+          <p className="text-[11px] leading-5 opacity-80 break-words">{formula.context || 'Context unavailable.'}</p>
         </article>
       ))}
     </div>
@@ -246,9 +254,9 @@ export function SuppressedPanel({ segments }: { segments: Segment[] }) {
               {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
             </span>
           </div>
-          <p className="text-xs font-bold text-lawn-muted-strong break-words line-clamp-3">{segment.display_text || segment.text}</p>
+          <p className="text-xs font-bold text-lawn-muted-strong break-words">{segment.display_text || segment.text}</p>
           {segment.suppression_reasons.length > 0 && (
-            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-lawn-muted break-words line-clamp-2">
+            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-lawn-muted break-words">
               {segment.suppression_reasons.join(' · ')}
             </p>
           )}
@@ -276,7 +284,7 @@ export function ErrorsPanel({ error, warning }: { error: string | null; warning:
             <TriangleAlert size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">Warning</span>
           </div>
-          <p className="text-sm font-bold text-lawn-border break-words line-clamp-3">{warning}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{warning}</p>
         </article>
       )}
       {error && (
@@ -285,7 +293,7 @@ export function ErrorsPanel({ error, warning }: { error: string | null; warning:
             <AlertCircle size={12} />
             <span className="text-[9px] font-black uppercase tracking-widest">Error</span>
           </div>
-          <p className="text-sm font-bold text-lawn-border break-words line-clamp-3">{error}</p>
+          <p className="text-sm font-bold text-lawn-border break-words">{error}</p>
         </article>
       )}
     </div>

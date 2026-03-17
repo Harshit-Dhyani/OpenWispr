@@ -5,21 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] - 2026-03-15
 
 ### Added
+- Provider health display in UI and backend
+- Provider URL support for refiner and coach services
+- Providers API route for provider management
+- Local LLM provider infrastructure
 - CI/CD workflows for automated testing and release
 - New prompt system for audit and fix workflows
 - Expanded E2E and regression test coverage
 - Module reorganization for audio, core, and Electron services
 
 ### Fixed
+- Settings validation improvements
+- Provider base URL fields in settings dataclasses
+- Database improvements
 - Python import errors across audio, API, and config modules
 - TypeScript type errors in floating window components
 - E2E test configuration issues
 - Legacy naming cleanup (Transcripta → OpenWispr)
 
 ### Changed
+- Updated settings to support provider health and URL
 - Reorganized audio pipeline modules into dedicated directories
 - Reorganized core modules (logging, metrics, optimization, profiling, session)
 - Updated backward-compatibility shims for settings
@@ -30,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - Initial Release
+## [0.1.0] - 2026-01-15
 
 ### Added
 - **Core Features**

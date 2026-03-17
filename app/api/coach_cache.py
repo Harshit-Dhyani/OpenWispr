@@ -1,3 +1,25 @@
+"""Coach service response caching for transcription refinement.
+
+Provides thread-safe caching for coach service responses to reduce redundant
+LLM calls. Uses SHA256 hashing to generate cache keys from request parameters.
+
+Key features:
+- Thread-safe operations with RLock
+- JSON persistence to disk
+- Automatic LRU eviction when max_entries is exceeded
+- Automatic access time tracking for cache eviction
+
+Example:
+    from app.api.coach_cache import CoachCache
+    
+    cache = CoachCache(Path(".openwispr/coach_cache.json"), max_entries=500)
+    key = CoachCache.build_key(text, language, detail_level)
+    result = cache.get(key)
+    if result is None:
+        result = call_coach_service(...)
+        cache.put(key, result)
+"""
+
 from __future__ import annotations
 
 import hashlib

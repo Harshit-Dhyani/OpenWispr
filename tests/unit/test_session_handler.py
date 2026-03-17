@@ -17,6 +17,8 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.core.models import SessionHealth, TranscriptSegment
 from app.core.session_manager import SessionManager, _normalize_transcript_text, slugify
 

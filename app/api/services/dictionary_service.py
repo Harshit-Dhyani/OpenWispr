@@ -1,6 +1,15 @@
+"""Dictionary service for phrase-to-replacement text transformations.
+
+Provides DictionaryService for managing user-defined phrase replacements
+with scope support (personal/shared/team). Supports CRUD operations,
+text application with usage tracking, and cache management.
+"""
+
 from __future__ import annotations
 
 import re
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +18,11 @@ from app.storage.history_db import HistoryDatabase
 
 _ALLOWED_SCOPES = {"personal", "shared", "team"}
 
+# In-memory cache for dictionary entries
+_dictionary_cache: dict[str, tuple[list[dict], float]] = {}
+_cache_lock = threading.Lock()
+_CACHE_TTL_SECONDS = 30.0  # Cache entries for 30 seconds
+
 
 @dataclass(frozen=True)
 class DictionaryApplyResult:
@@ -16,7 +30,63 @@ class DictionaryApplyResult:
     applied: list[dict[str, Any]]
 
 
+def _get_cached_entries(db: HistoryDatabase, scope: str | None = None) -> list[dict[str, Any]]:
+    """Get dictionary entries with caching."""
+    cache_key = f"dict:{scope or 'all'}"
+    current_time = time.time()
+
+    with _cache_lock:
+        if cache_key in _dictionary_cache:
+            entries, cache_time = _dictionary_cache[cache_key]
+            if current_time - cache_time < _CACHE_TTL_SECONDS:
+                return entries
+
+    # Cache miss - load from DB
+    params: list[Any] = []
+    filters: list[str] = []
+
+    normalized_scope = scope.strip().lower() if scope else None
+    if normalized_scope and normalized_scope in _ALLOWED_SCOPES:
+        filters.append("scope = ?")
+        params.append(normalized_scope)
+
+    where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+    rows = db.query_all(
+        f"""
+        SELECT id, phrase, replacement, scope, enabled, usage_count, created_at, updated_at
+        FROM dictionary_entries
+        {where_sql}
+        ORDER BY phrase COLLATE NOCASE ASC
+        """,
+        tuple(params),
+    )
+    for row in rows:
+        row["enabled"] = bool(row["enabled"])
+        row["usage_count"] = int(row["usage_count"] or 0)
+
+    # Update cache
+    with _cache_lock:
+        _dictionary_cache[cache_key] = (rows, current_time)
+
+    return rows
+
+
+def invalidate_dictionary_cache() -> None:
+    """Clear the dictionary cache."""
+    with _cache_lock:
+        _dictionary_cache.clear()
+
+
 class DictionaryService:
+    """Service for managing phrase-to-replacement dictionary entries.
+
+    Provides CRUD operations for user-defined phrase replacements with scope
+    support (personal/shared/team). Supports text application with usage tracking
+    and cache management for performance.
+
+    Key collaborators: HistoryDatabase for persistence.
+    """
+
     def __init__(self, db: HistoryDatabase) -> None:
         self._db = db
 
@@ -31,7 +101,18 @@ class DictionaryService:
     def _normalize_phrase(phrase: str) -> str:
         return " ".join(phrase.strip().split()).lower()
 
-    def list_entries(self, *, scope: str | None = None, search: str | None = None) -> list[dict[str, Any]]:
+    def list_entries(
+        self, *, scope: str | None = None, search: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List dictionary entries with optional scope filtering and search.
+
+        Args:
+            scope: Filter by scope (personal, shared, team)
+            search: Search term for phrase or replacement
+
+        Returns:
+            List of dictionary entry records
+        """
         params: list[Any] = []
         filters: list[str] = []
 
@@ -61,6 +142,11 @@ class DictionaryService:
         return rows
 
     def get_entry(self, entry_id: str) -> dict[str, Any] | None:
+        """Get a dictionary entry by ID.
+
+        Returns:
+            Entry dict if found, None otherwise.
+        """
         row = self._db.query_one(
             """
             SELECT id, phrase, replacement, scope, enabled, usage_count, created_at, updated_at
@@ -83,6 +169,20 @@ class DictionaryService:
         scope: str | None = None,
         enabled: bool = True,
     ) -> dict[str, Any]:
+        """Create a new dictionary entry.
+
+        Args:
+            phrase: The phrase to replace
+            replacement: The replacement text
+            scope: Scope (personal, shared, team)
+            enabled: Whether entry is enabled
+
+        Returns:
+            The created entry record
+
+        Raises:
+            ValueError: If phrase is empty
+        """
         normalized_phrase = self._normalize_phrase(phrase)
         if not normalized_phrase:
             raise ValueError("Dictionary phrase cannot be empty")
@@ -95,7 +195,14 @@ class DictionaryService:
                 id, phrase, phrase_normalized, replacement, scope, enabled, usage_count, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             """,
-            (entry_id, phrase.strip(), normalized_phrase, replacement, normalized_scope, 1 if enabled else 0),
+            (
+                entry_id,
+                phrase.strip(),
+                normalized_phrase,
+                replacement,
+                normalized_scope,
+                1 if enabled else 0,
+            ),
         )
         created = self.get_entry(entry_id)
         if created is None:
@@ -103,6 +210,19 @@ class DictionaryService:
         return created
 
     def update_entry(self, entry_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing dictionary entry.
+
+        Args:
+            entry_id: ID of entry to update
+            updates: Dict with fields to update (phrase, replacement, scope, enabled)
+
+        Returns:
+            The updated entry record
+
+        Raises:
+            KeyError: If entry not found
+            ValueError: If phrase is empty
+        """
         existing = self.get_entry(entry_id)
         if existing is None:
             raise KeyError(entry_id)
@@ -134,10 +254,27 @@ class DictionaryService:
         return updated
 
     def delete_entry(self, entry_id: str) -> bool:
+        """Delete a dictionary entry.
+
+        Returns:
+            True if entry was deleted, False if not found.
+        """
         cursor = self._db.execute("DELETE FROM dictionary_entries WHERE id = ?", (entry_id,))
         return bool(cursor.rowcount)
 
     def apply_to_text(self, text: str, *, commit_usage: bool = False) -> DictionaryApplyResult:
+        """Apply dictionary replacements to text.
+
+        Replaces phrases with their configured replacements using word-boundary
+        matching. Longer phrases are matched first to prevent partial replacements.
+
+        Args:
+            text: Input text to transform
+            commit_usage: Whether to increment usage counts
+
+        Returns:
+            DictionaryApplyResult with transformed text and list of applied replacements
+        """
         if not text:
             return DictionaryApplyResult(text=text, applied=[])
 

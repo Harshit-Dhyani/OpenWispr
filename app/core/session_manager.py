@@ -1,3 +1,13 @@
+"""Session management for transcription sessions.
+
+Orchestrates the complete transcription pipeline: audio capture, chunking,
+transcription, and output. Manages session lifecycle, callbacks, and
+health monitoring for real-time dictation sessions.
+
+This module handles the core dictation flow. Session mode (hotkey-triggered
+continuous transcription) is handled by app.core.hotkey_session.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.logging_utils import configure_logging
+from app.core.logging.logging_utils import configure_logging
 from app.core.models import AudioDeviceInfo, SessionHealth, SessionState, TranscriptSegment, utc_now
 from app.core.settings.config import AppSettings, resolve_live_profile
 from app.stem.postprocess import StemNoteProcessor
@@ -25,6 +35,31 @@ WhisperTranscriber = FastTranscriber
 
 
 class SessionManager:
+    """Manages real-time transcription sessions from start to finish.
+
+    Coordinates audio capture, STT chunking, transcription, and output delivery
+    via callbacks. Provides session state machine, health monitoring, and
+    graceful shutdown.
+
+    Lifecycle:
+        1. Create with AppSettings
+        2. Register callbacks via set_callbacks()
+        3. Call start_session() to begin transcription
+        4. Process transcript segments via on_segment callback
+        5. Call stop_session() to end gracefully
+
+    Thread Safety:
+        - All public methods are thread-safe
+        - Internal state protected by locks
+        - Callbacks invoked from processing thread
+
+    Callbacks:
+        - on_segment: Final transcript segment ready
+        - on_partial: Partial transcription update
+        - on_health: Session health state change
+        - on_state: Session state change
+    """
+
     CHUNK_DURATION_MS = 200
     TARGET_LATENCY_MS = 500
     MAX_WORKERS = 2

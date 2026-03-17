@@ -17,6 +17,8 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.audio.pipeline_base import AudioPipeline, PipelineConfig, PipelineHealth, PipelineState
 
 

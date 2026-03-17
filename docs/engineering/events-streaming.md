@@ -1,7 +1,7 @@
 ---
 title: Events and Streaming
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/api/websocket_server.py
   - app/electron/frontend/src/hooks/useEventSource.ts
@@ -58,8 +58,8 @@ OpenWispr uses multiple real-time streaming mechanisms for communication between
 
 | Endpoint | Location | Purpose |
 |----------|----------|---------|
-| `GET /api/events` | server.py:2363 | Main session events stream |
-| `GET /api/transcription/hotkey/events` | server.py:2269 | Hotkey transcription events |
+| `GET /api/events` | server.py:605 | Main session events stream |
+| `GET /api/transcription/hotkey/events` | server.py:562 | Hotkey transcription events |
 
 ### Main Events Stream (`/api/events`)
 
@@ -97,10 +97,10 @@ Dedicated SSE stream for hotkey transcription sessions. Throttles audio level up
 
 | Endpoint | Location | Purpose |
 |----------|----------|---------|
-| `WS /api/ws` | server.py:2623 | Main bidirectional communication |
-| `WS /api/ws/settings` | server.py:2697 | Settings synchronization |
-| `WS /api/ws/audio` | server.py:2762 | Audio visualization stream |
-| `WS /api/transcription/hotkey/ws` | server.py:2180 | Hotkey session events |
+| `WS /api/ws` | server.py:865 | Main bidirectional communication |
+| `WS /api/ws/settings` | server.py:939 | Settings synchronization |
+| `WS /api/ws/audio` | server.py:1004 | Audio visualization stream |
+| `WS /api/transcription/hotkey/ws` | server.py:491 | Hotkey session events |
 
 ### Main WebSocket (`/api/ws`)
 
@@ -141,7 +141,7 @@ Direct WebSocket for hotkey session events. Alternative to hotkey SSE endpoint.
 
 ## Message Types
 
-### WebSocket Message Types (app/api/websocket_server.py:35-75)
+### WebSocket Message Types (app/api/websocket_server.py:46-86)
 
 ```python
 class MessageType(str, Enum):
@@ -310,7 +310,7 @@ The SSE hook adds a polling fallback after max reconnection attempts:
 
 Server-side connection management with robust features.
 
-### ConnectionConfig (lines 78-92)
+### ConnectionConfig (lines 89-103)
 
 ```python
 @dataclass
@@ -368,7 +368,7 @@ stats = manager.get_stats()
 
 ## Health Metrics Broadcast
 
-Background task broadcasts health metrics every 5 seconds (app/api/server.py:3097-3135):
+Background task broadcasts health metrics every 5 seconds (app/api/server.py:798-836):
 
 ```python
 metrics = {

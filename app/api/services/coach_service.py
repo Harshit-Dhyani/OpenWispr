@@ -1,3 +1,12 @@
+"""LLM-powered English coaching and transcript refinement service.
+
+Provides CoachService for analyzing transcripts and suggesting improvements.
+Uses configurable LLM providers (llama.cpp, OpenAI, etc.) with caching for
+performance. Returns structured corrections with diffs, mistakes, and practice suggestions.
+
+This service is optional - falls back gracefully when no LLM provider is available.
+"""
+
 from __future__ import annotations
 
 import json
@@ -87,6 +96,22 @@ class CoachRequestContext:
 
 
 class CoachService:
+    """LLM-powered English coaching service for transcript improvement.
+
+    Analyzes transcripts and suggests improvements using configurable LLM providers
+    (llama.cpp, Ollama, LM Studio). Returns structured corrections with diffs,
+    mistakes, and practice suggestions.
+
+    State ownership:
+    - CoachCache for response caching (file-based)
+    - Lazy-loaded LLM model (llama.cpp)
+    - Lock-protected model loading
+
+    Fallback behavior:
+    - Returns fallback result when runtime unavailable
+    - Falls back gracefully when no LLM provider is available
+    """
+
     def __init__(self, download_root: Path, cache_path: Path) -> None:
         self.download_root = Path(download_root)
         self._cache = CoachCache(cache_path)
@@ -107,7 +132,7 @@ class CoachService:
     def _get_settings(self) -> tuple[str, str]:
         try:
             settings = get_settings_manager().get_settings()
-            engine_preference = getattr(settings.refiner, "engine_preference", "llamacpp")
+            engine_preference = getattr(settings.coach, "coach_engine_preference", "llamacpp")
             provider_base_url = (
                 settings.coach.coach_provider_base_url
                 if hasattr(settings, "coach")
@@ -238,12 +263,52 @@ class CoachService:
             cleaned = cleaned.strip("`").strip()
             if cleaned.lower().startswith("json"):
                 cleaned = cleaned[4:].strip()
+
+        # Try to extract just the JSON if there's extra text after it
+        json_start = cleaned.find("{")
+        json_end = cleaned.rfind("}") + 1
+        if json_start >= 0 and json_end > json_start:
+            extracted = cleaned[json_start:json_end]
+        else:
+            extracted = cleaned
+
         try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError as e:
+            parsed = json.loads(extracted)
+        except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to parse coach response as JSON: {e}")
-            return None
-        result = CoachResult.model_validate(parsed)
+            return self._fallback_result(
+                original=original or "",
+                polished=fallback_text or original or "",
+                provider="fallback_parse_error",
+                template_id=template_id or "unknown",
+                template_version=template_version or 1,
+                model=model or "unknown",
+            )
+
+        # Handle case where parsed is not a dict
+        if not isinstance(parsed, dict):
+            logger.warning(f"Coach response is not a dict: {type(parsed)}")
+            return self._fallback_result(
+                original=original or "",
+                polished=fallback_text or original or "",
+                provider="fallback_invalid_response",
+                template_id=template_id or "unknown",
+                template_version=template_version or 1,
+                model=model or "unknown",
+            )
+
+        try:
+            result = CoachResult.model_validate(parsed)
+        except Exception as e:
+            logger.warning(f"Coach validation failed: {e}, parsed={parsed}")
+            return self._fallback_result(
+                original=original or "",
+                polished=fallback_text or original or "",
+                provider="fallback_validation_error",
+                template_id=template_id or "unknown",
+                template_version=template_version or 1,
+                model=model or "unknown",
+            )
         if not result.original.strip():
             result.original = original
         if not result.polished.strip():

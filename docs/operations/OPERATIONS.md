@@ -1,13 +1,13 @@
 ---
 title: Operations Guide
 audience: operators
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/api/server.py
   - app/api/routes/system.py
   - app/core/logging_utils.py
   - app/storage/session_store.py
-  - app/api/streaming_metrics.py
+  - app/api/services/streaming_metrics.py
 ---
 
 # OpenWispr Operations Guide
@@ -29,11 +29,11 @@ Production operations guide for running and maintaining the OpenWispr desktop tr
 ## Legacy Naming Note
 
 > **Note:** The codebase currently uses legacy naming in some places:
-> - Data directory: `.transcripta` (instead of `.openwispr`)
+> - Data directory: `.openwispr` (aligned)
 > - Environment variables: `OPENWISPR_*` prefix
-> - Logger name: `transcripta`
+> - Logger name: `openwispr`
 > 
-> This is a known migration issue. Future releases will align to `OpenWispr` naming. Currently, operations should use the `.transcripta` path for data storage.
+> Operations should use the `.openwispr` path for data storage.
 
 ---
 
@@ -137,13 +137,13 @@ Log rotation is configured in `app/core/logging_utils.py`:
 Logs are structured JSON (JSON Lines format):
 
 ```json
-{"time": "2024-01-15T09:23:45", "level": "INFO", "logger": "transcripta", "message": "Session started"}
+{"time": "2024-01-15T09:23:45", "level": "INFO", "logger": "openwispr", "message": "Session started"}
 ```
 
 Standard fields:
 - `time`: Timestamp in ISO format (`%Y-%m-%dT%H:%M:%S`)
 - `level`: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `logger`: Logger name (e.g., `transcripta`)
+- `logger`: Logger name (e.g., `openwispr`)
 - `message`: Log message
 - `exception`: Exception info (if an exception occurred)
 
@@ -175,7 +175,7 @@ Get-ChildItem sessions -Recurse -Filter "app.log" |
 # Export logs for analysis
 Get-ChildItem sessions -Recurse -Filter "app.log" |
     ForEach-Object { Get-Content $_.FullName } |
-    Out-File transcripta-logs-export.jsonl
+    Out-File openwispr-logs-export.jsonl
 
 # Tail with filtering
 Get-Content sessions\study-session\logs\app.log -Wait -Tail 50 | 
@@ -271,7 +271,7 @@ Available metrics endpoint:
 |----------|--------|-------------|
 | `/api/metrics/streaming` | GET | Streaming transcription metrics |
 
-**Streaming Metrics** (`app/api/streaming_metrics.py`):
+**Streaming Metrics** (`app/api/services/streaming_metrics.py`):
 
 | Metric | Description |
 |--------|-------------|
@@ -475,7 +475,7 @@ Session data structure (`app/storage/session_store.py`):
 ### Automated Backup Script
 
 ```powershell
-# backup-transcripta.ps1
+# backup-openwispr.ps1
 $source = "$PWD\sessions"
 $backupRoot = "$env:USERPROFILE\Backups\OpenWispr"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -791,7 +791,7 @@ Get-Process | Where-Object {$_.ProcessName -in @("python","electron","OpenWispr"
 Get-Volume | Where-Object {$_.DriveLetter -eq 'C'} | Select-Object DriveLetter, SizeRemaining, Size
 
 # 3. Clear temp files
-Remove-Item -Path $env:TEMP\transcripta* -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $env:TEMP\openwispr* -Recurse -Force -ErrorAction SilentlyContinue
 
 # 4. Verify session data integrity
 Get-ChildItem sessions -Directory | ForEach-Object {

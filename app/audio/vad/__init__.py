@@ -1,3 +1,8 @@
+"""Voice Activity Detection module.
+
+Re-exports VAD components from app.audio.vad.vad_optimized.
+"""
+
 from app.audio.vad.vad_optimized import (
     NoiseProfiler,
     OptimizedVAD,

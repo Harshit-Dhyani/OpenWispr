@@ -1,3 +1,9 @@
+/**
+ * HomePage - Main dashboard page
+ * 
+ * Displays usage analytics, session history, and metrics. Allows copying,
+ * downloading, retrying, and deleting transcription sessions.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { HistoryAnalytics, HistorySession } from '../types/api';
 import { RENDERER_STRINGS } from '../strings/en';
@@ -127,8 +133,8 @@ export function HomePage({
   }
 
   return (
-    <div className={variant === 'compact' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'flex h-full min-h-0 flex-col overflow-hidden p-6 bg-lawn-bg/30'}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className={variant === 'compact' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'flex h-full min-h-0 flex-col overflow-hidden p-4 bg-lawn-bg/30'}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-3xl uppercase tracking-tight text-lawn-border">
             {variant === 'compact' ? text.compactTitle : text.title}
@@ -203,11 +209,11 @@ export function HomePage({
         </div>
       ) : null}
 
-      <section className="min-h-0 flex-1 overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal-sm">
-        <div className="border-b-2 border-lawn-border bg-lawn-bg px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-lawn-muted">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden border-2 border-lawn-border bg-lawn-panel shadow-brutal-sm">
+        <div className="shrink-0 border-b-2 border-lawn-border bg-lawn-bg px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-lawn-muted">
           {text.sessionsTitle}
         </div>
-        <div className="h-full overflow-y-auto p-2 custom-scrollbar">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">
           {loading ? <p className="text-sm font-bold text-lawn-muted">{text.loading}</p> : null}
           {!loading && sessions.length === 0 ? <p className="text-sm font-bold text-lawn-muted">{text.noSessions}</p> : null}
           <div className={variant === 'compact' ? 'space-y-1' : 'space-y-2'}>

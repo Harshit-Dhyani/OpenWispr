@@ -1,3 +1,8 @@
+"""API route modules re-export.
+
+Aggregates all route routers for inclusion in the FastAPI app.
+"""
+
 from .dictionary import router as dictionary_router
 from .history import router as history_router
 from .hotkey import router as hotkey_router
@@ -8,6 +13,7 @@ from .settings import router as settings_router
 from .snippets import router as snippets_router
 from .style import router as style_router
 from .system import router as system_router
+from .text_transform import router as text_transform_router
 
 __all__ = [
     "dictionary_router",
@@ -20,4 +26,5 @@ __all__ = [
     "snippets_router",
     "style_router",
     "system_router",
+    "text_transform_router",
 ]

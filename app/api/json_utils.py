@@ -1,3 +1,29 @@
+"""JSON serialization utilities for API responses.
+
+This module provides the make_json_safe function that recursively converts
+Python objects to JSON-serializable types. Handles:
+
+- NumPy scalars and arrays (numpy.int64 -> int, numpy.float64 -> float)
+- Dataclasses (converted to dict)
+- Path objects (converted to string)
+- datetime/date objects (converted to ISO format)
+- Pydantic models (via model_dump)
+- Nested dicts, lists, tuples, sets
+
+This is essential for WebSocket and SSE responses where complex objects
+must be serialized to JSON.
+
+Example:
+    from app.api.json_utils import make_json_safe
+    
+    data = {
+        "array": np.array([1, 2, 3]),
+        "timestamp": datetime.now(),
+        "path": Path("/tmp/file.txt"),
+    }
+    json_str = json.dumps(make_json_safe(data))
+"""
+
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass

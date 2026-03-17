@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.constants import (
+from app.config.constants import (
     AudioConstants,
     ModelConstants,
     VADConstants,

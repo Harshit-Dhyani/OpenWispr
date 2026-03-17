@@ -33,7 +33,7 @@ assignees: ''
 ## Desktop (please complete the following information):**
 
 - OS: [e.g. Windows 11, macOS 14, Ubuntu 22.04]
-- Version: [e.g. 1.0.0]
+- Version: [e.g. 0.1.0]
 - Installation method: [e.g. .exe installer, portable, from source]
 
 ## Additional Context

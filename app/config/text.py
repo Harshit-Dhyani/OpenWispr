@@ -1,12 +1,26 @@
-"""Centralized UI text for OpenWispr.
+"""Centralized UI text, labels, and messages for OpenWispr.
 
-All user-facing text should be imported from here.
-This enables:
-- Easy localization
-- Consistent terminology
-- Single source of truth
+All user-facing text should be imported from here to enable:
+- Easy localization (future-proofing)
+- Consistent terminology across the app
+- Single source of truth for UI copy
+
+Text categories defined:
+- MODEL_NAMES: Whisper model display names and descriptions
+- LIVE_MODE_LABELS/DESCRIPTIONS: Latency profile names
+- CATEGORY_LABELS: Settings category names
+- SETTING_LABELS/DESCRIPTIONS: Individual setting names and tooltips
+- THEME_LABELS: Theme display names
+- COMPUTE_TYPE_LABELS: Compute type options
+- CAPTURE_MODE_LABELS: Audio source options
+- ERROR_MESSAGES: User-facing error strings
+- BUTTON_LABELS: Action button text
+- STATUS_LABELS: Application state names
+- SETTINGS_SECTION_TEXT: Settings panel copy
+
+Key collaborator: app/config/generate_ts.py consumes this module
+to generate frontend text constants.
 """
-
 
 # ============================================
 # Model Names
@@ -112,6 +126,7 @@ SETTING_LABELS: dict[str, str] = {
     "key_combination": "Key Combination",
     "hold_mode": "Hold Mode",
     "auto_inject": "Auto-inject Text",
+    "auto_transform": "Auto-transform Text",
     "language": "Dictation Language",
     "device_id": "Dictation Microphone",
     "finish_mode_default": "Default Finish Action",
@@ -183,6 +198,7 @@ SETTING_DESCRIPTIONS: dict[str, str] = {
     "key_combination": "Press the button to record a new hotkey",
     "hold_mode": "Record while holding the hotkey",
     "auto_inject": "Type transcription into active window",
+    "auto_transform": "Apply smart formatting, short forms, and corrections to transcribed text",
     "language": "Default language for hotkey dictation",
     "device_id": "Microphone used for quick dictation",
     "finish_mode_default": "What happens when dictation stops from the hotkey toggle",
@@ -571,10 +587,10 @@ SETTINGS_SECTION_TEXT: dict[str, dict[str, str]] = {
     "models": {
         "title": "Model Manager",
         "description": "Install, verify, and choose speech-to-text and transcript refiner models.",
-        "asr_title": "Speech-to-Text",
-        "asr_description": "Choose the default ASR model for new sessions. Session Setup still lets you override the current run.",
-        "refiner_title": "Transcript Refiner",
-        "refiner_description": "Choose a local cleanup/refiner model. Enable llama.cpp runtime to apply Strict or Polished cleanup after final text is produced.",
+        "asr_title": "Speech-to-Text (STT)",
+        "asr_description": "Choose the model that converts your voice to text.",
+        "refiner_title": "Transcript Refiner (LLM)",
+        "refiner_description": "Choose the model that polishes your transcript after speech-to-text.",
         "runtime_title": "Enable Local Refiner Runtime",
         "runtime_description": "Uses llama.cpp with the selected installed GGUF model for final-text cleanup. When disabled, OpenWispr uses built-in cleanup only.",
         "runtime_hint": "Applies only to final text, not live partials.",

@@ -1,4 +1,8 @@
-"""Backward compatibility - pipeline_factory moved to app.audio.pipelines package."""
+"""Backward compatibility shim - redirects to app.audio.pipelines.pipeline_factory.
+
+This module exists for backwards compatibility during the audio pipeline
+reorganization. The canonical source is app.audio.pipelines.pipeline_factory.
+"""
 
 from app.audio.pipelines.pipeline_factory import *  # noqa: F401, F403
 from app.audio.pipelines.pipeline_factory import _detect_pipeline_type

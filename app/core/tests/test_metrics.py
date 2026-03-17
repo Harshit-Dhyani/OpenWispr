@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 
-from app.core.performance_monitor import (
+from app.core.metrics.performance_monitor import (
     LatencyProfiler,
     PerformanceDashboard,
     PerformanceMonitor,
@@ -19,7 +19,7 @@ from app.core.performance_monitor import (
     stop_monitoring,
 )
 
-from app.core.metrics import (
+from app.core.metrics.metrics import (
     AlertSeverity,
     Counter,
     Gauge,

@@ -1,7 +1,7 @@
 """Speech-to-text engine and rolling chunking.
 
 Optimized transcription engine with dual-mode support (Wispr/System),
-adaptive beam sizing, and GPU memory pooling.
+adaptive beam sizing, and GPU memory estimation/tracking.
 """
 
 from app.stt.fast_whisper_backend import (

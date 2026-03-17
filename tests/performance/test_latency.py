@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 
+@pytest.mark.performance
 class TestAudioLatency:
     """Tests for audio processing latency."""
 

@@ -317,9 +317,13 @@ class ModeManager:
         logger.debug("Initializing transcription engine")
 
         try:
+            settings = self._settings_manager.get_settings()
+            wispr_model = settings.transcription.microphone_asr_model_id or "tiny"
+            system_model = settings.transcription.system_asr_model_id or "medium"
+
             self._transcription_engine = DualModeTranscriptionEngine(
-                wispr_model="tiny",
-                system_model="medium",
+                wispr_model=wispr_model,
+                system_model=system_model,
                 download_root=str(self._settings.download_root),
                 device=self._settings.device,
                 warmup_on_init=True,
@@ -1031,5 +1035,3 @@ def reset_mode_manager() -> None:
     with _global_lock:
         _global_mode_manager = None
         ModeManager._instance = None
-
-

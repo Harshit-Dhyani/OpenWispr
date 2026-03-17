@@ -1,3 +1,11 @@
+/**
+ * SessionsView - Top-level view container for session recording mode
+ * 
+ * Manages session form state, device selection, model preloading, and coordinates
+ * MainContent and ModeCardsRow components for session management.
+ * 
+ * @component
+ */
 import { MainContent } from './MainContent';
 import { ModeCardsRow } from './ModeCardsRow';
 import type { Device, SessionSummary, Segment, Formula, Health } from '../types/api';
@@ -92,7 +100,7 @@ export function SessionsView({
       <div className="border-b-2 border-lawn-border bg-lawn-panel p-4">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto]">
           <div className="space-y-4">
-            <div className="border-2 border-lawn-border bg-lawn-bg/60 p-4 shadow-brutal-sm">
+            <div className="p-2 border-2 border-lawn-border">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-lawn-muted">
                 Session workspace
               </p>

@@ -1,3 +1,9 @@
+/**
+ * Live Transcript - Live draft state management utilities
+ * 
+ * Provides functions to build, merge, and clear live transcript state
+ * from structured and legacy event payloads.
+ */
 import type { CommitFinalPayload, DraftPartialPayload } from '../types/api';
 
 export type LiveDraftState = {

@@ -1,3 +1,9 @@
+/**
+ * Model Registry - Model catalog and download state management
+ * 
+ * Provides functions to apply model catalog payloads and handle download
+ * events for the model manager state.
+ */
 import type { ModelCatalogEntry, ModelCatalogPayload, ModelDownloadState, ModelInstallState } from '../types/api';
 
 export type ModelManagerState = {

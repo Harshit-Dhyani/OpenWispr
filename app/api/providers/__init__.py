@@ -1,5 +1,39 @@
+"""LLM provider implementations for coach and refiner services.
+
+This module provides abstract and concrete provider implementations for
+connecting to local LLM runtimes:
+
+Provider Types:
+- OllamaProvider: Connects to Ollama server (http://localhost:11434)
+- LMStudioProvider: Connects to LM Studio server (http://localhost:1234)
+- LlamaCPPProvider: Direct llama-cpp-python integration
+
+Security:
+- URL validation prevents SSRF attacks by restricting to localhost/internal IPs
+- is_safe_url() validates all provider URLs before connection
+
+Base Provider Interface:
+- health_check(): Returns availability and response time
+- list_models(): Returns available models from provider
+- complete(): Generates text completion from prompt
+
+Usage:
+    from app.api.providers import get_provider, ProviderType
+
+    provider = get_provider("ollama", "http://localhost:11434")
+    health = await provider.health_check()
+    models = await provider.list_models()
+    result = await provider.complete(prompt, model_id, {"max_tokens": 512})
+
+Edge Cases:
+- Provider server unavailable: health_check returns available=False with error
+- Invalid model: complete() raises RuntimeError
+- Connection timeout: httpx timeout configured per provider
+"""
+
 from __future__ import annotations
 
+import ipaddress
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -7,12 +41,28 @@ from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
 ProviderType = Literal["ollama", "lm_studio", "llamacpp"]
+
+
+def is_safe_url(url: str) -> bool:
+    """Validate URL is a safe localhost/internal URL to prevent SSRF."""
+    try:
+        parsed = urlparse(url)
+        if not parsed.hostname:
+            return False
+        allowed_hosts = {"localhost", "127.0.0.1", "::1"}
+        if parsed.hostname in allowed_hosts:
+            return True
+        ip = ipaddress.ip_address(parsed.hostname)
+        return ip.is_private or ip.is_loopback
+    except (ValueError, TypeError):
+        return False
 
 
 @dataclass(slots=True)
@@ -31,6 +81,8 @@ class ProviderModel:
 
 class BaseProvider(ABC):
     def __init__(self, base_url: str) -> None:
+        if not is_safe_url(base_url):
+            raise ValueError(f"URL must be a localhost or internal URL: {base_url}")
         self.base_url = base_url.rstrip("/")
 
     @abstractmethod
@@ -210,7 +262,6 @@ class LMStudioProvider(BaseProvider):
 
 class LlamaCPPProvider(BaseProvider):
     def __init__(self, model_path: str | None = None) -> None:
-        super().__init__("")
         self.model_path = model_path
         self._llm: Any | None = None
 

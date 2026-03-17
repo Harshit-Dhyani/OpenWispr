@@ -1,3 +1,13 @@
+/**
+ * SettingsPanel - Full-featured settings management interface
+ * 
+ * Provides categorized settings UI with search, import/export, auto-save with debounce,
+ * preset application, and validation. Renders section components for each settings category
+ * including general, models, transcription, audio, hotkeys, coach, history, dictionary, 
+ * snippets, style, and advanced options.
+ * 
+ * @component
+ */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Settings,

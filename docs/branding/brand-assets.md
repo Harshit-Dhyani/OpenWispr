@@ -2,7 +2,7 @@
 title: Brand Asset Pipeline
 owner: docs/ux
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 review_cadence: quarterly
 source_of_truth:
   - scripts/generate_brand_assets.py

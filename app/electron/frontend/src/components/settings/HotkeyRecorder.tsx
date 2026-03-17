@@ -1,4 +1,14 @@
-import { useState } from 'react';
+/**
+ * HotkeyRecorder - Keyboard shortcut input capture component
+ * 
+ * Records user keyboard shortcuts for hotkey binding. Handles modifier key combinations,
+ * normalizes key names for display, and provides a button interface with recording state.
+ * Exports utility functions for normalizing keyboard events to accelerator format and
+ * formatting hotkey combos for display.
+ * 
+ * @component
+ */
+import { useState, useRef, useEffect } from 'react';
 import { cn } from './utils';
 
 interface HotkeyRecorderProps {
@@ -117,6 +127,18 @@ export function formatHotkeyCombo(combo: string): string {
 
 export function HotkeyRecorder({ value, onChange, disabled = false }: HotkeyRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlersRef = useRef<{ keyDown?: (e: KeyboardEvent) => void; keyUp?: () => void }>({});
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      window.removeEventListener('keydown', handlersRef.current.keyDown!, true);
+      window.removeEventListener('keyup', handlersRef.current.keyUp!, true);
+    };
+  }, []);
 
   const startRecording = () => {
     if (disabled) return;
@@ -136,7 +158,14 @@ export function HotkeyRecorder({ value, onChange, disabled = false }: HotkeyReco
       stopRecording();
     };
 
+    handlersRef.current.keyDown = handleKeyDown;
+    handlersRef.current.keyUp = handleKeyUp;
+
     const stopRecording = (capturedCombo?: string) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       setIsRecording(false);
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
@@ -148,7 +177,7 @@ export function HotkeyRecorder({ value, onChange, disabled = false }: HotkeyReco
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp, true);
 
-    setTimeout(() => stopRecording(), 10000);
+    timeoutRef.current = setTimeout(() => stopRecording(), 10000);
   };
 
   return (

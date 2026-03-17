@@ -36,7 +36,7 @@ import numpy as np
 
 from app.audio.capture import LoopbackAudioSource, MeterSmoother
 from app.audio.devices import list_audio_devices
-from app.core.logging_utils import configure_logging
+from app.core.logging.logging_utils import configure_logging
 from app.core.models import (
     AudioDeviceInfo,
     SessionDocument,

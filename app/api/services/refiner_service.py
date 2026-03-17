@@ -1,3 +1,12 @@
+"""LLM-powered transcript refiner service.
+
+Provides RefinerService for rephrasing and improving transcripts using
+configurable LLM providers. Supports different refinement modes (casual,
+professional, concise) and maintains request queue for load management.
+
+This service is optional - falls back gracefully when no LLM provider is available.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -41,6 +50,23 @@ class ProtectedText:
 
 
 class RefinerService:
+    """LLM-powered transcript refiner service.
+
+    Rephrases and improves transcripts using configurable LLM providers.
+    Supports different refinement modes (casual, professional, concise) and
+    maintains placeholder protection for sensitive tokens.
+
+    State ownership:
+    - Lazy-loaded LLM model (llama.cpp)
+    - Lock-protected model loading
+    - Placeholder tracking for token protection
+
+    Fallback behavior:
+    - Returns original text when runtime unavailable
+    - Preserves protected tokens (numbers, URLs, hotkeys, etc.)
+    - Validates output doesn't change protected content aggressively
+    """
+
     def __init__(self, download_root: Path) -> None:
         self.download_root = Path(download_root)
         self._lock = Lock()

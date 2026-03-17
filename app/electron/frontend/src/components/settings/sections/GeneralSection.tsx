@@ -1,11 +1,18 @@
+/**
+ * GeneralSection - General application settings
+ * 
+ * Manages language, theme, startup behavior, storage paths, and UI preferences.
+ * Props: SectionProps with availableLanguages array.
+ */
 import { Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
-import { Slider, Select, Toggle } from '../controls';
+import { Slider, Select } from '../controls';
 import type { SectionProps } from '../types';
 import { getLanguageLabel } from '../../../lib/languages';
 import { RENDERER_STRINGS } from '../../../strings/en';
-import { isFakeSetting } from '../../../config/settingsSchema';
+import { getStoragePaths } from '../../../api/settings';
 
 interface GeneralSectionProps extends SectionProps {
   availableLanguages: string[];
@@ -21,6 +28,20 @@ export function GeneralSection({
   const text = RENDERER_STRINGS.settings.general;
   const common = RENDERER_STRINGS.settings.common;
   const themeOptions = [...text.themeOptions];
+  const [storagePaths, setStoragePaths] = useState<{
+    models_path: string;
+    settings_file: string;
+  } | null>(null);
+
+  useEffect(() => {
+    getStoragePaths()
+      .then(setStoragePaths)
+      .catch(() => setStoragePaths(null));
+  }, []);
+
+  const openFolder = (path: string) => {
+    window.openwisprDesktop?.openPath(path);
+  };
 
   return (
     <div className="space-y-6">
@@ -29,6 +50,30 @@ export function GeneralSection({
         icon={Settings}
         description={text.description}
       />
+
+      {storagePaths && (
+        <SettingCard
+          title={text.storagePathsTitle}
+          description={text.storagePathsDescription}
+        >
+          <div className="space-y-2">
+            <button
+              onClick={() => openFolder(storagePaths.models_path)}
+              className="w-full text-left px-3 py-2 text-sm bg-lawn-bg border border-lawn-border hover:border-lawn-accent transition-colors"
+            >
+              <span className="text-stone-500">{text.modelsFolder}:</span>{' '}
+              <span className="text-lawn-border font-mono text-xs">{storagePaths.models_path}</span>
+            </button>
+            <button
+              onClick={() => openFolder(storagePaths.settings_file)}
+              className="w-full text-left px-3 py-2 text-sm bg-lawn-bg border border-lawn-border hover:border-lawn-accent transition-colors"
+            >
+              <span className="text-stone-500">{text.settingsFile}:</span>{' '}
+              <span className="text-lawn-border font-mono text-xs">{storagePaths.settings_file}</span>
+            </button>
+          </div>
+        </SettingCard>
+      )}
 
       <div className="grid gap-4">
         <SettingCard
@@ -120,48 +165,6 @@ export function GeneralSection({
             suffix="s"
           />
         </SettingCard>
-
-        {isFakeSetting('general', 'showNotifications') && (
-          <SettingCard
-            title={text.showNotificationsTitle}
-            description={text.showNotificationsDescription}
-            badge="Coming Soon"
-          >
-            <Toggle
-              checked={Boolean(settings.general.showNotifications)}
-              onChange={() => {}}
-              disabled
-            />
-          </SettingCard>
-        )}
-
-        {isFakeSetting('general', 'minimizeToTray') && (
-          <SettingCard
-            title={text.minimizeToTrayTitle}
-            description={text.minimizeToTrayDescription}
-            badge="Coming Soon"
-          >
-            <Toggle
-              checked={Boolean(settings.general.minimizeToTray)}
-              onChange={() => {}}
-              disabled
-            />
-          </SettingCard>
-        )}
-
-        {isFakeSetting('general', 'startupWithSystem') && (
-          <SettingCard
-            title={text.startupWithSystemTitle}
-            description={text.startupWithSystemDescription}
-            badge="Coming Soon"
-          >
-            <Toggle
-              checked={Boolean(settings.general.startupWithSystem)}
-              onChange={() => {}}
-              disabled
-            />
-          </SettingCard>
-        )}
       </div>
     </div>
   );

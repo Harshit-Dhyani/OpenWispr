@@ -1,7 +1,7 @@
 """Model pool for managing multiple Whisper model instances.
 
 Provides thread-safe access to multiple model instances with:
-- GPU memory pooling
+- GPU memory estimation and tracking
 - Automatic model lifecycle management
 - Warmup at startup
 - CPU fallback on GPU OOM
@@ -16,26 +16,49 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
+# Lazy load numpy and faster-whisper to speed up import time
 import numpy as np
-from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
-try:
-    import torch
-    import torch.cuda
+# Lazy load torch only when needed
+torch = None
+HAS_TORCH = False
 
-    HAS_TORCH = True
-except ImportError:
-    torch = None
-    HAS_TORCH = False
+
+def _ensure_torch():
+    """Lazy load torch on first use."""
+    global torch, HAS_TORCH
+    if not HAS_TORCH:
+        try:
+            import torch
+            import torch.cuda
+
+            HAS_TORCH = True
+        except ImportError:
+            torch = None
+            HAS_TORCH = False
+
+
+# Lazy load faster-whisper only when needed
+_WhisperModel = None
+
+
+def _get_whisper_model():
+    """Lazy load WhisperModel on first use."""
+    global _WhisperModel
+    if _WhisperModel is None:
+        from faster_whisper import WhisperModel
+
+        _WhisperModel = WhisperModel
+    return _WhisperModel
 
 
 @dataclass(slots=True)
 class ModelInstance:
     """A managed model instance with metadata."""
 
-    model: WhisperModel
+    model: Any  # WhisperModel - lazy loaded
     model_name: str
     device: str
     compute_type: str
@@ -50,7 +73,7 @@ class ModelInstance:
 class ModelSlot:
     """A slot holding a reference to a pooled model."""
 
-    model: WhisperModel
+    model: Any  # WhisperModel - lazy loaded
     model_name: str
     device: str
     compute_type: str
@@ -68,7 +91,8 @@ class GPUMemoryPool:
     _model_memory: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if HAS_TORCH and torch.cuda.is_available():
+        _ensure_torch()
+        if HAS_TORCH and torch and torch.cuda.is_available():
             self._update_stats()
 
     def _update_stats(self) -> None:
@@ -199,7 +223,6 @@ class ModelPool:
 
         # Threading
         self._pool_lock = threading.RLock()
-        self._cleanup_lock = threading.Lock()
 
         # GPU memory management
         self._gpu_pool = GPUMemoryPool() if enable_gpu_pool else None
@@ -266,7 +289,7 @@ class ModelPool:
         compute_type: str,
         download_root: str | None = None,
         warmup: bool | None = None,
-    ) -> WhisperModel:
+    ) -> Any:  # WhisperModel - lazy loaded
         """Get or create a cached model with automatic GPU/CPU selection."""
         cache_key = f"{model_name}:{device}:{compute_type}"
         download_root = download_root or self._download_root
@@ -324,7 +347,7 @@ class ModelPool:
         compute_type: str,
         download_root: str,
         warmup: bool,
-    ) -> WhisperModel:
+    ) -> Any:  # WhisperModel - lazy loaded
         """Create a new model instance with retry and fallback logic."""
 
         # Per-key lock to prevent duplicate loads
@@ -351,11 +374,13 @@ class ModelPool:
 
             # Load model with retries
             model = None
+            load_time_ms = 0.0
             last_error: Exception | None = None
 
             for attempt in range(self._max_retries):
                 try:
                     load_start = time.perf_counter()
+                    WhisperModel = _get_whisper_model()
                     model = WhisperModel(
                         model_name,
                         device=device,
@@ -383,7 +408,8 @@ class ModelPool:
                             self._metrics.gpu_fallbacks += 1
 
                             # Clear GPU cache
-                            if HAS_TORCH and torch.cuda.is_available():
+                            _ensure_torch()
+                            if HAS_TORCH and torch and torch.cuda.is_available():
                                 torch.cuda.empty_cache()
                                 torch.cuda.synchronize()
                             continue
@@ -575,9 +601,10 @@ class ModelPool:
             self._metrics = PoolMetrics()
 
             # Clear GPU cache
-            if HAS_TORCH and torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
+            _ensure_torch()
+        if HAS_TORCH and torch and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
     def preload_models(
         self,

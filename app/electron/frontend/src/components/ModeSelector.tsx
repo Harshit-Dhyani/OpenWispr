@@ -1,3 +1,12 @@
+/**
+ * ModeSelector - Transcription mode selection UI components
+ * 
+ * Provides three variants for selecting between Hotkey (dictation) and System (session) 
+ * transcription modes: full card-based selector, compact button row, and toggle switch.
+ * Features include hover states, loading indicators, feature lists, and mode comparison hints.
+ * 
+ * @component
+ */
 import { Mic, Monitor, Check, Info, Loader2 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 

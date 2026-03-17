@@ -1,3 +1,15 @@
+"""Prompt templates and profiles for AI transcript refinement.
+
+Defines instruction sets and prompt templates used by the transcript
+refiner service to transform raw transcripts into polished output.
+
+Profiles:
+    - clean_dictation: Smooth dictation artifacts
+    - professional: Polished professional writing
+    - student_notes: Study notes format
+    - code_logs: Preserve technical tokens exactly
+"""
+
 from __future__ import annotations
 
 from typing import Final
@@ -43,6 +55,22 @@ def build_refiner_prompt(
     language_hint: str,
     cleanup_instructions: str = "",
 ) -> str:
+    """Build a prompt for AI transcript refinement.
+
+    Assembles the prompt by combining the base prefix, language hint,
+    intensity instruction (strict vs polished), profile instruction, optional
+    cleanup instructions, and the transcript text wrapped in XML tags.
+
+    Args:
+        text: Raw transcript text to be refined.
+        mode: Refinement intensity - "strict" for light cleanup, anything else for polished.
+        profile: Refinement profile name (e.g., "professional", "code_logs").
+        language_hint: Language code or description for the model.
+        cleanup_instructions: Additional user-provided instructions for final text only.
+
+    Returns:
+        Complete prompt string ready for LLM submission.
+    """
     intensity_instruction = (
         STRICT_INTENSITY_INSTRUCTION if mode == "strict" else POLISHED_INTENSITY_INSTRUCTION
     )
@@ -55,14 +83,6 @@ def build_refiner_prompt(
         + f"Task: {intensity_instruction} {profile_instruction}\n"
     )
     if extra_instructions:
-        prompt += (
-            "Additional cleanup instructions for final text only:\n"
-            f"{extra_instructions}\n"
-        )
-    prompt += (
-        "<TRANSCRIPT>\n"
-        f"{text}\n"
-        "</TRANSCRIPT>\n"
-        "<REFINED_TEXT>\n"
-    )
+        prompt += f"Additional cleanup instructions for final text only:\n{extra_instructions}\n"
+    prompt += f"<TRANSCRIPT>\n{text}\n</TRANSCRIPT>\n<REFINED_TEXT>\n"
     return prompt

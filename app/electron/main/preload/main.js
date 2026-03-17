@@ -164,6 +164,9 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
     updateTooltip: (tooltip) => ipcRenderer.invoke("tray:update-tooltip", tooltip)
   },
 
+  // Open path in file explorer
+  openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
+
   models: {
     getDownloadRoot: () => ipcRenderer.invoke("models:get-download-root"),
     download: (modelId) => ipcRenderer.invoke("models:download", { modelId }),

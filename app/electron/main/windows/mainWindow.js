@@ -1,4 +1,9 @@
-// Main window creation and management
+/**
+ * Main application window for OpenWispr
+ * Creates and manages the primary Electron BrowserWindow with preload script.
+ * Exports: createMainWindow, showMainWindowAndFocus
+ * @module mainWindow
+ */
 const { BrowserWindow } = require("electron");
 const path = require("path");
 const state = require("../shared/state");
@@ -28,7 +33,10 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "main.js"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: true,
+      sandbox: true,
+      allowRunningInsecureContent: false
     }
   });
 

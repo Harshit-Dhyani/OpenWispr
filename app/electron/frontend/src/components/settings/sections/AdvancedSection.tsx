@@ -1,12 +1,16 @@
+/**
+ * AdvancedSection - Advanced and experimental settings
+ * 
+ * Manages CPU threads, logging levels, debugging options, and experimental features.
+ * Props: SectionProps with saveError for displaying save failures.
+ */
 import { Cpu, Activity, Zap, Info, AlertCircle } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
 import { Toggle, Select, NumberInput } from '../controls';
 import type { SectionProps } from '../types';
 import { AppConstants } from '../../../config/generated/constants';
-import { SETTING_LABELS, SETTING_DESCRIPTIONS } from '../../../config/generated/text';
 import { RENDERER_STRINGS } from '../../../strings/en';
-import { isFakeSetting } from '../../../config/settingsSchema';
 
 interface AdvancedSectionProps extends SectionProps {
   saveError: string | null;
@@ -116,32 +120,6 @@ export function AdvancedSection({
                 onChange={(v) => updateSetting('advanced', 'enableMetrics', v)}
               />
             </div>
-            {isFakeSetting('advanced', 'experimentalStem') && (
-              <SettingCard
-                title={SETTING_LABELS.experimentalStem}
-                description={SETTING_DESCRIPTIONS.experimentalStem}
-                badge="Coming Soon"
-              >
-                <Toggle
-                  checked={Boolean(settings.advanced.experimentalStem)}
-                  onChange={() => {}}
-                  disabled
-                />
-              </SettingCard>
-            )}
-            {isFakeSetting('advanced', 'experimentalGpuAccel') && (
-              <SettingCard
-                title={SETTING_LABELS.experimentalGpuAccel}
-                description={SETTING_DESCRIPTIONS.experimentalGpuAccel}
-                badge="Coming Soon"
-              >
-                <Toggle
-                  checked={Boolean(settings.advanced.experimentalGpuAccel)}
-                  onChange={() => {}}
-                  disabled
-                />
-              </SettingCard>
-            )}
           </div>
         </div>
 

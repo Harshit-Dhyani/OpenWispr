@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 
+@pytest.mark.integration
 class TestHealthEndpoint:
     """Tests for the health endpoint."""
 

@@ -1,3 +1,15 @@
+"""Deterministic post-processing for transcribed text.
+
+Provides rule-based text transformations including:
+- Number normalization (digit words to digits, decimal handling)
+- Percent formatting
+- Whitespace normalization
+- Pattern-based text cleanup
+
+This module operates purely deterministically without ML/AI. Used for
+preparing transcripts before optional AI refinement.
+"""
+
 from __future__ import annotations
 
 import re
@@ -84,10 +96,16 @@ _NUMBER_WORD_VALUES = {
 
 
 def normalize_postprocess_text(text: str) -> str:
+    """Normalize whitespace: collapse multiple spaces, trim ends."""
     return _WHITESPACE_RE.sub(" ", (text or "").strip()).strip()
 
 
 def postprocess_live_text(text: str, *, mode: TranscriptionMode) -> str:
+    """Light normalization for live/partial transcript display.
+
+    Currently applies only whitespace normalization since live text
+    may still be incomplete and should not undergo full processing.
+    """
     del mode
     return normalize_postprocess_text(text)
 
@@ -98,6 +116,20 @@ def postprocess_final_text(
     mode: TranscriptionMode,
     profile: RefinementProfile = "clean_dictation",
 ) -> str:
+    """Apply full deterministic post-processing pipeline to final transcript.
+
+    Runs numeric normalization, acronym handling, repetition trimming,
+    sentence deduplication, and capitalization in the appropriate order
+    based on mode and profile. Skips sensitive transforms for code/literal modes.
+
+    Args:
+        text: The raw or partially processed transcript text.
+        mode: Transcription mode affecting transform behavior.
+        profile: Refinement profile affecting which transforms apply.
+
+    Returns:
+        Fully processed text ready for display or storage.
+    """
     normalized = normalize_postprocess_text(text)
     if not normalized:
         return ""
@@ -119,7 +151,8 @@ def postprocess_final_text(
 
     conservative_profile = profile in {"clean_dictation", "professional", "student_notes"}
     if mode != "literal" and profile not in {"code_log", "code_logs"}:
-        normalized = _capitalize_first(normalized)
+        # Capitalize each sentence for better readability
+        normalized = _capitalize_sentences(normalized)
         if (
             normalized
             and (normalized[-1].isalnum() or normalized[-1] == "%")
@@ -130,6 +163,20 @@ def postprocess_final_text(
 
 
 def spoken_numbers_to_symbols(text: str, *, mode: TranscriptionMode) -> str:
+    """Convert spoken number words to numeric symbols.
+
+    Handles decimal words ("three point five"), percentages (digit + "percent"),
+    word-based percentages ("twenty five percent"), digit runs, and dotted tokens
+    (e.g., "one dot two"). In literal mode, also handles symbol words like
+    "dot", "underscore", "slash", "dash".
+
+    Args:
+        text: Input text with potential spoken numbers.
+        mode: Transcription mode - "literal" preserves more number representations.
+
+    Returns:
+        Text with spoken numbers converted to numeric symbols where applicable.
+    """
     normalized = normalize_postprocess_text(text)
     if not normalized:
         return ""
@@ -147,6 +194,20 @@ def spoken_numbers_to_symbols(text: str, *, mode: TranscriptionMode) -> str:
 
 
 def normalize_acronyms_and_tokens(text: str, *, mode: TranscriptionMode) -> str:
+    """Normalize acronyms and known technical tokens.
+
+    Collapses spaced single-letter sequences into uppercase acronyms
+    (e.g., "U S A" -> "USA"). Also joins known token prefixes with
+    following single letters (e.g., "API key" -> "APIKey"). Only applies
+    in literal mode since dictation should preserve word boundaries.
+
+    Args:
+        text: Input text potentially containing spaced acronyms.
+        mode: Transcription mode - only applies transforms in "literal" mode.
+
+    Returns:
+        Text with normalized acronyms and tokens.
+    """
     normalized = normalize_postprocess_text(text)
     if not normalized or mode != "literal":
         return normalized
@@ -278,6 +339,45 @@ def _capitalize_first(text: str) -> str:
         if char.isalpha():
             return f"{text[:index]}{char.upper()}{text[index + 1 :]}"
     return text
+
+
+def _capitalize_sentences(text: str) -> str:
+    """Capitalize the first letter of each sentence.
+
+    Detects sentence boundaries by looking for sentence-ending punctuation
+    followed by whitespace and a new sentence.
+    """
+    if not text:
+        return text
+
+    result = []
+    i = 0
+    n = len(text)
+    next_capitalize = True
+
+    while i < n:
+        char = text[i]
+
+        if next_capitalize and char.isalpha():
+            result.append(char.upper())
+            next_capitalize = False
+            i += 1
+            continue
+
+        result.append(char)
+
+        # Check if this is a sentence boundary
+        if char in ".!?":
+            # Check what follows - if whitespace and then a letter, capitalize next
+            j = i + 1
+            while j < n and text[j] in " \t":
+                j += 1
+            if j < n and text[j].isalpha():
+                next_capitalize = True
+
+        i += 1
+
+    return "".join(result)
 
 
 def _protect_numeric_dots(text: str) -> str:

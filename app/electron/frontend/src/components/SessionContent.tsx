@@ -1,3 +1,11 @@
+/**
+ * SessionContent - Main content panel for session mode
+ * 
+ * Renders session transcript with inspector panels for review, formulas, suppressed,
+ * errors, and session metadata. Displays statistics and live draft state.
+ * 
+ * @component
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Waves } from 'lucide-react';
 import type { Formula, Segment, SessionSummary } from '../types/api';
@@ -121,26 +129,26 @@ export function SessionContent({
 
   return (
     <main className="flex min-h-0 flex-col gap-4 overflow-hidden bg-lawn-bg/30 p-4">
-      <header className="shrink-0 border-2 border-lawn-border bg-lawn-panel p-5 text-lawn-border shadow-brutal">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+      <header className="shrink-0 border-2 border-lawn-border bg-lawn-panel p-3 text-lawn-border shadow-brutal">
+        <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
+            <div className="mb-0.5 flex items-center gap-2">
               <p className="text-[10px] font-black uppercase tracking-[0.15em] text-lawn-muted">
                 {workspaceLabel}
               </p>
               <StatusBadge status={sessionStatus} />
             </div>
-            <h2 className="font-display text-3xl uppercase tracking-tighter leading-none md:text-4xl">
+            <h2 className="font-display text-2xl uppercase tracking-tighter leading-none md:text-3xl">
               {workspaceTitle || snapshot.session?.title || 'Live Transcript'}
             </h2>
-            <p className="mt-2 max-w-3xl text-xs font-bold leading-4 opacity-70">
+            <p className="mt-1.5 max-w-3xl text-[11px] font-bold leading-4 opacity-70 truncate line-clamp-1">
               {workspaceDescription ||
                 snapshot.session?.output_dir ||
                 'Transcript, verification, formulas, suppressed segments, and diagnostics stay visible here while capture is running.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <StatCard label="Segments" value={String(acceptedCount)} />
             <StatCard label="Review" value={String(reviewCount)} danger={reviewCount > 0} />
             <StatCard label="Formulas" value={String(formulaCount)} accent={formulaCount > 0} />
@@ -229,14 +237,14 @@ export function SessionContent({
                 Inspector
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap xl:grid xl:grid-cols-3 2xl:grid-cols-5">
               {panels.map((panel) => (
                 <button
                   key={panel.key}
                   type="button"
                   onClick={() => setActivePanel(panel.key)}
                   className={[
-                    'border-2 px-2 py-2 text-left shadow-brutal-sm transition-all',
+                    'border-2 px-1.5 py-1.5 text-left shadow-brutal-sm transition-all sm:flex-1 xl:flex-none',
                     activePanel === panel.key
                       ? 'border-lawn-border bg-lawn-accent text-lawn-bg'
                       : panel.accent

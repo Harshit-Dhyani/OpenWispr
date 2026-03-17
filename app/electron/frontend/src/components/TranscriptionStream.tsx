@@ -1,3 +1,11 @@
+/**
+ * TranscriptionStream - Real-time transcription display with segment management
+ * 
+ * Renders live transcript segments with audio visualization, search, export (txt/json/srt),
+ * and segment editing capabilities. Integrates WebSocket for real-time updates.
+ * 
+ * @component
+ */
 import { 
   useState, 
   useRef, 
@@ -497,6 +505,15 @@ export const TranscriptionStream = forwardRef<TranscriptionStreamRef, Transcript
       }
       lastSegmentCount.current = segments.length;
     }, [segments.length, autoScroll, onScrollToBottom]);
+
+    // Cleanup scroll timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (scrollTimeout.current) {
+          window.clearTimeout(scrollTimeout.current);
+        }
+      };
+    }, []);
 
     // Handle user scroll detection
     const handleScroll = useCallback(() => {

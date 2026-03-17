@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from app.core.settings_manager import (
+from app.core.settings.manager import (
     AudioSettings,
     GeneralSettings,
     ModeSpecificSettings,
@@ -29,6 +29,7 @@ from app.core.settings_manager import (
 from app.core.modes import TranscriptionMode
 
 
+@pytest.mark.unit
 class TestSettingsDataclasses:
     """Tests for settings dataclasses."""
 

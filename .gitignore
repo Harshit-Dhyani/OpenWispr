@@ -52,6 +52,9 @@ fix_model_download.py
 *.log
 nul
 
+# Mkdocs
+site/
+
 # Temporary files
 *.tmp
 *.temp
@@ -74,10 +77,12 @@ test-results/
 
 # OpenWispr local data
 .openwispr/
+.locks/
 
 # Generated reports
 prompts/REPORTS.md
 scripts/reports/
+reports/
 
 # Docs generated
 docs/pnpm-lock.yaml

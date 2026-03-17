@@ -517,7 +517,9 @@ function App() {
           Object.entries(settingsWithDefaults.transcription).filter(([key]) => !isFakeSetting('transcription', key))
         ) as SettingsState['transcription'],
         refiner: settingsWithDefaults.refiner,
-        coach: settingsWithDefaults.coach,
+        coach: Object.fromEntries(
+          Object.entries(settingsWithDefaults.coach).filter(([key]) => !isFakeSetting('coach', key))
+        ) as SettingsState['coach'],
         audio: Object.fromEntries(
           Object.entries(settingsWithDefaults.audio).filter(([key]) => !isFakeSetting('audio', key))
         ) as SettingsState['audio'],

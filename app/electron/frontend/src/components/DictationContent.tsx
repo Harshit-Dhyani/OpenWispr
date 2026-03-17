@@ -1,3 +1,11 @@
+/**
+ * DictationContent - Main content panel for dictation mode
+ * 
+ * Renders transcript segments, coach results, live draft text, and statistics.
+ * Supports inspector panels for combined text and coach output.
+ * 
+ * @component
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Waves } from 'lucide-react';
 import type { CoachResult, Segment } from '../types/api';
@@ -183,23 +191,23 @@ export function DictationContent({
   return (
     <main className="flex min-h-0 flex-col gap-2 overflow-hidden bg-lawn-bg/30 p-2">
       <header className="shrink-0 border-2 border-lawn-border bg-lawn-panel p-2 text-lawn-border shadow-brutal">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+        <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-end 2xl:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
+            <div className="mb-0.5 flex items-center gap-2">
               <p className="text-[10px] font-black uppercase tracking-[0.15em] text-lawn-muted">
                 {workspaceLabel}
               </p>
               <StatusBadge status={sessionStatus} />
             </div>
-            <h2 className="font-display text-xl uppercase tracking-tighter leading-none">
+            <h2 className="font-display text-xl uppercase tracking-tighter leading-none md:text-2xl">
               {workspaceTitle || 'Mic / hotkey timeline'}
             </h2>
-            <p className="mt-2 max-w-3xl text-xs font-bold leading-4 opacity-70">
+            <p className="mt-1.5 max-w-3xl text-[11px] font-bold leading-4 opacity-70 truncate line-clamp-1">
               {workspaceDescription || 'Quick dictation, low-latency feedback, and one shared timeline for recent spoken text.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:grid xl:grid-cols-3">
             <StatCard label="Segments" value={String(acceptedCount)} />
             <StatCard label="Words" value={String(combinedWordCount)} />
             <StatCard label="Latency" value={latencyValue} warning={Boolean(liveLatency && liveLatency >= 500)} />
@@ -297,14 +305,14 @@ export function DictationContent({
                   Inspector
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:flex lg:flex-wrap">
                 {panels.map((panel) => (
                   <button
                     key={panel.key}
                     type="button"
                     onClick={() => setActivePanel(panel.key)}
                     className={[
-                      'border-2 px-2 py-2 text-left shadow-brutal-sm transition-all',
+                      'border-2 px-1.5 py-1.5 text-left shadow-brutal-sm transition-all lg:flex-1',
                       activePanel === panel.key
                         ? 'border-lawn-border bg-lawn-accent text-lawn-bg'
                         : panel.accent

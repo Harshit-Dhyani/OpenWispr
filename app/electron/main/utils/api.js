@@ -1,3 +1,10 @@
+/**
+ * API utilities for backend communication
+ * Provides fetch wrappers with retry logic, timeout handling, and error recovery
+ * for settings, devices, and model download endpoints. Exports: fetchBackendJson,
+ * loadUserSettings, saveUserSettings, loadDevicesForDesktop
+ * @module api
+ */
 // API utilities for backend communication
 const state = require("../shared/state");
 let settingsRequestPromise = null;

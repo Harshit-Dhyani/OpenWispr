@@ -1,13 +1,11 @@
 ---
 title: English Coach Service
 description: LLM-powered writing coach for dictation transcript refinement
-description: LLM-powered writing coach for dictation transcript refinement
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
-  - app/api/coach_service.py
-  - app/api/coach_cache.py
-  - app/config/coach_prompts.py
+  - app/api/services/coach_service.py
+  - app/stt/prompts.py
 ---
 
 # English Coach Service
@@ -151,7 +149,7 @@ def build_key(*parts: object) -> str:
 ### Cache Persistence
 
 ```python
-# Storage: JSON file (default: ~/.transcripta/coach_cache.json)
+# Storage: JSON file (default: ~/.openwispr/coach_cache.json)
 # Max entries: 500 (LRU eviction)
 # TTL: None (persistent until max_entries exceeded)
 

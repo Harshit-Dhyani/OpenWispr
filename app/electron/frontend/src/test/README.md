@@ -143,7 +143,7 @@ Mock Electron and browser APIs:
 import { createMockElectronAPI, createMockMediaDevices, createMockFloatingAPI } from '@/test';
 
 // Mock Electron API
-window.transcriptaDesktop = createMockElectronAPI();
+window.openwisprDesktop = createMockElectronAPI();
 
 // Mock floating window API
 window.floatingAPI = createMockFloatingAPI();

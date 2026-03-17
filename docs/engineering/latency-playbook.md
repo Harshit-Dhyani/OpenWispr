@@ -1,7 +1,7 @@
 ---
 title: Latency Playbook
 audience: developers
-last_verified: 2026-03-08
+last_verified: 2026-03-15
 source_of_truth:
   - app/api/routes/session.py
   - app/api/routes/system.py
@@ -81,10 +81,10 @@ curl http://127.0.0.1:8765/api/health | jq '.health.queue_depth, .health.real_ti
 ```powershell
 # Option 1: Reduce max queue (faster backpressure)
 # In config.py
-max_queue_items = 16  # Was 64
+max_queue_items = 16
 
 # Option 2: Switch to smaller model
-$env:OPENWISPR_DEFAULT_MODEL="tiny"  # Was "small"
+$env:OPENWISPR_DEFAULT_MODEL="small"  # or "base", "tiny"
 
 # Option 3: Use GPU if available
 $env:OPENWISPR_DEVICE="cuda"
@@ -178,7 +178,7 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
 
 ### 3.2 Configuration Changes (Requires Restart)
 
-**Create `~/.transcripta/config.json`:**
+**Create `~/.openwispr/user_settings.json`:**
 
 ```json
 {
@@ -209,9 +209,9 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
 
 ```powershell
 # Windows PowerShell - Set before starting OpenWispr
-$env:OPENWISPR_DEFAULT_MODEL="tiny"
-$env:OPENWISPR_DEVICE="cpu"
-$env:OPENWISPR_DEFAULT_LANGUAGE="en"
+$env:OPENWISPR_DEFAULT_MODEL="small"
+$env:OPENWISPR_DEVICE="cuda"
+$env:OPENWISPR_COMPUTE_TYPE="int8"
 $env:OPENWISPR_LOG_LEVEL="INFO"  # Reduce log noise
 
 # Then launch

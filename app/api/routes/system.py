@@ -1,22 +1,35 @@
+"""System health and backend management endpoints.
+
+Provides health checks, backend service management, and system optimization.
+"""
+
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 import app.api.deps as api_deps
 from app.api.deps import get_service
 from app.api.route_utils import log_route
 from app.api.services.backend_service import BackendService
-from app.core.auto_optimizer import AutoOptimizer, get_recommended_settings
-from app.core.system_profiler import SystemProfiler
+from app.core.optimization.auto_optimizer import AutoOptimizer, get_recommended_settings
+from app.core.profiling.system_profiler import SystemProfiler
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.get("/api/health")
 @log_route("GET", "/api/health")
 def health(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    """
+    Get backend health status and metrics.
+
+    Returns:
+        dict: Contains ok status, health dict, meter_value, model_cache, and hotkey status
+    """
     snapshot = svc.get_snapshot()
     hotkey_status_data = None
     if api_deps.hotkey_service is not None:
@@ -43,6 +56,12 @@ def health(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
 @router.get("/api/devices")
 @log_route("GET", "/api/devices")
 def devices(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    """
+    List available audio input devices.
+
+    Returns:
+        dict: Contains 'devices' list with available audio devices
+    """
     return {"devices": svc.list_devices()}
 
 
@@ -53,12 +72,49 @@ def probe_device_endpoint(
     duration: float = 3.0,
     svc: BackendService = Depends(get_service),
 ) -> dict[str, Any]:
+    """
+    Probe an audio device to test its functionality.
+
+    Args:
+        device_id: ID of the device to probe (or 'default')
+        duration: Probe duration in seconds (default 3.0)
+
+    Returns:
+        dict: Contains device probe results
+
+    Raises:
+        HTTPException: 400 if probe fails, 500 on internal error
+    """
     actual_device_id = device_id if device_id != "default" else None
-    return svc.probe_device(actual_device_id, duration=duration)
+    try:
+        return svc.probe_device(actual_device_id, duration=duration)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to probe device: %s", device_id)
+        raise HTTPException(status_code=500, detail="Failed to probe device") from exc
+
+
+@router.get("/api/system/storage")
+@log_route("GET", "/api/system/storage")
+def get_storage_paths(svc: BackendService = Depends(get_service)) -> dict[str, Any]:
+    """
+    Get storage paths for models, settings, and app data.
+
+    Returns:
+        dict: Contains storage path information
+    """
+    return svc.get_storage_paths()
 
 
 @router.get("/api/system/profile")
 def get_system_profile() -> dict[str, Any]:
+    """
+    Get system hardware profile information.
+
+    Returns:
+        dict: Contains system hardware summary (CPU, memory, GPU info)
+    """
     profiler = SystemProfiler()
     return profiler.get_summary()
 
@@ -70,6 +126,16 @@ def get_optimized_settings(
     ),
     hotkey: bool = Query(False, description="Optimize for hotkey/push-to-talk mode"),
 ) -> dict[str, Any]:
+    """
+    Get recommended settings based on system optimization mode.
+
+    Args:
+        mode: Optimization mode ('maximum', 'balanced', 'speed', 'low_memory')
+        hotkey: Whether to optimize for hotkey/push-to-talk mode
+
+    Returns:
+        dict: Contains recommended settings and metadata including quality level and resource estimates
+    """
     settings = get_recommended_settings(mode=mode, hotkey=hotkey)
     return {
         "settings": {
@@ -101,6 +167,12 @@ def get_optimized_settings(
 
 @router.get("/api/system/presets")
 def get_preset_settings() -> dict[str, Any]:
+    """
+    Get all available preset configurations.
+
+    Returns:
+        dict: Contains 'presets' with all preset configurations
+    """
     optimizer = AutoOptimizer()
     presets: dict[str, Any] = {}
     for preset_name in [

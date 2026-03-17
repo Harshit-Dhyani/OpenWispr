@@ -1,3 +1,9 @@
+/**
+ * Test Utilities - Mock factories and test helpers
+ * 
+ * Provides mock implementations for WebSocket, Electron API, AudioContext,
+ * media devices, and various test helper functions.
+ */
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 

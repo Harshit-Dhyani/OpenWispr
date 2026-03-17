@@ -109,7 +109,8 @@ class HotkeySessionConfig:
     # Behavior settings
     auto_inject: bool = True
     copy_to_clipboard: bool = True
-    show_floating_window: bool = False
+    show_floating_window: bool = True
+    floating_window_position: str = "bottom-right"
     save_sessions: bool = False
 
     # Model settings - use tiny for speed
@@ -216,7 +217,13 @@ class PlatformTextInjector:
     def _inject_macos(self, text: str) -> bool:
         """macOS text injection using AppleScript."""
         try:
-            escaped_text = text.replace('"', '\\"')
+            escaped_text = (
+                text.replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+            )
             script = f'''
                 tell application "System Events"
                     keystroke "{escaped_text}"

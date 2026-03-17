@@ -1,3 +1,10 @@
+/**
+ * HotkeySection - Keyboard shortcut settings
+ * 
+ * Manages global hotkey configuration for dictation start/stop, key combination recording,
+ * and audio device selection for hotkey capture.
+ * Props: SectionProps with audioDevices list.
+ */
 import { Keyboard, Sliders } from 'lucide-react';
 import { SectionHeader } from '../SectionHeader';
 import { SettingCard } from '../SettingCard';
@@ -163,6 +170,16 @@ export function HotkeySection({
                   <Toggle
                     checked={settings.hotkey.auto_inject}
                     onChange={(v) => updateSetting('hotkey', 'auto_inject', v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-bold block">{text.behavior.autoTransform.title}</span>
+                    <p className="text-xs text-stone-500">{text.behavior.autoTransform.description}</p>
+                  </div>
+                  <Toggle
+                    checked={settings.hotkey.auto_transform ?? true}
+                    onChange={(v) => updateSetting('hotkey', 'auto_transform', v)}
                   />
                 </div>
                 <div className="flex items-center justify-between">

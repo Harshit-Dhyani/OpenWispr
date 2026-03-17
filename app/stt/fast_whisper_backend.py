@@ -4,7 +4,7 @@ This module provides a high-performance wrapper around faster-whisper with:
 - INT8 quantization support
 - Adaptive beam sizing based on latency targets
 - Prefix-based context carryover
-- Greedy decoding option for maximum speed
+- Configurable beam size (defaults to 1 for greedy decoding)
 """
 
 from __future__ import annotations
@@ -40,7 +40,14 @@ ModelSize = Literal[
 
 
 def _should_fallback_to_cpu(exc: Exception) -> bool:
-    """Check if error indicates GPU failure requiring CPU fallback."""
+    """Check if error indicates GPU failure requiring CPU fallback.
+
+    Args:
+        exc: The exception raised during GPU inference.
+
+    Returns:
+        True if the exception suggests a GPU/cuda-specific error requiring fallback.
+    """
     text = str(exc).lower()
     fallback_keywords = [
         "cublas",
@@ -63,7 +70,17 @@ def _should_fallback_to_cpu(exc: Exception) -> bool:
 
 
 def confidence_proxy(raw_segment: Any) -> float:
-    """Calculate confidence score from segment metadata."""
+    """Calculate confidence score from segment metadata.
+
+    Computes a confidence score (0-1) based on available segment attributes:
+    avg_logprob, no_speech_prob, and compression_ratio.
+
+    Args:
+        raw_segment: Segment object with metadata attributes.
+
+    Returns:
+        Confidence score between 0.0 and 0.99.
+    """
     avg_logprob = getattr(raw_segment, "avg_logprob", None)
     no_speech_prob = getattr(raw_segment, "no_speech_prob", None)
     compression_ratio = getattr(raw_segment, "compression_ratio", None)
@@ -79,7 +96,17 @@ def confidence_proxy(raw_segment: Any) -> float:
 
 
 def normalize_suppress_tokens(value: Any) -> list[int] | None:
-    """Normalize suppress_tokens into the format expected by faster-whisper."""
+    """Normalize suppress_tokens into the format expected by faster-whisper.
+
+    Accepts None, list, or string formats and returns a normalized list of int
+    token IDs or None if invalid.
+
+    Args:
+        value: Suppress tokens in various formats (None, list, JSON string, or comma-separated).
+
+    Returns:
+        Normalized list of token IDs, or None if invalid.
+    """
     if value is None:
         return None
 
@@ -250,7 +277,14 @@ class PerformanceMetrics:
 
 
 class AdaptiveBeamController:
-    """Dynamically adjust beam size based on latency targets."""
+    """Dynamically adjust beam size based on latency targets.
+
+    Maintains a sliding window of recent latency measurements and adjusts
+    beam size between min_beam and max_beam to stay within latency targets.
+
+    State: Tracks latency history and current beam size. Stateless regarding
+    audio processing.
+    """
 
     def __init__(
         self,
@@ -294,7 +328,13 @@ class AdaptiveBeamController:
 
 
 class PrefixContextManager:
-    """Manages prefix-based context carryover between chunks."""
+    """Manages prefix-based context carryover between chunks.
+
+    Stores the last few words from previous transcriptions to provide context
+    for the next inference call, improving continuity in streaming scenarios.
+
+    State: Owns _previous_text, resets on clear().
+    """
 
     def __init__(self, max_prefix_length: int = 100, enable_overlap: bool = True) -> None:
         self.max_prefix_length = max_prefix_length
@@ -335,7 +375,14 @@ class PrefixContextManager:
 
 
 class FastWhisperBackend:
-    """Optimized faster-whisper backend with adaptive inference."""
+    """Optimized faster-whisper backend with adaptive inference.
+
+    Wraps a faster-whisper WhisperModel with adaptive beam sizing, prefix
+    context management, and performance metrics tracking. Supports both
+    wispr (low-latency) and system (higher-accuracy) modes.
+
+    State: Owns model, mode_config, beam_controller, prefix_manager, metrics.
+    """
 
     def __init__(
         self,
@@ -575,7 +622,11 @@ class GPURuntimeError(RuntimeError):
 
 
 class OptimizedWhisperFactory:
-    """Factory for creating optimized Whisper backends."""
+    """Factory for creating optimized Whisper backends.
+
+    Provides static methods to construct FastWhisperBackend instances
+    configured for specific use cases (wispr vs system mode).
+    """
 
     @staticmethod
     def create_backend(

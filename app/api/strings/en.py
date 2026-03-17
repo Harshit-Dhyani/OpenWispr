@@ -1,3 +1,31 @@
+"""English string constants for API error messages and notifications.
+
+This module provides centralized string constants for user-facing messages
+in the API. Strings are organized into categories:
+
+Error Strings:
+- service_not_ready: Backend service not initialized
+- hotkey_service_not_ready: Hotkey transcription service not ready
+- unknown_model_category: Invalid model category requested
+- unsupported_refinement_mode: Invalid refinement mode specified
+- save_settings_failed: Settings persistence failed
+
+Message Strings:
+- settings_saved: Settings saved successfully confirmation
+- settings_reset: Settings reset to defaults confirmation
+- hotkey_inject_ready: Text ready for injection (Electron handles)
+- hotkey_started: Hotkey session started notification
+- hotkey_config_updated: Hotkey configuration updated confirmation
+
+Usage:
+    from app.api.strings.en import API_STRINGS
+    
+    raise HTTPException(400, detail=API_STRINGS.errors.save_settings_failed)
+
+This centralized approach ensures consistent messaging across the API
+and simplifies localization efforts in the future.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

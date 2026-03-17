@@ -121,21 +121,22 @@ class SpeechSegment:
     audio: NDArray[np.float32]
     confidence: float = 0.0
     padding_ms: int = 0
+    sample_rate: int = 16000
 
     @property
     def duration_ms(self) -> float:
         """Duration in milliseconds."""
-        return (self.end_sample - self.start_sample) / 16.0  # Assuming 16kHz
+        return (self.end_sample - self.start_sample) / (self.sample_rate / 1000)
 
     @property
     def start_ms(self) -> float:
         """Start time in milliseconds."""
-        return self.start_sample / 16.0
+        return self.start_sample / (self.sample_rate / 1000)
 
     @property
     def end_ms(self) -> float:
         """End time in milliseconds."""
-        return self.end_sample / 16.0
+        return self.end_sample / (self.sample_rate / 1000)
 
 
 @dataclass

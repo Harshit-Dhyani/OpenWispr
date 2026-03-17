@@ -1,3 +1,8 @@
+"""Settings API endpoints.
+
+Provides endpoints for retrieving and updating runtime settings.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,12 +19,30 @@ router = APIRouter()
 @router.get("/api/settings")
 @log_route("GET", "/api/settings")
 def get_settings() -> dict[str, Any]:
+    """
+    Get current application settings.
+
+    Returns:
+        dict: Contains all application settings as dictionary
+    """
     return get_settings_manager().get_settings_dict()
 
 
 @router.post("/api/settings")
 @log_route("POST", "/api/settings")
 def save_settings(request: dict[str, Any]) -> dict[str, Any]:
+    """
+    Save application settings.
+
+    Args:
+        request: Dictionary containing settings to save
+
+    Returns:
+        dict: Contains success status and message
+
+    Raises:
+        HTTPException: 400 if settings validation fails
+    """
     manager = get_settings_manager()
     success = manager.import_settings(request)
     if not success:
@@ -33,6 +56,12 @@ def save_settings(request: dict[str, Any]) -> dict[str, Any]:
 @router.post("/api/settings/reset")
 @log_route("POST", "/api/settings/reset")
 def reset_settings() -> dict[str, Any]:
+    """
+    Reset all settings to default values.
+
+    Returns:
+        dict: Contains success status and message
+    """
     manager = get_settings_manager()
     manager.reset_to_defaults()
     return {"success": True, "message": API_STRINGS.messages.settings_reset}

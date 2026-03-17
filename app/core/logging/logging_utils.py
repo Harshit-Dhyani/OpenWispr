@@ -1,3 +1,9 @@
+"""Logging configuration utilities for OpenWispr.
+
+Provides JSON formatting and structured logging setup for the application.
+Used by the core logging system for consistent log output across the app.
+"""
+
 from __future__ import annotations
 
 import json

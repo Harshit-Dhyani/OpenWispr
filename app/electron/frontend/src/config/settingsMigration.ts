@@ -1,3 +1,9 @@
+/**
+ * SettingsMigration - Handles settings version upgrades and legacy migration
+ * 
+ * Migrates saved settings from older versions to current schema,
+ * including legacy model name mapping and source-aware model routing.
+ */
 import { validateSettings, type SettingsState, DEFAULT_SETTINGS } from './settingsSchema';
 import { CURRENT_SETTINGS_VERSION } from './settings';
 
@@ -155,9 +161,11 @@ const migrations: Record<number, (data: unknown) => unknown> = {
       },
       refiner: {
         selected_model_id: (old.refiner as Record<string, unknown>)?.selected_model_id ?? 'qwen2.5-3b-instruct',
+        custom_model_id: (old.refiner as Record<string, unknown>)?.custom_model_id ?? '',
         runtime_enabled: (old.refiner as Record<string, unknown>)?.runtime_enabled ?? false,
         cleanup_instructions: (old.refiner as Record<string, unknown>)?.cleanup_instructions ?? '',
         engine_preference: (old.refiner as Record<string, unknown>)?.engine_preference ?? 'llamacpp',
+        refiner_provider_base_url: (old.refiner as Record<string, unknown>)?.refiner_provider_base_url ?? '',
       },
       audio: {
         captureMode: (old.audio as Record<string, unknown>)?.captureMode ?? 'microphone',
@@ -186,6 +194,7 @@ const migrations: Record<number, (data: unknown) => unknown> = {
           'CommandOrControl+Shift+Y',
         hold_mode: (old.hotkey as Record<string, unknown>)?.hold_mode ?? false,
         auto_inject: (old.hotkey as Record<string, unknown>)?.auto_inject ?? true,
+        auto_transform: (old.hotkey as Record<string, unknown>)?.auto_transform ?? true,
         language: (old.hotkey as Record<string, unknown>)?.language ?? 'auto',
         capture_source:
           (old.hotkey as Record<string, unknown>)?.capture_source ??
