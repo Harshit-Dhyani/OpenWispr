@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -157,45 +157,75 @@ class RingBuffer:
 
 
 class Histogram:
-    """Efficient histogram for latency distributions."""
+    """Efficient histogram for latency distributions with O(1) incremental stats."""
 
     def __init__(self, max_values: int = 10000):
         self._values: deque = deque(maxlen=max_values)
         self._lock = threading.RLock()
+        self._count: int = 0
+        self._sum: float = 0.0
+        self._min: float = float("inf")
+        self._max: float = 0.0
+        self._p50_cache: float = 0.0
+        self._p95_cache: float = 0.0
+        self._p99_cache: float = 0.0
 
     def record(self, value: float) -> None:
         """Record a value."""
         with self._lock:
             self._values.append(value)
+            self._count += 1
+            self._sum += value
+            if value < self._min:
+                self._min = value
+            if value > self._max:
+                self._max = value
+            if self._count % 100 == 0:
+                self._recompute_percentiles()
+
+    def _recompute_percentiles(self) -> None:
+        """Recompute percentiles every N samples to avoid O(n log n) every call."""
+        if len(self._values) < 10:
+            return
+        sorted_vals = sorted(self._values)
+        n = len(sorted_vals)
+        self._p50_cache = sorted_vals[int(n * 0.5)]
+        self._p95_cache = sorted_vals[int(n * 0.95)]
+        self._p99_cache = sorted_vals[int(n * 0.99)]
 
     def snapshot(self) -> HistogramSnapshot | None:
-        """Get histogram snapshot."""
+        """Get histogram snapshot with cached percentiles."""
         with self._lock:
             if not self._values:
                 return None
 
-            values = sorted(self._values)
-            n = len(values)
-            total = sum(values)
-            mean = total / n
-
-            # Calculate std dev
-            variance = sum((v - mean) ** 2 for v in values) / n
+            n = len(self._values)
+            mean = self._sum / n
+            variance = sum((v - mean) ** 2 for v in self._values) / n
             std_dev = variance**0.5
 
-            def percentile(p: float) -> float:
-                idx = int(n * p / 100)
-                return values[min(idx, n - 1)]
+            if n >= 50:
+                p50, p95, p99 = self._p50_cache, self._p95_cache, self._p99_cache
+            elif n >= 20:
+                sorted_vals = sorted(self._values)
+                p50 = sorted_vals[int(n * 0.5)]
+                p95 = self._p95_cache if n >= 95 else sorted_vals[int(n * 0.95)]
+                p99 = self._p99_cache if n >= 99 else sorted_vals[int(n * 0.99)]
+            else:
+                sorted_vals = sorted(self._values)
+                p50 = sorted_vals[int(n * 0.5)]
+                p95 = sorted_vals[int(n * 0.95)]
+                p99 = sorted_vals[int(n * 0.99)]
 
             return HistogramSnapshot(
                 count=n,
-                sum=total,
-                min=values[0],
-                max=values[-1],
+                sum=self._sum,
+                min=self._min,
+                max=self._max,
                 mean=mean,
-                p50=percentile(50),
-                p95=percentile(95),
-                p99=percentile(99),
+                p50=p50,
+                p95=p95,
+                p99=p99,
                 std_dev=std_dev,
             )
 
@@ -203,6 +233,13 @@ class Histogram:
         """Clear histogram."""
         with self._lock:
             self._values.clear()
+            self._count = 0
+            self._sum = 0.0
+            self._min = float("inf")
+            self._max = 0.0
+            self._p50_cache = 0.0
+            self._p95_cache = 0.0
+            self._p99_cache = 0.0
 
 
 class Metric:
@@ -229,7 +266,7 @@ class Counter(Metric):
 
     def __init__(self, name: str, description: str = ""):
         super().__init__(name, MetricType.COUNTER, description)
-        self._value = 0
+        self._value: float = 0.0
 
     def inc(self, value: float = 1) -> None:
         """Increment counter."""
@@ -366,6 +403,7 @@ class MetricsCollector:
         return cls._instance
 
     def __init__(self):
+        self._initialized: bool
         if self._initialized:
             return
 
@@ -420,21 +458,21 @@ class MetricsCollector:
         with self._metric_lock:
             if name not in self._metrics:
                 self._metrics[name] = Counter(name, description)
-            return self._metrics[name]
+            return cast(Counter, self._metrics[name])
 
     def register_gauge(self, name: str, description: str = "") -> Gauge:
         """Register a gauge metric."""
         with self._metric_lock:
             if name not in self._metrics:
                 self._metrics[name] = Gauge(name, description)
-            return self._metrics[name]
+            return cast(Gauge, self._metrics[name])
 
     def register_timer(self, name: str, description: str = "") -> Timer:
         """Register a timer metric."""
         with self._metric_lock:
             if name not in self._metrics:
                 self._metrics[name] = Timer(name, description)
-            return self._metrics[name]
+            return cast(Timer, self._metrics[name])
 
     def get_metric(self, name: str) -> Metric | None:
         """Get metric by name."""
@@ -547,9 +585,7 @@ class MetricsCollector:
         with open(filepath, "w") as f:
             json.dump(snapshot, f, indent=2)
 
-    def export_csv(
-        self, filepath: str | Path, metric_names: list[str] | None = None
-    ) -> None:
+    def export_csv(self, filepath: str | Path, metric_names: list[str] | None = None) -> None:
         """Export metrics to CSV."""
         filepath = Path(filepath)
 

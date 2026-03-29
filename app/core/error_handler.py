@@ -6,6 +6,7 @@ and crash reporting with full stack trace preservation.
 
 from __future__ import annotations
 
+import contextvars
 import enum
 import logging
 import traceback
@@ -14,9 +15,31 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
+
+if TYPE_CHECKING:
+    from app.core.recovery_strategies import RecoveryManager, RecoveryResult, RecoveryStatus
 
 logger = logging.getLogger("openwispr.errors")
+
+_error_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "error_context", default={}
+)
+
+
+def set_error_context(**kwargs: Any) -> None:
+    """Set error context for the current execution scope."""
+    _error_context.set({**_error_context.get(), **kwargs})
+
+
+def get_error_context() -> dict[str, Any]:
+    """Get current error context."""
+    return _error_context.get()
+
+
+def clear_error_context() -> None:
+    """Clear error context."""
+    _error_context.set({})
 
 
 # ============================================
@@ -89,6 +112,8 @@ class AppError(Exception):
     error_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     stack_trace: str | None = None
+    endpoint: str | None = None
+    file_path: str | None = None
 
     def __post_init__(self):
         super().__init__(self.message)
@@ -98,6 +123,32 @@ class AppError(Exception):
             )
         elif self.stack_trace is None:
             self.stack_trace = traceback.format_stack()[:-1]
+        self._log_with_error_id()
+
+    def _log_with_error_id(self) -> None:
+        """Log error creation with correlation ID for log tracing."""
+        set_error_context(error_id=self.error_id, category=self.category.value)
+        logger.debug(
+            f"Error created: [{self.error_id}] {self.category.value}: {self.message[:100]}",
+            extra={"error_id": self.error_id, "error_category": self.category.value},
+        )
+
+    def with_context(self, **kwargs: Any) -> "AppError":
+        """Create a copy of this error with additional context."""
+        new_details = {**self.details, **kwargs}
+        new_error = AppError(
+            message=self.message,
+            category=self.category,
+            severity=self.severity,
+            code=self.code,
+            details=new_details,
+            cause=self.cause,
+            recoverable=self.recoverable,
+            retry_allowed=self.retry_allowed,
+            max_retries=self.max_retries,
+            stack_trace=self.stack_trace,
+        )
+        return new_error
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -200,6 +251,103 @@ class SessionError(AppError):
 
 # Type alias for all error types
 OpenWisprError = Union[AppError, AudioError, ModelError, NetworkError, SessionError]
+
+
+def _lazy_import_recovery() -> tuple[type, type]:
+    """Lazily import recovery types to avoid circular imports."""
+    from app.core.recovery_strategies import RecoveryResult, RecoveryStatus
+
+    return RecoveryStatus, RecoveryResult
+
+
+def exception_to_error(
+    exc: BaseException,
+    category: ErrorCategory = ErrorCategory.SYSTEM_UNKNOWN,
+    severity: ErrorSeverity = ErrorSeverity.ERROR,
+    message: str | None = None,
+    **extra_details: Any,
+) -> AppError:
+    """Convert a generic exception to a structured AppError.
+
+    This is the preferred way to wrap exceptions in the application.
+    Preserves exception chain for proper traceback propagation.
+
+    Args:
+        exc: The exception to convert
+        category: Error category for targeted recovery
+        severity: Error severity level
+        message: Optional custom message (defaults to str(exc))
+        **extra_details: Additional error details
+
+    Returns:
+        Structured AppError with cause chain preserved
+    """
+    return AppError(
+        message=message or str(exc),
+        category=category,
+        severity=severity,
+        cause=exc,
+        details=extra_details,
+        stack_trace="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+    )
+
+
+def wrap_error(
+    exc: BaseException,
+    target_type: type[OpenWisprError],
+    **extra_details: Any,
+) -> OpenWisprError:
+    """Convert exception to specific error type with additional context.
+
+    Args:
+        exc: The exception to convert
+        target_type: Specific error type (AudioError, ModelError, etc.)
+        **extra_details: Additional error details
+
+    Returns:
+        Error of the target type with cause chain preserved
+    """
+    import dataclasses
+
+    error = target_type(message=str(exc), cause=exc)
+    for key, value in extra_details.items():
+        if hasattr(error, key):
+            setattr(error, key, value)
+    return error
+
+
+# Mapping from exception types to default categories
+_EXCEPTION_CATEGORY_MAP: dict[type[BaseException], ErrorCategory] = {}
+
+
+def register_exception_category(exc_type: type[BaseException], category: ErrorCategory) -> None:
+    """Register a default error category for an exception type.
+
+    Enables automatic categorization when converting exceptions.
+    """
+    _EXCEPTION_CATEGORY_MAP[exc_type] = category
+
+
+def auto_categorize_error(exc: BaseException) -> ErrorCategory:
+    """Automatically determine error category from exception type.
+
+    Checks registered mappings first, then falls back to
+    heuristics based on exception class names.
+    """
+    if type(exc) in _EXCEPTION_CATEGORY_MAP:
+        return _EXCEPTION_CATEGORY_MAP[type(exc)]
+
+    exc_name = type(exc).__name__.lower()
+    if "audio" in exc_name or "microphone" in exc_name or "device" in exc_name:
+        return ErrorCategory.AUDIO_CAPTURE_ERROR
+    if "model" in exc_name or "whisper" in exc_name:
+        return ErrorCategory.MODEL_LOAD_FAILED
+    if "network" in exc_name or "http" in exc_name or "connection" in exc_name:
+        return ErrorCategory.NETWORK_CONNECTION_ERROR
+    if "session" in exc_name or "disk" in exc_name or "storage" in exc_name:
+        return ErrorCategory.SESSION_DISK_FULL
+
+    return ErrorCategory.SYSTEM_UNKNOWN
 
 
 # ============================================
@@ -383,9 +531,7 @@ class ErrorReporter:
         if self.enable_crash_dumps:
             self.report_dir.mkdir(parents=True, exist_ok=True)
 
-    def report(
-        self, error: OpenWisprError, context: dict[str, Any] | None = None
-    ) -> str | None:
+    def report(self, error: OpenWisprError, context: dict[str, Any] | None = None) -> str | None:
         """Report an error to telemetry and optionally save crash dump."""
         self._error_counts[error.category] = self._error_counts.get(error.category, 0) + 1
 
@@ -393,9 +539,7 @@ class ErrorReporter:
         log_data = {
             "error": error.to_dict(),
             "context": context or {},
-            "session_duration_seconds": (
-                datetime.now(UTC) - self._session_start
-            ).total_seconds(),
+            "session_duration_seconds": (datetime.now(UTC) - self._session_start).total_seconds(),
         }
 
         if error.severity >= ErrorSeverity.ERROR:
@@ -412,8 +556,7 @@ class ErrorReporter:
     def _save_crash_dump(self, error: OpenWisprError, context: dict[str, Any] | None) -> str:
         """Save crash dump file for analysis."""
         dump_path = (
-            self.report_dir
-            / f"crash_{error.error_id}_{int(datetime.now(UTC).timestamp())}.json"
+            self.report_dir / f"crash_{error.error_id}_{int(datetime.now(UTC).timestamp())}.json"
         )
 
         import json
@@ -522,7 +665,7 @@ def with_retry(
 
                     time.sleep(delay)
 
-            raise last_exception
+            raise last_exception  # type: ignore[arg-type]
 
         return wrapper
 
@@ -542,8 +685,7 @@ async def with_retry_async(
     import asyncio
     import random
 
-    last_exception = None
-
+    last_exception: BaseException | None = None
     for attempt in range(cfg.max_retries + 1):
         try:
             return await func(*args, **kwargs)
@@ -577,7 +719,11 @@ async def with_retry_async(
 # Central Error Handler
 # ============================================
 class ErrorHandler:
-    """Central error handling and dispatch system."""
+    """Central error handling and dispatch system.
+
+    Coordinates error reporting, notification, recovery attempts,
+    and telemetry through registered handlers.
+    """
 
     def __init__(
         self,
@@ -590,6 +736,13 @@ class ErrorHandler:
         self._global_handlers: list[Callable[[OpenWisprError], None]] = []
         self._error_counts: dict[str, int] = {}
         self._rate_limits: dict[ErrorCategory, tuple[int, float]] = {}
+        self._error_history: list[OpenWisprError] = []
+        self._max_history = 100
+        self._recovery_manager: "RecoveryManager | None" = None
+
+    def set_recovery_manager(self, manager: "RecoveryManager") -> None:
+        """Set the recovery manager for automatic error recovery."""
+        self._recovery_manager = manager
 
     def register_handler(
         self,
@@ -617,55 +770,137 @@ class ErrorHandler:
         self,
         error: OpenWisprError,
         context: dict[str, Any] | None = None,
-    ) -> None:
-        """Handle an error through all registered handlers."""
-        # Check rate limiting
-        if self._is_rate_limited(error):
-            logger.debug(f"Rate limited error: {error.error_id}")
-            return
+        attempt_recovery: bool = True,
+    ) -> "RecoveryResult | None":
+        """Handle an error through all registered handlers.
 
-        # Track error count
+        Args:
+            error: The error to handle
+            context: Additional context for the error
+            attempt_recovery: Whether to attempt automatic recovery
+
+        Returns:
+            RecoveryResult if recovery was attempted, None otherwise
+        """
+        self._record_error(error)
+        ctx = context or {}
+
+        if self._is_rate_limited(error):
+            logger.debug(f"Rate limited error: [{error.error_id}] {error.category.value}")
+            return None
+
         self._error_counts[error.error_id] = self._error_counts.get(error.error_id, 0) + 1
 
-        # Report to telemetry
-        self.reporter.report(error, context)
+        logger.error(
+            f"Handling error: [{error.error_id}] {error.category.value}: {error.message}",
+            extra={
+                "error_id": error.error_id,
+                "error_category": error.category.value,
+                "error_severity": error.severity.name,
+                "recoverable": error.recoverable,
+                "context": ctx,
+            },
+        )
 
-        # Notify user
+        self.reporter.report(error, ctx)
         self.notifier.notify(error)
 
-        # Run category-specific handlers
         handlers = self._handlers.get(error.category, [])
         for handler in handlers:
             try:
                 handler(error)
             except Exception as e:
-                logger.error(f"Error handler failed for {error.error_id}: {e}")
+                logger.error(
+                    f"Error handler failed: [{error.error_id}] {type(e).__name__}: {e}",
+                    extra={"error_id": error.error_id},
+                    exc_info=True,
+                )
 
-        # Run global handlers
         for handler in self._global_handlers:
             try:
                 handler(error)
             except Exception as e:
-                logger.error(f"Global error handler failed for {error.error_id}: {e}")
+                logger.error(
+                    f"Global handler failed: [{error.error_id}] {type(e).__name__}: {e}",
+                    extra={"error_id": error.error_id},
+                    exc_info=True,
+                )
+
+        if attempt_recovery and error.recoverable and self._recovery_manager:
+            return self._attempt_recovery(error, ctx)
+
+        return None
+
+    def _attempt_recovery(
+        self, error: OpenWisprError, context: dict[str, Any]
+    ) -> "RecoveryResult | None":
+        """Attempt to recover from an error using the recovery manager."""
+        if not self._recovery_manager:
+            return None
+
+        try:
+            result = self._recovery_manager.attempt_recovery(error, context)
+            if result.status == RecoveryStatus.SUCCESS:
+                logger.info(
+                    f"Recovery succeeded: [{error.error_id}] {result.message}",
+                    extra={"error_id": error.error_id, "recovery": result.to_dict()},
+                )
+            elif result.status == RecoveryStatus.PARTIAL:
+                logger.warning(
+                    f"Recovery partial success: [{error.error_id}] {result.message}",
+                    extra={"error_id": error.error_id, "recovery": result.to_dict()},
+                )
+            else:
+                logger.warning(
+                    f"Recovery failed: [{error.error_id}] {result.message}",
+                    extra={"error_id": error.error_id, "recovery": result.to_dict()},
+                )
+            return result
+        except Exception as e:
+            logger.error(
+                f"Recovery attempt threw exception: [{error.error_id}] {type(e).__name__}: {e}",
+                extra={"error_id": error.error_id},
+                exc_info=True,
+            )
+            return None
 
     def handle_exception(
         self,
         exc: BaseException,
         category: ErrorCategory = ErrorCategory.SYSTEM_UNKNOWN,
         context: dict[str, Any] | None = None,
-    ) -> None:
-        """Convert generic exception to AppError and handle."""
+        attempt_recovery: bool = True,
+    ) -> "RecoveryResult | None":
+        """Convert generic exception to AppError and handle.
+
+        Args:
+            exc: The exception to handle
+            category: Default category if exception isn't an AppError
+            context: Additional context
+            attempt_recovery: Whether to attempt recovery
+
+        Returns:
+            RecoveryResult if recovery was attempted
+        """
         if isinstance(exc, AppError):
-            self.handle(exc, context)
-        else:
-            error = AppError(
-                message=str(exc),
-                category=category,
-                severity=ErrorSeverity.ERROR,
-                cause=exc,
-                stack_trace="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
-            )
-            self.handle(error, context)
+            return self.handle(exc, context, attempt_recovery)
+
+        auto_category = auto_categorize_error(exc)
+        error = AppError(
+            message=str(exc),
+            category=auto_category if category == ErrorCategory.SYSTEM_UNKNOWN else category,
+            severity=ErrorSeverity.ERROR,
+            cause=exc,
+            details=context or {},
+            stack_trace="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+        )
+        return self.handle(error, context, attempt_recovery)
+
+    def _record_error(self, error: OpenWisprError) -> None:
+        """Record error to history for analysis."""
+        self._error_history.append(error)
+        if len(self._error_history) > self._max_history:
+            self._error_history = self._error_history[-self._max_history :]
 
     def _is_rate_limited(self, error: OpenWisprError) -> bool:
         """Check if error category is rate limited."""
@@ -673,17 +908,30 @@ class ErrorHandler:
             return False
 
         max_count, window = self._rate_limits[error.category]
-        # Simple rate limiting - could be enhanced with time windows
-        count = sum(1 for e in self._error_counts if e.startswith(error.category.value))
-        return count > max_count
+        now = datetime.now(UTC)
+        recent_count = sum(
+            1
+            for e in self._error_history
+            if e.category == error.category and (now - e.timestamp).total_seconds() < window
+        )
+        return recent_count >= max_count
 
     def get_error_stats(self) -> dict[str, Any]:
         """Get error handling statistics."""
         return {
-            "total_handled": len(self._error_counts),
-            "unique_errors": len(set(self._error_counts.keys())),
+            "total_handled": sum(self._error_counts.values()),
+            "unique_errors": len(self._error_counts),
+            "history_size": len(self._error_history),
             "reporter_stats": self.reporter.get_stats(),
         }
+
+    def get_recent_errors(self, limit: int = 10) -> list[OpenWisprError]:
+        """Get recent errors for debugging."""
+        return self._error_history[-limit:]
+
+    def get_errors_by_category(self, category: ErrorCategory) -> list[OpenWisprError]:
+        """Get errors by category."""
+        return [e for e in self._error_history if e.category == category]
 
 
 # ============================================
