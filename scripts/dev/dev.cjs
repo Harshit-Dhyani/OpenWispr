@@ -4,6 +4,9 @@ const path = require("path");
 const repoRoot = path.resolve(__dirname, "..", "..");
 const nodeExe = process.execPath;
 
+// Generate random port BEFORE starting processes
+const PORT = String(Math.floor(10000 + Math.random() * 50000));
+
 function sanitizeCwd(cwd) {
   return typeof cwd === "string" && cwd.startsWith("\\\\?\\") ? cwd.slice(4) : cwd;
 }
@@ -16,11 +19,16 @@ function resolveDevTargets() {
   const devEnv = {
     ...process.env,
     OPENWISPR_DEV_EXTERNAL_BACKEND: "1",
+    OPENWISPR_PORT: PORT,
   };
   return {
     backend: {
       command: nodeExe,
       args: [path.join(repoRoot, "scripts", "dev", "run-backend-dev.cjs")],
+      env: {
+        ...process.env,
+        OPENWISPR_PORT: PORT,
+      },
     },
     electron: {
       command: nodeExe,
