@@ -5,36 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-03-15
+## [Unreleased] - 2026-03-19
 
 ### Added
-- Provider health display in UI and backend
-- Provider URL support for refiner and coach services
-- Providers API route for provider management
-- Local LLM provider infrastructure
-- CI/CD workflows for automated testing and release
-- New prompt system for audit and fix workflows
-- Expanded E2E and regression test coverage
-- Module reorganization for audio, core, and Electron services
+- Text transform API routes and services for transcript processing
+- Hotkey transcription service for push-to-talk workflows
+- User corrections service for managing transcript edits
+- Skills system with 20+ specialized workflows for agents
+- Comprehensive docstrings for all API modules and services
+- mkdocs.yml with full documentation site configuration
+- Repo-local skills in `.codex/skills/` for agent guidance
+- Performance, integration, and unit test coverage updates
+- Script sync infrastructure for skills
 
 ### Fixed
-- Settings validation improvements
-- Provider base URL fields in settings dataclasses
-- Database improvements
-- Python import errors across audio, API, and config modules
-- TypeScript type errors in floating window components
-- E2E test configuration issues
-- Legacy naming cleanup (Transcripta → OpenWispr)
+- Core module updates and compatibility fixes
+- Electron UI module improvements
+- Backend and frontend type safety enhancements
+- Project configuration updates
+- Test coverage for new features
 
 ### Changed
-- Updated settings to support provider health and URL
-- Reorganized audio pipeline modules into dedicated directories
-- Reorganized core modules (logging, metrics, optimization, profiling, session)
-- Updated backward-compatibility shims for settings
+- Updated deployment guide with latest build commands
+- Updated project structure documentation
+- Added contributing-docs guide for documentation workflows
+- Added operations guide for development workflows
+- Added python-api reference documentation
+- CHANGELOG and README date stamps
 
 ### Security
-- Added security policy documentation
 - Improved secret handling in CI/CD
+- Brand assets protection
+
+### Documentation
+- Added 20+ specialized skills for agent workflows
+- Updated docs hub and engineering docs
+- Added source-of-truth skill for information verification
+- Added public-doc-honesty skill for documentation accuracy
 
 ---
 
