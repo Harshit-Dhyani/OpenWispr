@@ -139,7 +139,7 @@ class SpeechSegment:
         return self.end_sample / (self.sample_rate / 1000)
 
 
-@dataclass
+@dataclass(slots=True)
 class VADMetrics:
     """VAD performance metrics."""
 
@@ -147,7 +147,8 @@ class VADMetrics:
     speech_samples: int = 0
     silence_samples: int = 0
     transitions: int = 0
-    avg_processing_time_ms: float = 0.0
+    _avg_processing_time_ms: float = 0.0
+    _processing_count: int = 0
     peak_level_db: float = -np.inf
     noise_floor_db: float = -np.inf
     current_threshold_db: float = -40.0
@@ -155,10 +156,15 @@ class VADMetrics:
 
     processing_times: deque[float] = field(default_factory=lambda: deque(maxlen=100))
 
+    @property
+    def avg_processing_time_ms(self) -> float:
+        return self._avg_processing_time_ms
+
     def add_processing_time(self, ms: float) -> None:
-        """Add a processing time sample."""
+        """Add a processing time sample with O(1) average update."""
+        self._processing_count += 1
+        self._avg_processing_time_ms += (ms - self._avg_processing_time_ms) / self._processing_count
         self.processing_times.append(ms)
-        self.avg_processing_time_ms = sum(self.processing_times) / len(self.processing_times)
 
     @property
     def speech_ratio(self) -> float:
@@ -201,6 +207,20 @@ if NUMBA_AVAILABLE:
 
         return np.sqrt(sum_sq / n)
 
+    @jit(nopython=True, cache=True, fastmath=True, inline="always")
+    def _compute_energy_inline(audio: NDArray[np.float32]) -> float:
+        """Inline energy computation for hot paths."""
+        n = audio.shape[0]
+        if n == 0:
+            return 0.0
+
+        sum_sq = 0.0
+        for i in range(n):
+            val = audio[i]
+            sum_sq += val * val
+
+        return np.sqrt(sum_sq / n)
+
     @jit(nopython=True, cache=True, fastmath=True)
     def _compute_energy_batch_numba(
         audio: NDArray[np.float32],
@@ -208,17 +228,17 @@ if NUMBA_AVAILABLE:
     ) -> NDArray[np.float32]:
         """Compute energy for multiple frames."""
         num_frames = len(audio) // frame_size
+        if num_frames == 0:
+            return np.empty(0, dtype=np.float32)
         energies = np.empty(num_frames, dtype=np.float32)
 
         for i in prange(num_frames):
             start = i * frame_size
             end = start + frame_size
-            frame = audio[start:end]
-
             sum_sq = 0.0
             for j in range(frame_size):
-                sum_sq += frame[j] * frame[j]
-
+                val = audio[start + j]
+                sum_sq += val * val
             energies[i] = np.sqrt(sum_sq / frame_size)
 
         return energies
@@ -228,12 +248,24 @@ if NUMBA_AVAILABLE:
         """Convert dB to linear amplitude."""
         return 10.0 ** (db / 20.0)
 
-    @jit(nopython=True, cache=True, fastmath=True)
+    @jit(nopython=True, cache=True, fastmath=True, inline="always")
     def _linear_to_db_numba(linear: float) -> float:
         """Convert linear amplitude to dB."""
-        if linear <= 0:
+        if linear <= 1e-10:
             return -100.0
         return 20.0 * np.log10(linear)
+
+    @jit(nopython=True, cache=True, fastmath=True)
+    def _vad_frame_numba(
+        audio: NDArray[np.float32],
+        threshold: float,
+        peak_hold: int,
+    ) -> tuple[bool, int]:
+        """Optimized VAD frame processing."""
+        energy = _compute_energy_inline(audio)
+        if energy > threshold:
+            return True, peak_hold
+        return False, max(0, peak_hold - len(audio))
 else:
 
     def _compute_energy_numba(audio: NDArray[np.float32]) -> float:
@@ -242,19 +274,26 @@ else:
             return 0.0
         return np.sqrt(np.mean(audio * audio))
 
+    def _compute_energy_inline(audio: NDArray[np.float32]) -> float:
+        """Inline energy computation without Numba."""
+        if len(audio) == 0:
+            return 0.0
+        return np.sqrt(np.dot(audio, audio) / len(audio))
+
     def _compute_energy_batch_numba(
         audio: NDArray[np.float32],
         frame_size: int,
     ) -> NDArray[np.float32]:
         """Fallback batch energy computation."""
         num_frames = len(audio) // frame_size
+        if num_frames == 0:
+            return np.empty(0, dtype=np.float32)
         energies = np.empty(num_frames, dtype=np.float32)
 
         for i in range(num_frames):
             start = i * frame_size
             end = start + frame_size
-            frame = audio[start:end]
-            energies[i] = np.sqrt(np.mean(frame * frame))
+            energies[i] = np.sqrt(np.dot(audio[start:end], audio[start:end]) / frame_size)
 
         return energies
 
@@ -267,6 +306,17 @@ else:
         if linear <= 1e-10:
             return -100.0
         return 20.0 * np.log10(linear)
+
+    def _vad_frame_numba(
+        audio: NDArray[np.float32],
+        threshold: float,
+        peak_hold: int,
+    ) -> tuple[bool, int]:
+        """Fallback VAD frame processing."""
+        energy = _compute_energy_inline(audio)
+        if energy > threshold:
+            return True, peak_hold
+        return False, max(0, peak_hold - len(audio))
 
 
 class NoiseProfiler:
@@ -726,6 +776,8 @@ class SpeechSegmenter:
 
         # Sort by start time
         sorted_segments = sorted(self.pending_segments, key=lambda s: s.start_sample)
+        if not sorted_segments:
+            return []
 
         # Merge close segments
         current = sorted_segments[0]

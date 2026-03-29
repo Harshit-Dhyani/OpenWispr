@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def _device_id(device: Any) -> str:
-    return getattr(device, "id", None) or getattr(device, "name", "unknown")
+    return str(getattr(device, "id", None) or getattr(device, "name", "unknown"))
 
 
 def _device_name(device: Any) -> str:
@@ -153,9 +153,13 @@ def _score_microphone(
     lowered = name.lower()
     normalized = _normalize_name(name)
     matches_selected_id = selected_id is not None and _device_id(microphone) == selected_id
-    matches_speaker_name = bool(speaker_name) and (
-        _normalize_name(speaker_name) in normalized or normalized in _normalize_name(speaker_name)
-    )
+    if speaker_name:
+        speaker_name_normalized = _normalize_name(speaker_name)
+        matches_speaker_name = (
+            speaker_name_normalized in normalized or normalized in speaker_name_normalized
+        )
+    else:
+        matches_speaker_name = False
     is_loopback = _is_loopback_microphone(microphone)
     is_virtual_cable = "vb-audio" in lowered or "cable" in lowered
     return (

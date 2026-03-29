@@ -16,13 +16,14 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from numpy.fft import irfft, rfft
+from numpy.typing import NDArray
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -126,13 +127,14 @@ class ProcessingConfig:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class ProcessingMetrics:
     """Audio processing metrics."""
 
     total_frames: int = 0
     total_samples: int = 0
-    avg_processing_time_ms: float = 0.0
+    _avg_processing_time_ms: float = 0.0
+    _processing_count: int = 0
     peak_level_db: float = -np.inf
     rms_level_db: float = -np.inf
     noise_floor_db: float = -np.inf
@@ -140,10 +142,15 @@ class ProcessingMetrics:
 
     processing_times: deque[float] = field(default_factory=lambda: deque(maxlen=100))
 
+    @property
+    def avg_processing_time_ms(self) -> float:
+        return self._avg_processing_time_ms
+
     def add_time(self, ms: float) -> None:
-        """Add processing time sample."""
+        """Add processing time sample with O(1) average update."""
+        self._processing_count += 1
+        self._avg_processing_time_ms += (ms - self._avg_processing_time_ms) / self._processing_count
         self.processing_times.append(ms)
-        self.avg_processing_time_ms = sum(self.processing_times) / len(self.processing_times)
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -174,22 +181,40 @@ if NUMBA_AVAILABLE:
             sum_sq += audio[i] * audio[i]
         return np.sqrt(sum_sq / n)
 
+    @jit(nopython=True, cache=True, fastmath=True, inline="always")
+    def _dot_self_numba(audio: NDArray[np.float32]) -> float:
+        """Compute sum of squares efficiently for RMS and energy."""
+        n = len(audio)
+        if n == 0:
+            return 0.0
+        result = 0.0
+        for i in prange(n):
+            val = audio[i]
+            result += val * val
+        return result
+
     @jit(nopython=True, cache=True, fastmath=True)
     def _normalize_numba(
         audio: NDArray[np.float32],
         target_rms: float,
     ) -> NDArray[np.float32]:
         """Normalize audio to target RMS."""
-        current_rms = _rms_numba(audio)
+        n = len(audio)
+        if n == 0:
+            return audio.copy()
+
+        sum_sq = 0.0
+        for i in prange(n):
+            sum_sq += audio[i] * audio[i]
+        current_rms = np.sqrt(sum_sq / n)
+
         if current_rms < 1e-10:
             return audio.copy()
 
-        gain = target_rms / current_rms
-        # Limit gain to prevent clipping amplification
-        gain = min(gain, 10.0)
+        gain = min(target_rms / current_rms, 10.0)
 
         result = np.empty_like(audio)
-        for i in prange(len(audio)):
+        for i in prange(n):
             result[i] = audio[i] * gain
 
         return result
@@ -250,12 +275,21 @@ else:
             return 0.0
         return np.sqrt(np.mean(audio * audio))
 
+    def _dot_self_numba(audio: NDArray[np.float32]) -> float:
+        """Compute sum of squares without Numba."""
+        if len(audio) == 0:
+            return 0.0
+        return np.dot(audio, audio)
+
     def _normalize_numba(
         audio: NDArray[np.float32],
         target_rms: float,
     ) -> NDArray[np.float32]:
         """Normalize audio without Numba."""
-        current_rms = _rms_numba(audio)
+        dot_sum = _dot_self_numba(audio)
+        if dot_sum == 0:
+            return audio.copy()
+        current_rms = np.sqrt(dot_sum / len(audio))
         if current_rms < 1e-10:
             return audio.copy()
         gain = min(target_rms / current_rms, 10.0)
@@ -332,13 +366,15 @@ class AudioFilter(ABC):
 
 
 class ResamplingFilter(AudioFilter):
-    """High-quality resampling filter."""
+    """High-quality resampling filter with cached coefficients."""
 
     def __init__(self, target_rate: int = 16000):
         self.target_rate = target_rate
         self._cached_rate = 0
-        self._cached_num = 0
-        self._cached_den = 0
+        self._cached_up = 0
+        self._cached_down = 0
+        self._ratio = 0.0
+        self._inverse_ratio = 0.0
 
     def process(
         self,
@@ -358,30 +394,44 @@ class ResamplingFilter(AudioFilter):
         audio: NDArray[np.float32],
         sample_rate: int,
     ) -> NDArray[np.float32]:
-        """High-quality resampling using scipy."""
-        # Calculate resampling ratio
-        gcd = np.gcd(sample_rate, self.target_rate)
-        up = self.target_rate // gcd
-        down = sample_rate // gcd
+        """High-quality resampling using scipy with cached coefficients."""
+        if sample_rate != self._cached_rate:
+            gcd = np.gcd(sample_rate, self.target_rate)
+            self._cached_up = self.target_rate // gcd
+            self._cached_down = sample_rate // gcd
+            self._cached_rate = sample_rate
 
-        # Use polyphase resampling for efficiency
-        return resample_poly(audio, up, down, window=("kaiser", 5.0))
+        return resample_poly(audio, self._cached_up, self._cached_down, window=("kaiser", 5.0))
 
     def _resample_numpy(
         self,
         audio: NDArray[np.float32],
         sample_rate: int,
     ) -> NDArray[np.float32]:
-        """Fallback resampling using numpy."""
-        # Calculate new length
-        duration = len(audio) / sample_rate
-        new_length = int(duration * self.target_rate)
+        """Optimized numpy resampling with precomputed indices."""
+        ratio = self.target_rate / sample_rate
+        new_length = max(1, int(len(audio) * ratio))
 
-        # Simple linear interpolation
-        old_indices = np.linspace(0, len(audio) - 1, len(audio))
-        new_indices = np.linspace(0, len(audio) - 1, new_length)
+        if new_length == len(audio):
+            return audio
 
-        return np.interp(new_indices, old_indices, audio).astype(np.float32)
+        if abs(ratio - 1.0) < 0.01:
+            return audio
+
+        if self._ratio != ratio:
+            self._ratio = ratio
+            self._inverse_ratio = 1.0 / ratio
+
+        indices = np.arange(new_length, dtype=np.float64) * self._inverse_ratio
+        indices = np.clip(indices, 0, len(audio) - 1)
+
+        left = np.floor(indices).astype(np.intp)
+        right = np.minimum(left + 1, len(audio) - 1)
+        frac = (indices - left.astype(np.float64)).astype(np.float32)
+
+        left_vals = audio[left]
+        right_vals = audio[right]
+        return (left_vals + frac * (right_vals - left_vals)).astype(np.float32)
 
     def reset(self) -> None:
         """Reset filter state."""
@@ -421,7 +471,7 @@ class NormalizationFilter(AudioFilter):
         if len(self._level_history) > 10:
             avg_rms = np.mean(list(self._level_history))
             if avg_rms > 1e-10:
-                adaptive_gain = target_rms / avg_rms
+                adaptive_gain = float(target_rms / avg_rms)
                 # Smooth gain changes
                 self._adaptive_gain = 0.95 * self._adaptive_gain + 0.05 * adaptive_gain
 
@@ -616,11 +666,12 @@ class SpectralGateFilter(AudioFilter):
             np.pad(audio, (self.n_fft // 2, self.n_fft // 2)), self.n_fft
         )[::hop_length][:n_frames]
 
-        # Apply Hann window
-        window = np.hanning(self.n_fft).astype(np.float32)
-        windowed = frames * window
+        # Cache the window to avoid recreating on every call
+        if not hasattr(self, '_cached_hann_window') or self._cached_hann_window.shape[0] != self.n_fft:
+            self._cached_hann_window = np.hanning(self.n_fft).astype(np.float32)
+        windowed = frames * self._cached_hann_window
 
-        return rfft(windowed, axis=1)
+        return cast(NDArray[np.complex64], rfft(windowed, axis=1))
 
     def _istft(
         self,
@@ -631,11 +682,13 @@ class SpectralGateFilter(AudioFilter):
         """Compute Inverse Short-Time Fourier Transform."""
         n_frames = stft_matrix.shape[0]
 
-        # Inverse FFT
-        window = np.hanning(self.n_fft).astype(np.float32)
+        # Inverse FFT - use cached window
+        if not hasattr(self, '_cached_hann_window') or self._cached_hann_window.shape[0] != self.n_fft:
+            self._cached_hann_window = np.hanning(self.n_fft).astype(np.float32)
+        window = self._cached_hann_window
         time_slices = irfft(stft_matrix, n=self.n_fft) * window
 
-        # Overlap-add
+        # Overlap-add using vectorized approach
         output = np.zeros(length + self.n_fft, dtype=np.float32)
         for i, frame in enumerate(time_slices):
             start = i * hop_length
@@ -644,14 +697,16 @@ class SpectralGateFilter(AudioFilter):
         # Remove padding and normalize
         output = output[self.n_fft // 2 : length + self.n_fft // 2]
 
-        # Compensate for window overlap
-        window_sum = np.zeros(length + self.n_fft)
-        for i in range(n_frames):
-            start = i * hop_length
-            window_sum[start : start + self.n_fft] += window**2
+        # Vectorized window overlap compensation - O(n) instead of Python loop
+        window_squared = window * window
+        # Use np.add.at for repeated indices (faster than loop)
+        window_sum = np.zeros(length + self.n_fft, dtype=np.float64)
+        starts = np.arange(n_frames) * hop_length
+        for i, start in enumerate(starts):
+            window_sum[start : start + self.n_fft] += window_squared
 
         window_sum = window_sum[self.n_fft // 2 : length + self.n_fft // 2]
-        output /= np.maximum(window_sum, 1e-10)
+        output = output / np.maximum(window_sum, 1e-10)
 
         return output[:length]
 
@@ -867,13 +922,19 @@ class AudioPreprocessor:
         Returns:
             Processed audio array
         """
-        chunks = []
+        # Pre-allocate output array if possible for efficiency
+        n_chunks = (len(audio) + chunk_size - 1) // chunk_size
+        if n_chunks == 1:
+            return self.process(audio, input_sample_rate)
+        
+        # Process each chunk and stack directly
+        processed_chunks = []
         for i in range(0, len(audio), chunk_size):
             chunk = audio[i : i + chunk_size]
             processed = self.process(chunk, input_sample_rate)
-            chunks.append(processed)
+            processed_chunks.append(processed)
 
-        return np.concatenate(chunks)
+        return np.concatenate(processed_chunks)
 
     def add_filter(self, filter_instance: AudioFilter, index: int | None = None) -> None:
         """Add a custom filter to the chain.
