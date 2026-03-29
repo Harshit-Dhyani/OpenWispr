@@ -16,7 +16,6 @@ Key collaborators: app.core.models (SessionState, TranscriptSegment, FormulaFind
 Uses atomic write-through-temp-file pattern for crash safety.
 """
 
-
 from __future__ import annotations
 
 import json
@@ -25,6 +24,8 @@ from threading import Lock
 from typing import Any
 
 from app.core.models import FormulaFinding, SessionState, TranscriptSegment
+
+_CHUNK_SIZE = 64
 
 
 class SessionWriter:
@@ -44,9 +45,34 @@ class SessionWriter:
         self.session = session
         self.output_dir = (session.output_dir if session else root) if (session or root) else None
         self._append_lock = Lock()
+        self._segment_buffer: list[str] = []
+        self._timestamp_buffer: list[str] = []
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             (self.output_dir / "logs").mkdir(exist_ok=True)
+
+    def flush_buffers(self) -> None:
+        """Flush buffered segment writes to disk."""
+        with self._append_lock:
+            if not self._segment_buffer:
+                return
+
+            if self.output_dir is not None:
+                jsonl_path = self.output_dir / "transcript.jsonl"
+                txt_path = self.output_dir / "transcript.txt"
+
+                jsonl_content = "".join(self._segment_buffer)
+                txt_content = "".join(self._timestamp_buffer)
+
+                jsonl_temp = jsonl_path.with_suffix(".db-tmp")
+                txt_temp = txt_path.with_suffix(".db-tmp")
+                jsonl_temp.write_text(jsonl_content, encoding="utf-8", newline="")
+                txt_temp.write_text(txt_content, encoding="utf-8", newline="")
+                jsonl_temp.replace(jsonl_path)
+                txt_temp.replace(txt_path)
+
+            self._segment_buffer.clear()
+            self._timestamp_buffer.clear()
 
     def write_metadata(self) -> None:
         """Write session metadata to session.json if output_dir is configured."""
@@ -66,18 +92,20 @@ class SessionWriter:
         """
         if self.output_dir is None:
             raise RuntimeError("SessionWriter output_dir is not configured")
-        line = json.dumps(segment.to_dict(), ensure_ascii=False) + "\n"
+
+        json_line = json.dumps(segment.to_dict(), ensure_ascii=False) + "\n"
+        timestamp_line = f"[{segment.start:.2f} - {segment.end:.2f}] {segment.display_text}\n"
+
         with self._append_lock:
-            with (self.output_dir / "transcript.jsonl").open(
-                "a", encoding="utf-8", newline="\n"
-            ) as handle:
-                handle.write(line)
-                handle.flush()
-            with (self.output_dir / "transcript.txt").open(
-                "a", encoding="utf-8", newline="\n"
-            ) as handle:
-                handle.write(f"[{segment.start:.2f} - {segment.end:.2f}] {segment.display_text}\n")
-                handle.flush()
+            self._segment_buffer.append(json_line)
+            self._timestamp_buffer.append(timestamp_line)
+
+            if len(self._segment_buffer) >= _CHUNK_SIZE:
+                self.flush_buffers()
+
+    def flush(self) -> None:
+        """Force flush of all buffered writes."""
+        self.flush_buffers()
 
     def write_outputs(
         self,

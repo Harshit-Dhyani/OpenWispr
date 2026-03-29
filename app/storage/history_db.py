@@ -19,9 +19,10 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
-from contextlib import contextmanager
+
 from pathlib import Path
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Generator
 
 from app.storage.migrations import run_migrations
 
@@ -60,7 +61,7 @@ class HistoryDatabase:
         run_migrations(self._conn)
 
     @contextmanager
-    def transaction(self) -> contextmanager[sqlite3.Connection]:
+    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
         with self._lock:
             self._conn.execute("BEGIN")
             try:

@@ -43,7 +43,7 @@ class StemNoteProcessor:
         formulas = extract_formula_findings(segments)
         logger.debug(f"Formula extraction complete: found {len(formulas)} formulas")
         if formulas:
-            formula_types = {}
+            formula_types: dict[str, int] = {}
             for f in formulas:
                 key = (
                     "assignment"

@@ -10,7 +10,7 @@ Features:
 - Automatic chapter detection on long silences (>2 seconds)
 - STEM processing for formulas/equations
 - Contextual notes with document attachments
-- Export to txt, json, srt, md formats
+- Export to txt, json, srt, md formats (parallelized)
 - Session resume capability
 - Progress reporting for long operations
 - Background export tasks
@@ -25,9 +25,10 @@ import threading
 import time
 import wave
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -45,7 +46,7 @@ from app.core.models import (
     TranscriptSegment,
     utc_now,
 )
-from app.core.session.formatters import ExportFormat, MarkdownFormatter, SrtFormatter
+from app.core.session.formatters import ExportFormat, SrtFormatter
 from app.core.settings.config import AppSettings, resolve_live_profile
 from app.stem.postprocess import NotesBundle, StemNoteProcessor
 from app.storage.document_store import ContextProvider, DocumentStore
@@ -61,7 +62,7 @@ WhisperTranscriber = FastTranscriber
 # Re-export for backward compatibility
 
 
-class MarkdownFormatter:
+class SystemMarkdownFormatter:
     """Formatter for Markdown export."""
 
     @classmethod
@@ -71,57 +72,59 @@ class MarkdownFormatter:
         notes_bundle: NotesBundle,
         chapters: list[Chapter],
     ) -> str:
-        """Format complete session as Markdown."""
-        lines = [
-            f"# {session.title}",
-            "",
-            "## Metadata",
-            "",
-            f"- **Session ID:** `{session.session_id}`",
-            f"- **Started:** {session.started_at.isoformat()}",
-            f"- **Model:** {session.model_name}",
-            f"- **Language:** {session.language_mode}",
-            f"- **Segments:** {len([s for s in session.segments if not s.suppressed])}",
-            f"- **Formulas:** {len(session.formulas)}",
-            f"- **Needs Review:** {len(session.needs_review)}",
-            "",
-        ]
+        """Format complete session as Markdown using efficient string building."""
+        buf = StringIO()
+        visible_segments = [s for s in session.segments if not s.suppressed]
 
-        # Add chapters if available
+        buf.write("# ")
+        buf.write(session.title)
+        buf.write("\n\n## Metadata\n\n")
+        buf.write(f"- **Session ID:** `{session.session_id}`\n")
+        buf.write(f"- **Started:** {session.started_at.isoformat()}\n")
+        buf.write(f"- **Model:** {session.model_name}\n")
+        buf.write(f"- **Language:** {session.language_mode}\n")
+        buf.write(f"- **Segments:** {len(visible_segments)}\n")
+        buf.write(f"- **Formulas:** {len(session.formulas)}\n")
+        buf.write(f"- **Needs Review:** {len(session.needs_review)}\n\n")
+
         if chapters:
-            lines.extend(["## Chapters", ""])
+            buf.write("## Chapters\n\n")
             for chapter in chapters:
-                lines.append(f"### {cls._format_timestamp(chapter.start_time)} - {chapter.title}")
+                buf.write("### ")
+                buf.write(cls._format_timestamp(chapter.start_time))
+                buf.write(" - ")
+                buf.write(chapter.title)
+                buf.write("\n")
                 if chapter.description:
-                    lines.append(chapter.description)
-                lines.append("")
+                    buf.write(chapter.description)
+                    buf.write("\n")
+                buf.write("\n")
 
-        # Add notes
         if notes_bundle.notes_markdown:
-            lines.extend(["## Notes", ""])
-            lines.append(notes_bundle.notes_markdown)
-            lines.append("")
+            buf.write("## Notes\n\n")
+            buf.write(notes_bundle.notes_markdown)
+            buf.write("\n\n")
 
-        # Add formulas section
         if session.formulas:
-            lines.extend(["## Extracted Formulas", ""])
+            buf.write("## Extracted Formulas\n\n")
             for formula in session.formulas:
                 status = "✅" if not formula.review_flag else "⚠️"
-                lines.append(
-                    f"{status} `{formula.expression}` "
-                    f"({cls._format_timestamp(formula.timestamp_start)}-"
-                    f"{cls._format_timestamp(formula.timestamp_end)})"
-                )
-            lines.append("")
+                buf.write(f"{status} `{formula.expression}` (")
+                buf.write(cls._format_timestamp(formula.timestamp_start))
+                buf.write("-")
+                buf.write(cls._format_timestamp(formula.timestamp_end))
+                buf.write(")\n")
+            buf.write("\n")
 
-        # Add full transcript
-        lines.extend(["## Full Transcript", ""])
-        for segment in session.segments:
-            if not segment.suppressed:
-                lines.append(f"**[{cls._format_timestamp(segment.start)}]** {segment.display_text}")
-        lines.append("")
+        buf.write("## Full Transcript\n\n")
+        for segment in visible_segments:
+            buf.write("**[")
+            buf.write(cls._format_timestamp(segment.start))
+            buf.write("]** ")
+            buf.write(segment.display_text)
+            buf.write("\n")
 
-        return "\n".join(lines)
+        return buf.getvalue()
 
     @staticmethod
     def _format_timestamp(seconds: float) -> str:
@@ -426,7 +429,7 @@ class ExportManager:
 
     def __init__(self, output_dir: Path) -> None:
         self.output_dir = output_dir
-        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="export-")
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="export-")
         self._pending_tasks: dict[str, asyncio.Future] = {}
         self._export_history: list[dict[str, Any]] = []
         self._lock = threading.Lock()
@@ -466,12 +469,28 @@ class ExportManager:
         task_id: str,
         callback: Callable[[str, bool, str], None] | None,
     ) -> None:
-        """Perform the actual export."""
+        """Perform the actual export with parallel format generation."""
         try:
-            results = []
-            for fmt in formats:
-                path = self._export_single(session, notes_bundle, chapters, fmt)
-                results.append(f"{fmt.value}:{path.name}")
+            precomputed = self._precompute_export_data(session, notes_bundle, chapters)
+
+            with ThreadPoolExecutor(
+                max_workers=min(len(formats), 4), thread_name_prefix="format-"
+            ) as format_executor:
+                futures = {
+                    format_executor.submit(
+                        self._export_single, session, notes_bundle, chapters, fmt, precomputed
+                    ): fmt
+                    for fmt in formats
+                }
+                results = []
+                for future in as_completed(futures):
+                    fmt = futures[future]
+                    try:
+                        path = future.result()
+                        results.append(f"{fmt.value}:{path.name}")
+                    except Exception as e:
+                        logger.warning(f"Format {fmt.value} export failed: {e}")
+                        results.append(f"{fmt.value}:error")
 
             message = f"Exported {len(results)} formats"
             success = True
@@ -513,31 +532,48 @@ class ExportManager:
             except Exception as e:
                 logger.error(f"Export callback error: {e}")
 
+    def _precompute_export_data(
+        self,
+        session: SessionState,
+        notes_bundle: NotesBundle,
+        chapters: list[Chapter],
+    ) -> dict[str, Any]:
+        visible_segments = [s for s in session.segments if not s.suppressed]
+        return {
+            "visible_segments": visible_segments,
+            "session_metadata": session.to_metadata_dict(),
+            "chapters_data": [c.to_dict() for c in chapters],
+            "formulas_data": [f.to_dict() for f in session.formulas],
+            "needs_review_data": [s.to_dict() for s in session.needs_review],
+            "notes_preview": notes_bundle.notes_markdown[:500] if notes_bundle else "",
+        }
+
     def _export_single(
         self,
         session: SessionState,
         notes_bundle: NotesBundle,
         chapters: list[Chapter],
         fmt: ExportFormat,
+        precomputed: dict[str, Any] | None = None,
     ) -> Path:
         """Export to a single format."""
         output_path = self.output_dir / f"export.{fmt.value}"
 
+        if precomputed is None:
+            precomputed = self._precompute_export_data(session, notes_bundle, chapters)
+
         if fmt == ExportFormat.TXT:
-            content = self._format_txt(session)
+            content = self._format_txt(precomputed)
         elif fmt == ExportFormat.JSON:
-            content = self._format_json(session, notes_bundle, chapters)
+            content = self._format_json(precomputed, notes_bundle)
         elif fmt == ExportFormat.SRT:
-            content = SrtFormatter.format_segments(session.segments)
+            content = SrtFormatter.format_transcript(precomputed["visible_segments"])
         elif fmt == ExportFormat.MD:
-            content = MarkdownFormatter.format_session(session, notes_bundle, chapters)
+            content = SystemMarkdownFormatter.format_session(session, notes_bundle, chapters)
         else:
             raise ValueError(f"Unknown format: {fmt}")
 
-        # Atomic write
-        temp_path = output_path.with_suffix(output_path.suffix + ".tmp")
-        temp_path.write_text(content, encoding="utf-8")
-        temp_path.replace(output_path)
+        self._atomic_write(output_path, content)
 
         logger.debug(
             "export_complete",
@@ -546,32 +582,42 @@ class ExportManager:
 
         return output_path
 
-    def _format_txt(self, session: SessionState) -> str:
-        """Format as plain text."""
-        lines = [f"Session: {session.title}", f"Started: {session.started_at.isoformat()}", ""]
+    def _atomic_write(self, path: Path, content: str) -> None:
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        temp_path.write_text(content, encoding="utf-8")
+        temp_path.replace(path)
 
-        for segment in session.segments:
-            if not segment.suppressed:
-                lines.append(segment.display_text)
+    def _format_txt(self, precomputed: dict[str, Any]) -> str:
+        """Format as plain text using efficient string building."""
+        buf = StringIO()
+        visible = precomputed["visible_segments"]
+        if not visible:
+            return ""
 
-        return "\n".join(lines)
+        buf.write(f"Session: {precomputed['session_metadata'].get('title', 'Untitled')}\n")
+        buf.write(f"Started: {precomputed['session_metadata'].get('started_at', 'Unknown')}\n\n")
+
+        for segment in visible:
+            buf.write(segment.display_text)
+            buf.write("\n")
+
+        return buf.getvalue()
 
     def _format_json(
         self,
-        session: SessionState,
+        precomputed: dict[str, Any],
         notes_bundle: NotesBundle,
-        chapters: list[Chapter],
     ) -> str:
-        """Format as JSON."""
+        """Format as JSON with compact serialization."""
         data = {
-            "session": session.to_metadata_dict(),
-            "segments": [s.to_dict() for s in session.segments],
-            "formulas": [f.to_dict() for f in session.formulas],
-            "needs_review": [s.to_dict() for s in session.needs_review],
-            "chapters": [c.to_dict() for c in chapters],
+            "session": precomputed["session_metadata"],
+            "segments": precomputed["visible_segments"],
+            "formulas": precomputed["formulas_data"],
+            "needs_review": precomputed["needs_review_data"],
+            "chapters": precomputed["chapters_data"],
             "export_metadata": {
                 "exported_at": utc_now().isoformat(),
-                "notes_preview": notes_bundle.notes_markdown[:500] if notes_bundle else "",
+                "notes_preview": precomputed["notes_preview"],
             },
         }
         return json.dumps(data, ensure_ascii=False, indent=2)
@@ -904,6 +950,7 @@ class SystemSessionHandler:
         # Initialize components
         self.writer = SessionWriter(self.session)
         self.logger = configure_logging(output_dir / "logs", self.settings.log_level)
+        assert self.logger is not None
         self.export_manager = ExportManager(output_dir)
 
         # Initialize audio recorder if enabled
@@ -984,6 +1031,9 @@ class SystemSessionHandler:
 
         if self.session is None:
             raise RuntimeError("Failed to create session")
+
+        # Logger is set by create_session
+        assert self.logger is not None
 
         # Update session parameters
         self.session.model_name = model_name
@@ -1149,25 +1199,27 @@ class SystemSessionHandler:
         enable_streaming: bool,
     ) -> SessionState:
         """Resume a previously saved session."""
-        self.logger.info(f"Resuming session from {resume_from}")
-
-        # Load session metadata
+        # Load session metadata first to get title
         session_file = resume_from / "session.json"
         if not session_file.exists():
             raise FileNotFoundError(f"Session file not found: {session_file}")
 
-        # Parse existing session data
         try:
             metadata = json.loads(session_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
-            self.logger.warning(f"Failed to parse session file: {e}")
-            raise
+            raise ValueError(f"Failed to parse session file: {e}") from e
 
-        # Create new session with loaded data
+        # Create new session with loaded data (this sets up logger)
         self.create_session(
             title=metadata.get("title", "Resumed Session"),
             output_root=resume_from.parent,
+            description=metadata.get("description", ""),
+            tags=metadata.get("tags"),
         )
+
+        # Now logger is set up
+        assert self.logger is not None
+        self.logger.info(f"Resuming session from {resume_from}")
 
         if self.session is None:
             raise RuntimeError("Failed to create session for resume")
@@ -1199,6 +1251,7 @@ class SystemSessionHandler:
         if self.session is None:
             return
 
+        assert self.logger is not None
         count = 0
         with transcript_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -1235,6 +1288,7 @@ class SystemSessionHandler:
     def pause_session(self) -> None:
         """Pause the current session."""
         if self.session and self.session.status == "running":
+            assert self.logger is not None
             self._pause_event.set()
             self.session.status = "paused"
 
@@ -1247,6 +1301,7 @@ class SystemSessionHandler:
     def resume_session(self) -> None:
         """Resume a paused session."""
         if self.session and self.session.status == "paused":
+            assert self.logger is not None
             self._pause_event.clear()
             self.session.status = "running"
 
