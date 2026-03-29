@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Get port from environment variable (set by backend startup script)
+const API_PORT = process.env.OPENWISPR_PORT || "8765";
+
 contextBridge.exposeInMainWorld("openwisprDesktop", {
   // Existing APIs
   chooseDirectory: () => ipcRenderer.invoke("choose-directory"),
@@ -16,7 +19,7 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
     ipcRenderer.on("settings-updated", callback);
     return () => ipcRenderer.removeListener("settings-updated", callback);
   },
-  getApiOrigin: () => "http://127.0.0.1:8765",
+  getApiOrigin: () => `http://127.0.0.1:${API_PORT}`,
 
   // Fetch API for backend communication
   fetchJson: async (path, options = {}) => {
@@ -36,7 +39,7 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
 
     for (let attempt = 0; attempt < (isRetryableGet ? 5 : 1); attempt += 1) {
       try {
-        response = await fetch(`http://127.0.0.1:8765${path}`, {
+        response = await fetch(`http://127.0.0.1:${API_PORT}${path}`, {
           ...options,
           method,
           headers
@@ -55,10 +58,20 @@ contextBridge.exposeInMainWorld("openwisprDesktop", {
       throw lastError || new Error("Failed to fetch");
     }
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `HTTP ${response.status}`);
+      let errorMessage = `HTTP ${response.status}`;
+      try {
+        const text = await response.text();
+        if (text) {
+          errorMessage = text;
+        }
+      } catch {}
+      throw new Error(errorMessage);
     }
-    return response.json();
+    try {
+      return await response.json();
+    } catch {
+      return {};
+    }
   },
 
   // Hotkey APIs

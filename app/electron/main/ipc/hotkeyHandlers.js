@@ -25,7 +25,9 @@ const { createHoldModeController } = require("../services/holdModeHotkeys");
 const { shouldKeepFloatingResultVisible } = require("./hotkeyStopPolicy");
 const { ELECTRON_STRINGS } = require("../../strings/en");
 
-const API_BASE_URL = "http://127.0.0.1:8765";
+// Get port from environment variable (set by backend startup script)
+const API_PORT = process.env.OPENWISPR_PORT || "8765";
+const API_BASE_URL = `http://127.0.0.1:${API_PORT}`;
 
 /**
  * Transforms text via backend API for auto-correction, punctuation, casing, etc.
@@ -673,7 +675,7 @@ function unregisterHotkey() {
 async function connectHotkeyWebSocket(sessionId) {
   try {
     const WebSocket = require("ws");
-    const wsUrl = `ws://127.0.0.1:8765/api/transcription/hotkey/ws`;
+    const wsUrl = `ws://127.0.0.1:${API_PORT}/api/transcription/hotkey/ws`;
     if (state.hotkeyWebSocket) {
       closeHotkeyWebSocket();
     }

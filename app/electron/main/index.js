@@ -32,11 +32,19 @@ require("./ipc/handlers");
 
 // Global exception handlers
 process.on("uncaughtException", (error) => {
-  console.error("[main] Uncaught exception", error);
+  console.error("[main] Uncaught exception:", error.message);
+  if (process.env.OPENWISPR_LOG_LEVEL === "debug") {
+    console.error("[main] Stack trace:", error.stack);
+  }
 });
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[main] Unhandled rejection", reason);
+process.on("unhandledRejection", (reason, promise) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error("[main] Unhandled rejection:", message);
+  if (process.env.OPENWISPR_LOG_LEVEL === "debug") {
+    const stack = reason instanceof Error ? reason.stack : undefined;
+    console.error("[main] Stack trace:", stack);
+  }
 });
 
 // App event handlers
@@ -92,7 +100,10 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    app.quit();
+    if (!state.isQuitting) {
+      state.isQuitting = true;
+      app.quit();
+    }
   }
 });
 
@@ -129,7 +140,11 @@ if (process.platform === "darwin") {
 
 // Backend-to-renderer forwarding for hotkey mode
 ipcMain.on("transcription-result", (event, data) => {
-  updateFloatingTranscription(data.text, data.isPartial);
+  try {
+    updateFloatingTranscription(data.text, data.isPartial);
+  } catch (error) {
+    console.error("[main] transcription-result forward failed:", error.message);
+  }
 });
 
 console.log("[main] Electron main process started");

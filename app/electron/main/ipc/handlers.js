@@ -60,18 +60,20 @@ ipcMain.handle("choose-pdf", async () => {
  * @returns {Promise<boolean>} True if successful
  */
 ipcMain.handle("open-path", async (event, filePath) => {
-  if (!filePath) return false;
+  if (!filePath) {
+    return { success: false, error: "No file path provided" };
+  }
   try {
     const normalizedPath = path.normalize(filePath);
     if (normalizedPath.includes('..')) {
       console.error("Path traversal attempt detected:", filePath);
-      return false;
+      return { success: false, error: "Path traversal not allowed" };
     }
     shell.showItemInFolder(normalizedPath);
-    return true;
+    return { success: true };
   } catch (error) {
-    console.error("Failed to open path:", error);
-    return false;
+    console.error("Failed to open path:", error.message);
+    return { success: false, error: error.message };
   }
 });
 
@@ -459,8 +461,7 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
         state.hotkeyPendingAction = "cancel";
         await stopRecording({ keepFloatingResultVisible: false });
       } catch (error) {
-        console.error("[main] Failed to stop:", error);
-      } finally {
+        console.error("[main] Failed to stop on cancel:", error.message);
         state.hotkeyPendingAction = null;
       }
     }
@@ -469,7 +470,8 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
       state.hotkeyPendingAction = "finish";
       try {
         await stopRecording({ keepFloatingResultVisible: true });
-      } finally {
+      } catch (error) {
+        console.error("[main] Failed to stop on finish:", error.message);
         state.hotkeyPendingAction = null;
       }
     }
@@ -478,7 +480,8 @@ ipcMain.on("floating-window-action", async (event, { action }) => {
       try {
         state.hotkeyPendingAction = "finish_and_paste";
         await stopRecording({ keepFloatingResultVisible: true });
-      } finally {
+      } catch (error) {
+        console.error("[main] Failed to stop on finish-and-paste:", error.message);
         state.hotkeyPendingAction = null;
       }
     }

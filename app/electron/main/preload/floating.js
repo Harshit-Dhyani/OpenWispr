@@ -39,7 +39,7 @@ try {
     floatingStrings = resolvedStrings;
   }
 } catch (error) {
-  console.error("[floating:preload] Failed to resolve floating strings via IPC, using fallback:", error);
+  console.error("[floating:preload] Failed to resolve floating strings via IPC, using fallback:", error.message);
 }
 
 let floatingSettings = { showFloatingCoachResult: true };
@@ -49,7 +49,7 @@ try {
     floatingSettings = resolvedSettings;
   }
 } catch (error) {
-  console.error("[floating:preload] Failed to resolve floating settings via IPC, using default:", error);
+  console.error("[floating:preload] Failed to resolve floating settings via IPC, using default:", error.message);
 }
 
 const debugEnabled =
