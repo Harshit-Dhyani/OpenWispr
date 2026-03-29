@@ -149,6 +149,8 @@ WebSocket connections are managed by app/api/websocket_server.py:
 | allowed_origins | None | Needs restriction |
 | auth_required | False | Local IP auto-auth |
 
+**Rate Limiting Note:** WebSocket connections enforce rate limiting at 1000 messages per 60 seconds. This prevents abuse but should be considered as defense-in-depth since the application runs locally. Settings save operations have a 30-second timeout to prevent resource exhaustion.
+
 The WebSocket manager validates origins but currently accepts all origins. However, local IP addresses (127.0.0.1) are automatically authenticated without requiring tokens (see websocket_server.py:220-232).
 
 **Security Note:** For production deployment, restrict allowed_origins to specific origins.

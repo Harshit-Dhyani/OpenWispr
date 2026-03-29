@@ -1,7 +1,7 @@
 ---
 title: Deployment Guide
 audience: operators
-last_verified: 2026-03-15
+last_verified: 2026-03-19
 source_of_truth:
   - tools/setup/
   - pyproject.toml

@@ -1,7 +1,7 @@
 ---
 title: API Endpoints Reference
 audience: developers
-last_verified: 2026-03-15
+last_verified: 2026-03-19
 note: This file supplements FastAPI /api/docs. Run `python -m app.api.generate_docs` to regenerate.
 source_of_truth:
   - app/api/server.py
