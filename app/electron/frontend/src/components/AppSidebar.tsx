@@ -7,6 +7,7 @@
  * 
  * @component
  */
+import React from 'react';
 import { Activity, BookText, Cpu, Home, Mic, RefreshCw, ScissorsSquareDashedBottom, Settings, Volume2, Wifi, WifiOff } from 'lucide-react';
 import { RENDERER_STRINGS } from '../strings/en';
 import openWisprLogo from '../assets/openwispr-logo.png';
@@ -36,7 +37,7 @@ const pageMeta: Array<{ page: AppPage; label: string; eyebrow: string }> = [
   { page: 'settings', ...SIDEBAR_STRINGS.pageMeta.settings },
 ];
 
-export function AppSidebar({
+export const AppSidebar = React.memo(function AppSidebar({
   activePage,
   onNavigate,
   onRefreshDevices,
@@ -163,6 +164,4 @@ export function AppSidebar({
       </div>
     </aside>
   );
-}
-
-
+});

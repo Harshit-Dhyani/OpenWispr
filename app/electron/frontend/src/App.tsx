@@ -715,6 +715,31 @@ function App() {
     }
   }, [mergeFormDefaults]);
 
+  const handleNavigate = useCallback((page: AppPage) => {
+    setActivePage(page);
+    setQuickSettingsMode(null);
+  }, []);
+
+  const handleCloseQuickSettings = useCallback(() => {
+    setQuickSettingsMode(null);
+  }, []);
+
+  const handleOpenDictationSettings = useCallback(() => {
+    setQuickSettingsMode('dictation');
+  }, []);
+
+  const handleOpenSessionSettings = useCallback(() => {
+    setQuickSettingsMode('sessions');
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setActivePage('home');
+  }, []);
+
+  const handleNavigateToSettings = useCallback(() => {
+    handleNavigate('settings');
+  }, [handleNavigate]);
+
   const loadInitialSnapshot = useCallback(async () => {
     try {
       const payload = await backendRequest<SnapshotPayload>('/api/session');
@@ -1533,7 +1558,7 @@ function App() {
   const homeView = (
     <HomePage
       request={backendRequest}
-      onOpenSettings={() => setActivePage('settings')}
+      onOpenSettings={handleNavigateToSettings}
       onStatus={setStatusMessage}
       defaultRangeDays={settings.history.default_analytics_range_days}
       allowRetry={settings.history.allow_retry}
@@ -1566,8 +1591,8 @@ function App() {
       dictationHotkeyLabel={dictationHotkeyLabel}
       onStartDictation={startDictation}
       onStopDictation={stopDictation}
-      onOpenQuickSettings={() => setQuickSettingsMode('dictation')}
-      onOpenSettings={() => setActivePage('settings')}
+      onOpenQuickSettings={handleOpenDictationSettings}
+      onOpenSettings={handleNavigateToSettings}
     />
   );
 
@@ -1589,7 +1614,7 @@ function App() {
       onStopSession={stopSession}
       onPreloadModel={preloadModel}
       onAttachPdf={attachPdf}
-      onOpenQuickSettings={() => setQuickSettingsMode('sessions')}
+      onOpenQuickSettings={handleOpenSessionSettings}
     />
   );
 
@@ -1599,7 +1624,7 @@ function App() {
         <SettingsPanel
           inline
           isOpen
-          onClose={() => setActivePage('home')}
+          onClose={handleCloseSettings}
           initialSettings={settings}
           onSettingsChange={async (newSettings) => {
             await saveSettings(newSettings);
@@ -1649,7 +1674,7 @@ function App() {
         open
         title="Dictation Quick Settings"
         description="Only the everyday controls for microphone or hotkey dictation live here."
-        onClose={() => setQuickSettingsMode(null)}
+        onClose={handleCloseQuickSettings}
       >
         <QuickSettingsContent
           mode="dictation"
@@ -1676,7 +1701,7 @@ function App() {
         open
         title="Session Quick Settings"
         description="Use the essentials here. Deeper tuning stays in the Settings page."
-        onClose={() => setQuickSettingsMode(null)}
+        onClose={handleCloseQuickSettings}
       >
         <QuickSettingsContent
           mode="sessions"
@@ -1705,13 +1730,8 @@ function App() {
       <div className="flex h-full min-h-0 flex-col overflow-hidden xl:flex-row">
         <AppSidebar
           activePage={activePage}
-          onNavigate={(page) => {
-            setActivePage(page);
-            setQuickSettingsMode(null);
-          }}
-          onRefreshDevices={() => {
-            void loadDevices();
-          }}
+          onNavigate={handleNavigate}
+          onRefreshDevices={loadDevices}
           appName={AppConstants.APP_NAME}
           statusMessage={statusMessage}
           connectionStatus={connectionStatus}

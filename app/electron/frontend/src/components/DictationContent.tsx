@@ -6,7 +6,7 @@
  * 
  * @component
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Waves } from 'lucide-react';
 import type { CoachResult, Segment } from '../types/api';
 import { RENDERER_STRINGS } from '../strings/en';
@@ -94,7 +94,7 @@ type DictationContentProps = {
   showCoachDiff?: boolean;
 };
 
-export function DictationContent({
+export const DictationContent = React.memo(function DictationContent({
   snapshot,
   liveLatency,
   workspaceLabel = 'Workspace',
@@ -149,6 +149,12 @@ export function DictationContent({
   );
 
   useEffect(() => {
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [autoScroll, snapshot.transcript]);
+
+  useEffect(() => {
     if (
       coachResult ||
       originalText ||
@@ -169,19 +175,13 @@ export function DictationContent({
     }
   }, [coachResult, coachStatus, originalText, pasteText, combinedWordCount]);
 
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [autoScroll, snapshot.transcript]);
-
-  function handleScroll() {
+  const handleScroll = useCallback(() => {
     if (!scrollRef.current) {
       return;
     }
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 60);
-  }
+  }, []);
 
   const latencyValue =
     liveLatency !== null && liveLatency !== undefined && liveLatency > 0
@@ -346,9 +346,9 @@ export function DictationContent({
       </div>
     </main>
   );
-}
+});
 
-function CombinedTimelineCard({ combinedText }: { combinedText: string }) {
+const CombinedTimelineCard = React.memo(function CombinedTimelineCard({ combinedText }: { combinedText: string }) {
   return (
     <article className="border-2 border-lawn-border bg-lawn-dark/90 p-3 text-lawn-bg">
       <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-lawn-accent">
@@ -359,4 +359,4 @@ function CombinedTimelineCard({ combinedText }: { combinedText: string }) {
       </p>
     </article>
   );
-}
+});

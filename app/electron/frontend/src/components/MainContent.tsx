@@ -7,6 +7,7 @@
  * 
  * @component
  */
+import React, { useMemo } from 'react';
 import type { CoachResult, Formula, Segment, SessionSummary } from '../types/api';
 import { DictationContent } from './DictationContent';
 import { SessionContent } from './SessionContent';
@@ -55,7 +56,7 @@ type MainContentProps = {
   showCoachDiff?: boolean;
 };
 
-export function MainContent({
+export const MainContent = React.memo(function MainContent({
   scope = 'session',
   snapshot,
   liveLatency,
@@ -72,36 +73,65 @@ export function MainContent({
   pasteText,
   showCoachDiff,
 }: MainContentProps) {
+  const dictationContentProps = useMemo(
+    () => ({
+      snapshot,
+      liveLatency,
+      workspaceLabel,
+      workspaceTitle,
+      workspaceDescription,
+      liveDraft,
+      transcriptDebugEvents,
+      coachResult,
+      coachStatus,
+      coachDisplaySource,
+      coachError,
+      originalText,
+      pasteText,
+      showCoachDiff,
+    }),
+    [
+      snapshot,
+      liveLatency,
+      workspaceLabel,
+      workspaceTitle,
+      workspaceDescription,
+      liveDraft,
+      transcriptDebugEvents,
+      coachResult,
+      coachStatus,
+      coachDisplaySource,
+      coachError,
+      originalText,
+      pasteText,
+      showCoachDiff,
+    ],
+  );
+
+  const sessionContentProps = useMemo(
+    () => ({
+      snapshot,
+      liveLatency,
+      workspaceLabel,
+      workspaceTitle,
+      workspaceDescription,
+      liveDraft,
+      transcriptDebugEvents,
+    }),
+    [
+      snapshot,
+      liveLatency,
+      workspaceLabel,
+      workspaceTitle,
+      workspaceDescription,
+      liveDraft,
+      transcriptDebugEvents,
+    ],
+  );
+
   if (scope === 'dictation') {
-    return (
-      <DictationContent
-        snapshot={snapshot}
-        liveLatency={liveLatency}
-        workspaceLabel={workspaceLabel}
-        workspaceTitle={workspaceTitle}
-        workspaceDescription={workspaceDescription}
-        liveDraft={liveDraft}
-        transcriptDebugEvents={transcriptDebugEvents}
-        coachResult={coachResult}
-        coachStatus={coachStatus}
-        coachDisplaySource={coachDisplaySource}
-        coachError={coachError}
-        originalText={originalText}
-        pasteText={pasteText}
-        showCoachDiff={showCoachDiff}
-      />
-    );
+    return <DictationContent {...dictationContentProps} />;
   }
 
-  return (
-    <SessionContent
-      snapshot={snapshot}
-      liveLatency={liveLatency}
-      workspaceLabel={workspaceLabel}
-      workspaceTitle={workspaceTitle}
-      workspaceDescription={workspaceDescription}
-      liveDraft={liveDraft}
-      transcriptDebugEvents={transcriptDebugEvents}
-    />
-  );
-}
+  return <SessionContent {...sessionContentProps} />;
+});
