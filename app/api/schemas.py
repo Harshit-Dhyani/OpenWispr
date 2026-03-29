@@ -69,10 +69,14 @@ class AttachPdfRequest(BaseModel):
     @field_validator("path")
     @classmethod
     def validate_path(cls, v: str) -> str:
+        normalized = v.replace("\\", "/")
+        if ".." in normalized or normalized.startswith("/"):
+            raise ValueError("Invalid path: path traversal not allowed")
         p = Path(v)
         if not p.is_file() or p.suffix.lower() != ".pdf":
             raise ValueError("Must be a valid PDF file path")
-        return str(p.resolve())
+        resolved = p.resolve()
+        return str(resolved)
 
 
 class PreloadModelRequest(BaseModel):
@@ -107,6 +111,20 @@ class SnippetImportRequest(BaseModel):
     entries: list[dict]
     replace_existing: bool = False
 
+    @field_validator("entries")
+    @classmethod
+    def validate_entries(cls, v: list[dict]) -> list[dict]:
+        for i, entry in enumerate(v):
+            if not isinstance(entry, dict):
+                raise ValueError(f"Entry at index {i} must be a dictionary")
+            trigger = entry.get("trigger")
+            expansion = entry.get("expansion")
+            if trigger and not isinstance(trigger, str):
+                raise ValueError(f"Entry at index {i}: trigger must be a string")
+            if expansion and not isinstance(expansion, str):
+                raise ValueError(f"Entry at index {i}: expansion must be a string")
+        return v[:100]
+
 
 class PreviewExpandRequest(BaseModel):
     text: str = ""
@@ -140,10 +158,17 @@ class StylePreviewRequest(BaseModel):
 
 
 class DictionaryEntryCreateRequest(BaseModel):
-    phrase: str = Field(..., min_length=1)
-    replacement: str = Field(..., min_length=1)
+    phrase: str = Field(..., min_length=1, max_length=500)
+    replacement: str = Field(..., min_length=1, max_length=2000)
     scope: str | None = None
     enabled: bool = True
+
+    @field_validator("phrase", "replacement")
+    @classmethod
+    def validate_text_fields(cls, v: str) -> str:
+        if "\x00" in v:
+            raise ValueError("Null characters not allowed")
+        return v
 
 
 class DictionaryEntryUpdateRequest(BaseModel):
@@ -222,6 +247,13 @@ class HotkeyStatusResponse(BaseModel):
 
 class HotkeyInjectRequest(BaseModel):
     text: str
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        if len(v) > 50000:
+            raise ValueError("Text exceeds maximum length of 50000 characters")
+        return v
 
 
 class HotkeyInjectResponse(BaseModel):

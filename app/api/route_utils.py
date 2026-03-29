@@ -48,41 +48,66 @@ def apply_runtime_log_levels(log_level: str) -> None:
 
 def log_route(method: str, path: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        func.__endpoint_path__ = path
-        func.__http_method__ = method
+        func.__endpoint_path__ = path  # type: ignore[attr-defined]
+        func.__http_method__ = method  # type: ignore[attr-defined]
         return log_endpoint(func)
 
     return decorator
 
 
+_SIGNATURE_CACHE: dict[int, tuple[inspect.Signature, dict[str, Any]]] = {}
+
+
 def log_endpoint(func):
-    @wraps(func)
-    async def async_wrapper(*args, **kwargs):
-        return await _log_endpoint_call_async(func, args, kwargs)
+    func_id = id(func)
+    cached = _SIGNATURE_CACHE.get(func_id)
+    if cached is not None:
+        cached_signature, cached_annotations = cached
+        is_async = asyncio.iscoroutinefunction(func)
+    else:
+        cached_annotations = inspect.get_annotations(func, eval_str=True)
+        cached_signature = inspect.signature(func)
+        is_async = asyncio.iscoroutinefunction(func)
+        _SIGNATURE_CACHE[func_id] = (cached_signature, cached_annotations)
+
+    if is_async:
+
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            return await _log_endpoint_call_async(func, args, kwargs)
+
+        async_wrapper.__signature__ = cached_signature
+        async_wrapper.__annotations__ = cached_annotations
+        async_wrapper.__module__ = func.__module__
+        return async_wrapper
 
     @wraps(func)
     def sync_wrapper(*args, **kwargs):
         return _log_endpoint_call_sync(func, args, kwargs)
 
-    resolved_annotations = inspect.get_annotations(func, eval_str=True)
-    original_signature = inspect.signature(func)
-    resolved_parameters = [
-        parameter.replace(annotation=resolved_annotations.get(parameter.name, parameter.annotation))
-        for parameter in original_signature.parameters.values()
-    ]
-    resolved_signature = original_signature.replace(
-        parameters=resolved_parameters,
-        return_annotation=resolved_annotations.get("return", original_signature.return_annotation),
-    )
-    if asyncio.iscoroutinefunction(func):
-        async_wrapper.__signature__ = resolved_signature
-        async_wrapper.__annotations__ = resolved_annotations
-        async_wrapper.__module__ = func.__module__
-        return async_wrapper
-    sync_wrapper.__signature__ = resolved_signature
-    sync_wrapper.__annotations__ = resolved_annotations
+    sync_wrapper.__signature__ = cached_signature
+    sync_wrapper.__annotations__ = cached_annotations
     sync_wrapper.__module__ = func.__module__
     return sync_wrapper
+
+
+_SENSITIVE_FIELDS = frozenset(
+    {
+        "password",
+        "token",
+        "secret",
+        "api_key",
+        "apikey",
+        "api_secret",
+        "access_token",
+        "refresh_token",
+        "private_key",
+        "client_secret",
+        "credential",
+        "auth",
+        "authorization",
+    }
+)
 
 
 def _get_request_info(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -92,9 +117,7 @@ def _get_request_info(kwargs: dict[str, Any]) -> dict[str, Any]:
             try:
                 req_dict = value.dict()
                 request_info = {
-                    k: v
-                    for k, v in req_dict.items()
-                    if k not in ("password", "token", "secret", "api_key")
+                    k: v for k, v in req_dict.items() if k.lower() not in _SENSITIVE_FIELDS
                 }
             except Exception:
                 logger.warning(
@@ -150,8 +173,8 @@ def _log_endpoint_call_sync(func, args, kwargs):
         return result
     except HTTPException as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint error: %s %s | status=%s | detail=%s | time=%.2fms",
+        logger.warning(
+            "API endpoint HTTP error: %s %s | status=%s | detail=%s | time=%.2fms",
             http_method,
             endpoint_path,
             exc.status_code,
@@ -161,12 +184,15 @@ def _log_endpoint_call_sync(func, args, kwargs):
         raise
     except Exception as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
+        error_id = getattr(exc, "error_id", None)
+        logger.error(
             "API endpoint exception: %s %s | error=%s | time=%.2fms",
             http_method,
             endpoint_path,
             str(exc),
             elapsed_ms,
+            extra={"error_id": error_id, "exception_type": type(exc).__name__},
+            exc_info=True,
         )
         raise
 
@@ -210,8 +236,8 @@ async def _log_endpoint_call_async(func, args, kwargs):
         return result
     except HTTPException as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
-            "API endpoint error: %s %s | status=%s | detail=%s | time=%.2fms",
+        logger.warning(
+            "API endpoint HTTP error: %s %s | status=%s | detail=%s | time=%.2fms",
             http_method,
             endpoint_path,
             exc.status_code,
@@ -221,11 +247,14 @@ async def _log_endpoint_call_async(func, args, kwargs):
         raise
     except Exception as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
-        logger.debug(
+        error_id = getattr(exc, "error_id", None)
+        logger.error(
             "API endpoint exception: %s %s | error=%s | time=%.2fms",
             http_method,
             endpoint_path,
             str(exc),
             elapsed_ms,
+            extra={"error_id": error_id, "exception_type": type(exc).__name__},
+            exc_info=True,
         )
         raise

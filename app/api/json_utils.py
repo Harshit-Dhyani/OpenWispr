@@ -15,7 +15,7 @@ must be serialized to JSON.
 
 Example:
     from app.api.json_utils import make_json_safe
-    
+
     data = {
         "array": np.array([1, 2, 3]),
         "timestamp": datetime.now(),
@@ -48,7 +48,7 @@ def make_json_safe(value: Any) -> Any:
     if hasattr(value, "model_dump") and callable(value.model_dump):
         return make_json_safe(value.model_dump())
     if isinstance(value, dict):
-        return {str(key): make_json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
+        return {key: make_json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
         return [make_json_safe(item) for item in value]
     return value
