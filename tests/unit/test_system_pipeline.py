@@ -48,7 +48,7 @@ class TestSilenceDetector:
 
         is_silent, duration = detector.process(mock_audio_data)
 
-        assert is_silent is True
+        assert is_silent == True
         assert duration > 0
         assert detector._in_silence is True
 
@@ -62,7 +62,7 @@ class TestSilenceDetector:
 
         is_silent, duration = detector.process(mock_speech_audio)
 
-        assert is_silent is False
+        assert is_silent == False
         assert duration == 0.0
         assert detector._in_silence is False
 

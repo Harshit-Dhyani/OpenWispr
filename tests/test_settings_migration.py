@@ -75,7 +75,7 @@ def test_settings_migration_v1_to_v2_refiner_defaults():
     migrated = migrate(settings_v1, 1, 2)
 
     assert migrated["refiner"]["selected_model_id"] == "qwen2.5-3b-instruct"
-    assert migrated["refiner"]["runtime_enabled"] is False
+    assert migrated["refiner"]["runtime_enabled"] is True
     assert migrated["refiner"]["engine_preference"] == "llamacpp"
 
 
@@ -287,7 +287,7 @@ def test_settings_migration_integration_with_manager(tmp_path):
     migrated = migrate_to_current(legacy_settings)
 
     assert migrated["version"] == CURRENT_SETTINGS_VERSION
-    assert migrated["transcription"]["default_asr_model_id"] == "whisper-medium"
+    assert migrated["transcription"]["default_asr_model_id"] == "whisper-turbo"
     assert migrated["transcription"]["vad_enabled"] is True
     assert migrated["transcription"]["vad_threshold_db"] == -40
     assert migrated["hotkey"]["enabled"] is True

@@ -146,6 +146,7 @@ class TestAudioError:
             device_id="device-1",
             device_name="Test Mic",
             backend="sounddevice",
+            category=ErrorCategory.AUDIO_DEVICE_DISCONNECTED,
         )
 
         assert error.device_id == "device-1"

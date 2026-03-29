@@ -80,8 +80,8 @@ class TestModeSpecificSettings:
         """Test ModeSpecificSettings default values."""
         modes = ModeSpecificSettings()
 
-        assert "wispr" in modes.wispr
-        assert "system" in modes.system
+        assert "model_name" in modes.wispr
+        assert "model_name" in modes.system
         assert modes.active_mode in ["wispr", "system"]
 
     def test_to_container_conversion(self) -> None:
@@ -103,20 +103,28 @@ class TestModeSpecificSettings:
         assert modes2.active_mode == modes.active_mode
 
 
+@pytest.fixture
+def settings_manager_fixture(temp_dir: Path) -> SettingsManager:
+    """Create a test settings manager for tests outside TestSettingsManager."""
+    return SettingsManager(settings_dir=temp_dir)
+
+
 class TestSettingsManager:
     """Tests for SettingsManager."""
 
-    @pytest.fixture
+    @pytest.fixture(autouse=True)
     def settings_manager(self, temp_dir: Path) -> SettingsManager:
         """Create a test settings manager."""
         return SettingsManager(settings_dir=temp_dir)
 
     def test_init_creates_default_settings(self, temp_dir: Path) -> None:
         """Test initialization creates default settings if none exist."""
-        settings_file = temp_dir / "user_settings.json"
+        unique_temp = temp_dir / "new_settings_dir"
+        unique_temp.mkdir(parents=True, exist_ok=True)
+        settings_file = unique_temp / "user_settings.json"
         assert not settings_file.exists()
 
-        manager = SettingsManager(settings_dir=temp_dir)
+        manager = SettingsManager(settings_dir=unique_temp)
 
         assert settings_file.exists()
         assert manager.get_settings() is not None
@@ -157,18 +165,16 @@ class TestSettingsManager:
         # Should not raise error
         settings_manager.update_partial("unknown_category", {"key": "value"})
 
-    def test_reset_to_defaults(self, settings_manager: SettingsManager) -> None:
+    def test_reset_to_defaults(self, temp_dir: Path) -> None:
         """Test resetting settings to defaults."""
-        # Modify some settings
-        settings_manager.get_settings().general.defaultSessionTitle = "Modified"
-        settings_manager.get_settings().transcription.model_name = "large"
+        manager = SettingsManager(settings_dir=temp_dir)
+        manager.get_settings().general.defaultSessionTitle = "Modified"
 
-        # Reset
-        settings_manager.reset_to_defaults()
-        settings = settings_manager.get_settings()
+        assert manager.get_settings().general.defaultSessionTitle == "Modified"
 
-        # Should have default values again
-        assert settings.general.defaultSessionTitle != "Modified"
+        manager.reset_to_defaults()
+
+        assert manager.get_settings().general.defaultSessionTitle != "Modified"
 
     def test_get_settings_dict(self, settings_manager: SettingsManager) -> None:
         """Test getting settings as dictionary."""
@@ -254,15 +260,108 @@ class TestSettingsManager:
         settings_manager._notify_sync("test2", {})
         assert callback_count[0] == 1  # Should not increment
 
-    def test_import_settings(self, settings_manager: SettingsManager, test_settings: dict) -> None:
+    def test_import_settings(self, settings_manager: SettingsManager) -> None:
         """Test importing settings."""
-        result = settings_manager.import_settings(test_settings)
+        valid_settings = {
+            "general": {
+                "defaultSessionTitle": "Test Import",
+                "defaultLanguage": "en",
+                "exportDirectory": "./test_output",
+                "autoSaveInterval": 30,
+                "showNotifications": True,
+                "minimizeToTray": False,
+                "startupWithSystem": False,
+                "theme": "dark",
+            },
+            "transcription": {
+                "model_name": "tiny",
+                "default_asr_model_id": "whisper-tiny",
+                "refinement_mode": "off",
+                "compute_type": "int8",
+                "chunk_duration": 5.0,
+                "overlap_ratio": 0.15,
+                "vad_enabled": True,
+                "vad_threshold_db": -40.0,
+                "vad_min_silence_ms": 300,
+                "vad_speech_pad_ms": 200,
+                "confidence_threshold": 0.5,
+                "enable_filler_filter": True,
+                "enable_hallucination_filter": True,
+                "min_segment_length": 0.5,
+                "max_workers": 2,
+                "use_parallel_processing": False,
+                "preload_model": False,
+                "hotkey_optimized": False,
+                "beam_size": 5,
+                "best_of": 5,
+                "patience": 1.0,
+                "temperature": 0.0,
+            },
+            "refiner": {
+                "selected_model_id": "none",
+                "runtime_enabled": False,
+                "engine_preference": "llamacpp",
+            },
+            "audio": {
+                "captureMode": "system",
+                "defaultDeviceId": "default",
+                "backend": "auto",
+                "audio_backend": "auto",
+                "sampleRate": 16000,
+                "vadEnabled": True,
+                "vadThresholdDb": -40.0,
+                "noiseFiltering": True,
+                "echoCancellation": False,
+                "autoGainControl": True,
+            },
+            "hotkey": {
+                "enabled": True,
+                "key_combination": "Ctrl+Shift+R",
+                "hold_mode": False,
+                "auto_inject": True,
+                "language": "auto",
+                "device_id": "default",
+                "finish_mode_default": "finish",
+                "show_floating_window": True,
+                "floating_window_position": "bottom-right",
+                "record_on_start": False,
+                "stop_on_release": False,
+                "copy_to_clipboard": True,
+            },
+            "coach": {
+                "coach_enabled": False,
+                "coach_runtime_enabled": False,
+            },
+            "history": {
+                "retention_days": 30,
+                "persist_audio": True,
+                "allow_retry": True,
+            },
+            "dictionary": {
+                "dictionary_enabled": False,
+            },
+            "snippets": {
+                "snippets_enabled": False,
+                "snippets_quick_insert": False,
+            },
+            "style": {
+                "style_default_profile": "casual",
+                "style_apply_enabled": False,
+            },
+            "advanced": {
+                "debugMode": False,
+                "logLevel": "INFO",
+                "enableMetrics": True,
+                "maxLogFiles": 10,
+                "experimentalStem": False,
+                "experimentalGpuAccel": False,
+            },
+        }
+        result = settings_manager.import_settings(valid_settings)
 
         assert result is True
         settings = settings_manager.get_settings()
-        assert (
-            settings.general.defaultSessionTitle == test_settings["general"]["defaultSessionTitle"]
-        )
+        assert settings.general.defaultSessionTitle == "Test Import"
 
     def test_import_settings_invalid(self, settings_manager: SettingsManager) -> None:
         """Test importing invalid settings."""
@@ -298,17 +397,18 @@ class TestSettingsManagerSingleton:
 class TestSettingsValidation:
     """Tests for settings validation."""
 
-    def test_validate_settings(self, settings_manager: SettingsManager) -> None:
+    def test_validate_settings(self, settings_manager_fixture: SettingsManager) -> None:
         """Test settings validation."""
-        result = settings_manager.validate()
+        result = settings_manager_fixture.validate()
 
         assert result is not None
-        # Should be valid by default
         assert hasattr(result, "is_valid")
 
-    def test_validate_category(self, settings_manager: SettingsManager) -> None:
+    def test_validate_category(self, settings_manager_fixture: SettingsManager) -> None:
         """Test category validation."""
-        result = settings_manager.validate_category("general", {"defaultSessionTitle": "Test"})
+        result = settings_manager_fixture.validate_category(
+            "general", {"defaultSessionTitle": "Test"}
+        )
 
         assert result is not None
         assert hasattr(result, "is_valid")

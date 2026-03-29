@@ -21,14 +21,14 @@ import pytest
 from app.core.settings.config import AppSettings
 
 from app.core.models import SessionState, TranscriptSegment, utc_now
+from app.core.session.formatters import MarkdownFormatter, SrtFormatter
 from app.core.system_session import (
     AudioRecordingManager,
     Chapter,
     ChapterDetector,
     ExportFormat,
     ExportManager,
-    MarkdownFormatter,
-    SrtFormatter,
+    SystemMarkdownFormatter,
     SystemSessionConfig,
     SystemSessionHandler,
     create_system_session_handler,
@@ -135,7 +135,9 @@ class TestSrtFormatter:
             ),
         ]
 
-        result = SrtFormatter.format_segments(segments)
+        visible = [s for s in segments if not s.suppressed]
+        seg_dicts = [{"start": s.start, "end": s.end, "text": s.text} for s in visible]
+        result = SrtFormatter.format_transcript(seg_dicts)
 
         # Should only have 2 entries (suppressed segment excluded)
         assert "1" in result
@@ -151,9 +153,9 @@ class TestMarkdownFormatter:
 
     def test_format_timestamp(self):
         """Test timestamp formatting."""
-        assert MarkdownFormatter._format_timestamp(30) == "0:30"
-        assert MarkdownFormatter._format_timestamp(90) == "1:30"
-        assert MarkdownFormatter._format_timestamp(3661) == "1:01:01"
+        assert SystemMarkdownFormatter._format_timestamp(30) == "0:30"
+        assert SystemMarkdownFormatter._format_timestamp(90) == "1:30"
+        assert SystemMarkdownFormatter._format_timestamp(3661) == "1:01:01"
 
     def test_format_session(self, temp_output_dir):
         """Test formatting session as markdown."""
@@ -167,7 +169,6 @@ class TestMarkdownFormatter:
             execution_mode="auto",
         )
 
-        # Add a segment
         session.segments.append(
             TranscriptSegment(
                 id="1",
@@ -188,7 +189,7 @@ class TestMarkdownFormatter:
 
         chapters = [Chapter(start_time=0, end_time=10, title="Chapter 1")]
 
-        result = MarkdownFormatter.format_session(session, notes, chapters)
+        result = SystemMarkdownFormatter.format_session(session, notes, chapters)
 
         assert "# Test Session" in result
         assert "Test notes" in result
