@@ -247,8 +247,14 @@ class ModelDownloadManager {
             state.bytesDownloaded = completedBytes;
             state.totalBytes = totalBytes;
             state.totalBytesKnown = knownArtifactCount === artifactCount;
-            state.progress = state.totalBytesKnown && totalBytes > 0 ? (completedBytes / totalBytes) * 100 : 0;
-            state.progress = Math.max(state.lastEmittedProgress, state.progress);
+            // Calculate progress based on known artifacts
+            let newProgress;
+            if (state.totalBytesKnown && totalBytes > 0) {
+              newProgress = (completedBytes / totalBytes) * 100;
+            } else {
+              newProgress = (knownArtifactCount / artifactCount) * 100;
+            }
+            state.progress = Math.max(state.lastEmittedProgress, newProgress);
             state.lastEmittedProgress = state.progress;
             this.emit("model-download-progress", state.snapshot());
             continue;
@@ -274,8 +280,14 @@ class ModelDownloadManager {
             state.bytesDownloaded = completedBytes;
             state.totalBytes = totalBytes;
             state.totalBytesKnown = artifactCount > 0 && knownArtifactCount === artifactCount;
-            state.progress = state.totalBytesKnown && totalBytes > 0 ? (completedBytes / totalBytes) * 100 : 0;
-            state.progress = Math.max(state.lastEmittedProgress, state.progress);
+            // Calculate progress based on known artifacts
+            let newProgress;
+            if (state.totalBytesKnown && totalBytes > 0) {
+              newProgress = (completedBytes / totalBytes) * 100;
+            } else {
+              newProgress = (knownArtifactCount / artifactCount) * 100;
+            }
+            state.progress = Math.max(state.lastEmittedProgress, newProgress);
             state.lastEmittedProgress = state.progress;
             this.emit("model-download-progress", state.snapshot());
             continue;
@@ -350,11 +362,19 @@ class ModelDownloadManager {
             artifactBytesWritten += chunkSize;
             state.bytesDownloaded = completedBytes + artifactBytesWritten;
             state.totalBytes = totalBytes || state.bytesDownloaded;
-            state.progress =
-              state.totalBytesKnown && state.totalBytes > 0
-                ? (state.bytesDownloaded / state.totalBytes) * 100
-                : 0;
-            state.progress = Math.max(state.lastEmittedProgress, state.progress);
+            // Calculate progress: use total bytes if known, otherwise use completed bytes
+            // scaled by artifact count to estimate progress across all artifacts
+            let newProgress;
+            if (state.totalBytesKnown && state.totalBytes > 0) {
+              newProgress = (state.bytesDownloaded / state.totalBytes) * 100;
+            } else if (totalBytes > 0) {
+              // Estimate progress assuming equal-sized artifacts
+              newProgress = (completedBytes / totalBytes) * 100;
+            } else {
+              // No total known, estimate based on artifacts completed
+              newProgress = (knownArtifactCount / artifactCount) * 100;
+            }
+            state.progress = Math.max(state.lastEmittedProgress, newProgress);
             state.lastEmittedProgress = state.progress;
             const elapsedSeconds = Math.max((Date.now() - startedAt) / 1000, 0.1);
             state.speedBytesPerSec = state.bytesDownloaded / elapsedSeconds;

@@ -329,7 +329,12 @@ async function createTray() {
     { type: "separator" },
     {
       label: "Quit",
-      click: () => {
+      click: () => {
+        state.isQuitting = true;
+        // Force close all windows to ensure quit proceeds
+        if (state.mainWindow && !state.mainWindow.isDestroyed()) {
+          state.mainWindow.destroy();
+        }
         app.quit();
       },
     },

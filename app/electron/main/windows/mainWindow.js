@@ -86,6 +86,7 @@ function createMainWindow() {
 
   state.mainWindow.on("close", (event) => {
     if (state.isQuitting) {
+      // Force close without hiding when quitting
       return;
     }
     event.preventDefault();

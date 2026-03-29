@@ -19,7 +19,9 @@ let modelDownloadManager = null;
 
 // Backend process
 let backendProcess = null;
-const API_ORIGIN = "http://127.0.0.1:8765";
+
+// Get port from environment variable (set by backend startup script)
+const API_ORIGIN = `http://127.0.0.1:${process.env.OPENWISPR_PORT || "8765"}`;
 let backendReady = false;
 let cachedSettings = null;
 let cachedDevices = [];
