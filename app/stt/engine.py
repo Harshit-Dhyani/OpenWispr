@@ -206,7 +206,7 @@ class WhisperTranscriber:
         logger.debug("Transcriber stop requested")
         self._stop.set()
         if self._thread:
-            joined = self._thread.join(timeout=5)
+            self._thread.join(timeout=5)
             logger.debug(f"Transcriber stopped: thread_joined={self._thread.is_alive() is False}")
 
     def submit(self, chunk: AudioChunk) -> bool:
@@ -591,8 +591,8 @@ class WhisperTranscriber:
                 )
         except Exception as exc:
             logger.debug(f"Transcription loop error: error={exc}, gpu_mode={self._gpu_mode}")
-            for callback in self._error_callbacks:
-                callback(exc)
+            for err_callback in self._error_callbacks:
+                err_callback(exc)
 
     def _publish_health(self, health: SessionHealth) -> None:
         logger.debug(

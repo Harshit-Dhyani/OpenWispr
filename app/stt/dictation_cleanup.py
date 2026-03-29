@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from difflib import SequenceMatcher
 
 from app.stt.repetition_guard import dedupe_boundary, trim_repetitive_segment
+
+# Pre-compiled SequenceMatcher reused for efficiency - avoids re-instantiation
+_SEQUENCE_MATCHER = SequenceMatcher()
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,.;:!?])")
@@ -178,7 +182,16 @@ def stabilize_partial_text(previous_display: str, candidate_raw: str) -> str:
     if cand_lower.startswith(prev_lower) and len(candidate) - len(previous) <= 2:
         return previous
 
-    similarity = SequenceMatcher(None, prev_lower, cand_lower).ratio()
+    similarity = _SEQUENCE_MATCHER.set_seqs(prev_lower, cand_lower)
+    quick_ratio = _SEQUENCE_MATCHER.quick_ratio()
+    if quick_ratio < 0.92:
+        return candidate
+    if quick_ratio >= 0.92 and len(candidate) <= len(previous) + 2:
+        return previous
+    similarity = _SEQUENCE_MATCHER.ratio()
+    if similarity >= 0.92 and len(candidate) <= len(previous) + 2:
+        return previous
+    return candidate
     if similarity >= 0.92 and len(candidate) <= len(previous) + 2:
         return previous
 

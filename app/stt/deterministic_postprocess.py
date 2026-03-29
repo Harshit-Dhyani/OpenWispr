@@ -250,7 +250,7 @@ def _convert_decimal_match(match: re.Match[str]) -> str:
     ]
     if integer is None or not fraction_tokens:
         return match.group(0)
-    return f"{integer}.{''.join(fraction_tokens)}"
+    return f"{integer}.{''.join(t for t in fraction_tokens if t is not None)}"
 
 
 def _convert_digit_run_match(match: re.Match[str]) -> str:

@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 from app.config.constants import (
     COMMON_FILLER_WORDS,
@@ -26,8 +27,16 @@ from app.config.constants import (
 
 logger = logging.getLogger(__name__)
 
-# Re-export for backward compatibility
-COMMON_FILLERS = COMMON_FILLER_WORDS | {"thanks", "thank you", "bye", "goodbye"}
+# Pre-compiled regex patterns for performance
+_COMPILED_FILLER_SET = frozenset(f.lower() for f in COMMON_FILLER_WORDS) | frozenset(
+    {"thanks", "thank you", "bye", "goodbye"}
+)
+_COMPILED_HALLUCINATION_SET = frozenset(p.lower() for p in HALLUCINATION_PHRASES)
+_NON_LATIN_PATTERN = re.compile(r".*[\u0250-\uffff]")
+_LATIN_LETTER_PATTERN = re.compile(r"[a-zA-Z]")
+_WHITESPACE_PATTERN = re.compile(r"\s+")
+_TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+_PUNCTUATION_PATTERN = re.compile(r"[^\w\s]")
 
 
 @dataclass(slots=True)
@@ -204,7 +213,7 @@ def _punctuation_ratio(text: str) -> float:
     """
     if not text:
         return 0.0
-    punctuation = sum(1 for char in text if not char.isalnum() and not char.isspace())
+    punctuation = len(_PUNCTUATION_PATTERN.findall(text))
     return punctuation / len(text)
 
 
@@ -254,12 +263,13 @@ def _low_entropy(text: str) -> bool:
         >>> _low_entropy("the the the the the")
         True
     """
-    compact = re.sub(r"\s+", "", text)
-    if len(compact) < 12:
+    compact = _WHITESPACE_PATTERN.sub("", text)
+    compact_len = len(compact)
+    if compact_len < 12:
         return False
-    unique_ratio = len(set(compact)) / max(len(compact), 1)
-    tokens = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
-    repeated_token = _repeated_token(text)
+    unique_ratio = len(set(compact)) / compact_len
+    tokens = _TOKEN_PATTERN.findall(text)
+    repeated_token = _repeated_token_fast(tokens)
     return (
         unique_ratio < QualityConstants.LOW_ENTROPY_UNIQUE_RATIO_THRESHOLD
         or repeated_token >= QualityConstants.LOW_ENTROPY_TOKEN_REPEAT_THRESHOLD
@@ -270,35 +280,43 @@ def _low_entropy(text: str) -> bool:
     )
 
 
-def _repeated_token(text: str) -> int:
-    """Find the maximum count of consecutive identical tokens.
+def _repeated_token_fast(tokens: list[str]) -> int:
+    """Find the maximum count of consecutive identical tokens (optimized).
 
     Args:
-        text: Input text to analyze
+        tokens: Pre-split tokens from text
 
     Returns:
         Maximum count of consecutive repeated tokens
 
     Example:
-        >>> _repeated_token("yes yes yes okay")
+        >>> _repeated_token_fast(["yes", "yes", "yes", "okay"])
         3
     """
-    tokens = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
     if not tokens:
         return 0
     longest = 1
     current = 1
-    for index in range(1, len(tokens)):
-        if tokens[index] == tokens[index - 1]:
+    prev = tokens[0]
+    for i in range(1, len(tokens)):
+        if tokens[i] == prev:
             current += 1
         else:
-            longest = max(longest, current)
+            if current > longest:
+                longest = current
             current = 1
+            prev = tokens[i]
     return max(longest, current)
 
 
 # Common phrases Whisper hallucinates - use constants from app.core.constants
 HALLUCINATION_PHRASES = HALLUCINATION_PHRASES
+
+
+@lru_cache(maxsize=256)
+def _is_likely_hallucination_cached(text_lower: str) -> bool:
+    """Cached version of hallucination check."""
+    return any(phrase in text_lower for phrase in _COMPILED_HALLUCINATION_SET)
 
 
 def _is_likely_hallucination(text: str, confidence: float) -> bool:
@@ -314,11 +332,10 @@ def _is_likely_hallucination(text: str, confidence: float) -> bool:
     Returns:
         True if text appears to be a hallucination
     """
+    if confidence >= HALLUCINATION_CONFIDENCE_THRESHOLD:
+        return False
     normalized = text.lower().strip()
-    for phrase in HALLUCINATION_PHRASES:
-        if phrase in normalized and confidence < HALLUCINATION_CONFIDENCE_THRESHOLD:
-            return True
-    return False
+    return _is_likely_hallucination_cached(normalized)
 
 
 def _looks_like_filler(text: str, confidence: float) -> bool:
@@ -342,7 +359,7 @@ def _looks_like_filler(text: str, confidence: float) -> bool:
 
     # Check if the text is a known filler word with low confidence
     # Threshold 0.72: Only suppress fillers if confidence is below this level
-    if normalized in COMMON_FILLERS:
+    if normalized in _COMPILED_FILLER_SET:
         if confidence < QualityConstants.FILLER_CONFIDENCE_THRESHOLD:
             return True
 
@@ -380,7 +397,7 @@ def _script_mismatch(text: str, language_mode: str, detected_language: str) -> b
     if not text:
         return False
     if language_mode == "en":
-        return _contains_non_latin_letters(text)
+        return bool(_NON_LATIN_PATTERN.match(text))
     if language_mode == "hi":
         latin_ratio = _latin_letter_ratio(text)
         is_detected_en = detected_language == "en"
@@ -403,7 +420,7 @@ def _contains_non_latin_letters(text: str) -> bool:
         >>> _contains_non_latin_letters("नमस्ते")
         True
     """
-    return any(char.isalpha() and ord(char) > 0x024F for char in text)
+    return bool(_NON_LATIN_PATTERN.match(text))
 
 
 def _latin_letter_ratio(text: str) -> float:
@@ -421,7 +438,7 @@ def _latin_letter_ratio(text: str) -> float:
         >>> _latin_letter_ratio("hello दुनिया")
         0.5384615384615384
     """
-    letters = [char for char in text if char.isalpha()]
+    letters = _LATIN_LETTER_PATTERN.findall(text)
     if not letters:
         return 0.0
     latin = sum(1 for char in letters if ord(char) <= 0x024F)

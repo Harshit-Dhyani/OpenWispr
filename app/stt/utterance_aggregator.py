@@ -163,12 +163,13 @@ class UtteranceAggregator:
                 )
             return
 
-        original_text = normalize_dictation_text((text or "") or display_text)
-        raw_text = normalize_dictation_text(trim_repetitive_segment(original_text))
+        source_text = (text or "") or display_text
+        normalized = normalize_dictation_text(source_text)
+        raw_text = normalize_dictation_text(trim_repetitive_segment(normalized))
         if not raw_text:
             self.dropped_segments_count += 1
             return
-        if is_repetitive_segment(original_text):
+        if is_repetitive_segment(normalized):
             if not raw_text or is_repetitive_segment(raw_text):
                 self.dropped_segments_count += 1
                 self.warnings.append("dropped:repetition")
@@ -187,7 +188,7 @@ class UtteranceAggregator:
             _AcceptedSegment(
                 segment_id=segment_id,
                 raw_text=raw_text,
-                clean_text=normalize_dictation_text(display_text or text),
+                clean_text=normalize_dictation_text(display_text if display_text else source_text),
                 start=float(start or 0.0),
                 end=float(end or 0.0),
                 confidence=float(confidence or 0.0),

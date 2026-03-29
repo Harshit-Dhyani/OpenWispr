@@ -60,7 +60,9 @@ def tokenize_guard_text(text: str) -> list[str]:
         >>> tokenize_guard_text("Hello World! It's fine.")
         ['hello', 'world', "it's", 'fine']
     """
-    return [token.lower() for token in _TOKEN_RE.findall(normalize_guard_text(text))]
+    if not text:
+        return []
+    return [token.lower() for token in _TOKEN_RE.findall(text)]
 
 
 def repeated_sentence_count(text: str) -> int:
@@ -337,13 +339,25 @@ def dedupe_boundary(
 
     existing_tokens = tokenize_guard_text(existing)
     candidate_tokens = tokenize_guard_text(candidate)
+    
+    if len(existing_tokens) < min_overlap_words or len(candidate_tokens) < min_overlap_words:
+        return normalize_guard_text(f"{existing} {candidate}")
+    
     max_words = min(len(existing_tokens), len(candidate_tokens), max_overlap_words)
-
-    overlap = 0
+    
+    # Quick check: compare last token first for early exit
+    if not existing_tokens or not candidate_tokens:
+        return normalize_guard_text(f"{existing} {candidate}")
+    
+    # Check exact match of full token list slices for efficiency
+    # Iterate from largest to smallest overlap
     for size in range(max_words, min_overlap_words - 1, -1):
+        # Compare slices directly - list equality is fast in Python
         if existing_tokens[-size:] == candidate_tokens[:size]:
             overlap = size
             break
+    else:
+        overlap = 0
 
     if overlap <= 0:
         return normalize_guard_text(f"{existing} {candidate}")
