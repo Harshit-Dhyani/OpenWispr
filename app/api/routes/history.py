@@ -264,3 +264,51 @@ def cleanup_history(
     count = svc.cleanup_retention(days)
     logger.info(f"History retention cleanup completed, removed {count} records")
     return {"status": "completed", "count": count}
+
+
+@router.post("/api/history/batch-export")
+@log_route("POST", "/api/history/batch-export")
+def batch_export_sessions(
+    session_ids: list[str] = Query(..., description="List of session IDs to export"),
+    format: str = Query("jsonl", description="Export format: 'jsonl' or 'txt'"),
+    include_audio: bool = Query(False, description="Include audio files in export"),
+    svc: TranscriptHistoryService = Depends(get_history_service),
+):
+    """
+    Export multiple sessions as a ZIP archive.
+
+    Args:
+        session_ids: List of session IDs to export (max 100)
+        format: Export format ('jsonl' for newline-delimited JSON, 'txt' for plain text)
+        include_audio: Whether to include audio files in the export
+
+    Returns:
+        FileResponse: ZIP archive containing the exported sessions
+
+    Raises:
+        HTTPException: 400 if request is invalid, 404 if session not found
+    """
+    if not session_ids:
+        raise HTTPException(status_code=400, detail="session_ids cannot be empty")
+    if len(session_ids) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 sessions per batch export")
+    if format not in ("jsonl", "txt"):
+        raise HTTPException(status_code=400, detail="format must be 'jsonl' or 'txt'")
+
+    try:
+        data, filename = svc.batch_export(
+            session_ids=session_ids,
+            format=format,
+            include_audio=include_audio,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Session not found: {exc}")
+    except Exception as exc:
+        logger.error(f"Batch export failed: {exc}")
+        raise HTTPException(status_code=500, detail="Batch export failed")
+
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

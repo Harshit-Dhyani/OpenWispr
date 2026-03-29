@@ -23,13 +23,12 @@ Security notes:
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import logging
 import os
-import wave
 import time
 import uuid
+import wave
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -55,6 +54,45 @@ from app.api.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _check_runtime_dependencies() -> None:
+    """Check for missing runtime dependencies and log warnings."""
+    # Check torch
+    try:
+        import torch  # type: ignore[no-redef]
+
+        try:
+            if torch.cuda.is_available():
+                logger.info("torch with CUDA available")
+            else:
+                logger.info("torch available (CPU mode)")
+        except Exception:
+            logger.info("torch available")
+    except ImportError:
+        logger.warning(
+            "torch not installed - GPU acceleration unavailable. Install with `pip install torch`"
+        )
+
+    # Check faster-whisper
+    try:
+        import faster_whisper  # type: ignore[no-redef]
+
+        logger.info("faster-whisper available")
+    except ImportError:
+        logger.error(
+            "faster-whisper not installed - transcription will fail. Install with `pip install faster-whisper`"
+        )
+
+    # Check llama-cpp-python
+    try:
+        import llama_cpp  # type: ignore[no-redef]
+
+        logger.info("llama-cpp-python available")
+    except ImportError:
+        logger.warning(
+            "llama-cpp-python not installed - refinement unavailable. Install with `pip install llama-cpp-python`"
+        )
 
 
 class RateLimiter:
@@ -96,14 +134,16 @@ class RateLimiter:
         window_start = now - window_seconds
 
         async with self._lock:
-            self._requests[key] = [ts for ts in self._requests[key] if ts > window_start]
+            timestamps = self._requests[key]
+            self._requests[key] = [ts for ts in timestamps if ts > window_start]
 
             if len(self._requests[key]) >= max_requests:
+                count = len(self._requests[key])
                 logger.warning(
                     "Rate limit exceeded: client=%s path=%s count=%d limit=%d",
                     client_id,
                     path,
-                    len(self._requests[key]),
+                    count,
                     max_requests,
                 )
                 from fastapi.responses import JSONResponse
@@ -225,7 +265,30 @@ _sse_metrics: dict[str, int] = {
     "keepalives_sent": 0,
     "events_sent": 0,
 }
-SSE_EVENT_QUEUE_MAXSIZE = 100
+SSE_EVENT_QUEUE_MAXSIZE = 50
+SSE_CLIENT_IDLE_TIMEOUT_SECONDS = 300
+DEFAULT_AUDIO_THROTTLE_MS = 50.0
+
+
+class AudioThrottle:
+    """Shared audio event throttle to reduce redundant updates."""
+
+    __slots__ = ("_last_update", "_throttle_ms")
+
+    def __init__(self, throttle_ms: float = DEFAULT_AUDIO_THROTTLE_MS):
+        self._last_update: float = 0.0
+        self._throttle_ms: float = throttle_ms
+
+    def should_update(self) -> bool:
+        now = time.time() * 1000
+        if now - self._last_update < self._throttle_ms:
+            return False
+        self._last_update = now
+        return True
+
+    def reset(self) -> None:
+        self._last_update = 0.0
+
 
 # WebSocket manager and settings synchronizer
 _ws_manager: WebSocketManager | None = None
@@ -335,6 +398,9 @@ class HotkeySession:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     start_time = time.perf_counter()
+
+    # Check for missing dependencies
+    _check_runtime_dependencies()
 
     try:
         settings = AppSettings()
@@ -472,18 +538,12 @@ async def hotkey_websocket(websocket: WebSocket):
 
     svc = get_hotkey_service()
     svc.register_websocket(websocket)
-
-    last_audio_update = 0.0
-    audio_throttle_ms = 50.0
+    audio_throttle = AudioThrottle()
 
     async def send_event(event_type: str, data: dict[str, Any]) -> None:
-        nonlocal last_audio_update
         try:
-            if event_type == "hotkey_audio_level":
-                now = time.time() * 1000
-                if now - last_audio_update < audio_throttle_ms:
-                    return
-                last_audio_update = now
+            if event_type == "hotkey_audio_level" and not audio_throttle.should_update():
+                return
             await websocket.send_json(
                 {
                     "type": event_type,
@@ -543,32 +603,38 @@ async def hotkey_events(
     client_id = id(request)
     logger.debug("Hotkey SSE connect: client_id=%s", client_id)
 
-    queue = asyncio.Queue(maxsize=100)
+    queue = asyncio.Queue(maxsize=50)
     loop = asyncio.get_running_loop()
-    last_audio_update = 0.0
-    audio_throttle_ms = 50.0
+    audio_throttle = AudioThrottle()
+    idle_deadline = time.perf_counter() + SSE_CLIENT_IDLE_TIMEOUT_SECONDS
 
     def on_event(event_type: str, data: dict[str, Any]) -> None:
-        nonlocal last_audio_update
-        if event_type == "hotkey_audio_level":
-            now = time.time() * 1000
-            if now - last_audio_update < audio_throttle_ms:
-                return
-            last_audio_update = now
+        if event_type == "hotkey_audio_level" and not audio_throttle.should_update():
+            return
         try:
             queue.put_nowait({"type": event_type, "payload": data})
         except asyncio.QueueFull:
-            logger.warning("Hotkey SSE queue full, dropping event: %s", event_type)
+            logger.debug("Hotkey SSE queue full, dropping event: %s", event_type)
 
     svc.register_callback(on_event)
 
     async def event_generator():
         try:
             while True:
-                event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                yield f"data: {json.dumps(event)}\n\n"
-        except asyncio.TimeoutError:
-            yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+                if await request.is_disconnected():
+                    break
+
+                remaining = idle_deadline - time.perf_counter()
+                timeout = min(30.0, max(1.0, remaining))
+
+                if remaining <= 0:
+                    break
+
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=timeout)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
         except Exception as exc:
             logger.debug("Hotkey SSE error: %s", exc)
         finally:
@@ -622,6 +688,7 @@ async def events(
     async def event_generator():
         nonlocal events_sent, keepalives_sent, last_event_time
         connection_start = time.perf_counter()
+        idle_deadline = connection_start + SSE_CLIENT_IDLE_TIMEOUT_SECONDS
 
         logger.debug("SSE event generator started: %s", client_info)
 
@@ -631,8 +698,19 @@ async def events(
                     logger.debug("SSE client disconnected: %s", client_info)
                     break
 
+                if time.perf_counter() > idle_deadline:
+                    logger.debug(
+                        "SSE client idle timeout: %s | alive_for=%.1fs",
+                        client_info,
+                        time.perf_counter() - connection_start,
+                    )
+                    break
+
+                timeout = min(15.0, idle_deadline - time.perf_counter())
+                timeout = max(1.0, timeout)
+
                 try:
-                    event_type, data = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    event_type, data = await asyncio.wait_for(queue.get(), timeout=timeout)
                     events_sent += 1
                     last_event_time = time.perf_counter()
 
@@ -734,6 +812,12 @@ def get_ws_manager() -> WebSocketManager:
     """Get or initialize the WebSocket manager."""
     global _ws_manager
     if _ws_manager is None:
+        allowed_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+        ]
         config = ConnectionConfig(
             heartbeat_interval=30.0,
             heartbeat_timeout=60.0,
@@ -744,8 +828,8 @@ def get_ws_manager() -> WebSocketManager:
             rate_limit_window=60.0,
             message_queue_size=1000,
             max_connections_per_ip=10,
-            allowed_origins=["*"],  # Configure for production
-            auth_required=False,
+            allowed_origins=allowed_origins,
+            auth_required=os.getenv("OPENWISPR_WS_AUTH_REQUIRED", "true").lower() == "true",
         )
         _ws_manager = WebSocketManager(config)
     return _ws_manager
@@ -775,23 +859,27 @@ async def _broadcast_health_metrics() -> None:
     manager = get_ws_manager()
     while True:
         try:
-            await asyncio.sleep(5.0)  # Broadcast every 5 seconds
+            await asyncio.sleep(5.0)
 
-            if api_deps.service is None or manager.connection_count == 0:
+            if api_deps.service is None:
+                continue
+
+            conn_count = manager.connection_count
+            if conn_count == 0:
                 continue
 
             snapshot = api_deps.service.get_snapshot()
             health = snapshot.health if hasattr(snapshot, "health") else {}
 
-            # Get hotkey status
             hotkey_data = None
             if api_deps.hotkey_service is not None:
                 hs = api_deps.hotkey_service.get_status()
-                hotkey_data = {
-                    "is_recording": hs.is_recording,
-                    "session_id": hs.session_id,
-                    "duration_ms": hs.duration_ms,
-                }
+                if hs.is_recording:
+                    hotkey_data = {
+                        "is_recording": hs.is_recording,
+                        "session_id": hs.session_id,
+                        "duration_ms": hs.duration_ms,
+                    }
 
             metrics = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -991,20 +1079,14 @@ async def websocket_audio(websocket: WebSocket):
     if connection is None:
         return
 
-    # Audio update throttling
-    last_audio_update = 0.0
-    audio_throttle_ms = 50.0  # 20fps
+    audio_throttle = AudioThrottle()
 
     async def handle_audio_event(event_type: str, data: dict[str, Any]) -> None:
-        nonlocal last_audio_update
-
         if event_type not in ("meter", "audio_level", "hotkey_audio_level"):
             return
 
-        now = time.time() * 1000
-        if now - last_audio_update < audio_throttle_ms:
+        if not audio_throttle.should_update():
             return
-        last_audio_update = now
 
         level = data.get("level", 0.0)
         peak = data.get("peak", level)
@@ -1012,7 +1094,6 @@ async def websocket_audio(websocket: WebSocket):
 
         await connection.send_audio_level(level, peak, levels)
 
-    # Register audio event callback
     if api_deps.service is not None:
         api_deps.service.register_event_callback(handle_audio_event)
 
