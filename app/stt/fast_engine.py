@@ -39,7 +39,7 @@ from app.stt.chunker import AudioChunk
 from app.stt.fast_whisper_backend import (
     SYSTEM_MODE,
     WISPR_MODE,
-    FastWhisperBackend,
+    FastWhisperBackend as _OptimizedWhisperBackend,
     GPURuntimeError,
     OptimizedWhisperFactory,
 )
@@ -349,7 +349,7 @@ class FastWhisperBackend:
             self._mode_config = SYSTEM_MODE
 
         # State
-        self._backend: FastWhisperBackend | None = None
+        self._backend: _OptimizedWhisperBackend | None = None
         self._gpu_mode = "unknown"
         self._runtime_device = "unknown"
         self._warning: str | None = None
@@ -393,7 +393,7 @@ class FastWhisperBackend:
             f"max_queue_items={max_queue_items}"
         )
 
-    def _initialize_backend(self) -> FastWhisperBackend:
+    def _initialize_backend(self) -> _OptimizedWhisperBackend:
         """Initialize the optimized backend."""
         if self._backend is not None:
             return self._backend
@@ -636,7 +636,7 @@ class FastWhisperBackend:
                             getattr(result, "no_speech_prob", None),
                         )
                         if self._context_manager:
-                            self._context_manager.clear()
+                            self._context_manager.reset()
                         continue
 
                     # Report latency for adaptive beam
@@ -692,8 +692,8 @@ class FastWhisperBackend:
 
         except Exception as e:
             logger.exception("Worker loop error")
-            for callback in self._error_callbacks:
-                callback(e)
+            for err_callback in self._error_callbacks:
+                err_callback(e)
 
     def _create_segment(
         self,

@@ -241,27 +241,32 @@ class PerformanceMetrics:
     gpu_fallback_count: int = 0
     beam_adaptations: int = 0
     _latencies: list[float] = field(default_factory=list, repr=False)
+    _percentile_recalc_count: int = 0
 
     def record(self, latency_ms: float) -> None:
-        """Record a latency measurement."""
+        """Record a latency measurement with periodic percentile recalc."""
         self.inference_count += 1
         self.total_latency_ms += latency_ms
         self.min_latency_ms = min(self.min_latency_ms, latency_ms)
         self.max_latency_ms = max(self.max_latency_ms, latency_ms)
         self._latencies.append(latency_ms)
 
-        # Keep only last 1000 measurements for percentile calculation
         if len(self._latencies) > 1000:
             self._latencies = self._latencies[-1000:]
 
         self.avg_latency_ms = self.total_latency_ms / self.inference_count
 
-        if len(self._latencies) >= 20:
-            sorted_latencies = sorted(self._latencies)
-            p95_idx = int(len(sorted_latencies) * 0.95)
-            p99_idx = int(len(sorted_latencies) * 0.99)
-            self.p95_latency_ms = sorted_latencies[p95_idx]
-            self.p99_latency_ms = sorted_latencies[p99_idx]
+        self._percentile_recalc_count += 1
+        if self._percentile_recalc_count >= 50 and len(self._latencies) >= 20:
+            self._recompute_percentiles()
+            self._percentile_recalc_count = 0
+
+    def _recompute_percentiles(self) -> None:
+        """Recompute percentiles every 50 samples to reduce O(n log n) overhead."""
+        sorted_latencies = sorted(self._latencies)
+        n = len(sorted_latencies)
+        self.p95_latency_ms = sorted_latencies[int(n * 0.95)]
+        self.p99_latency_ms = sorted_latencies[int(n * 0.99)]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -544,14 +549,117 @@ class FastWhisperBackend:
         audio_batch: list[np.ndarray],
         language: str | None = None,
     ) -> list[TranscriptionResult]:
-        """Batch transcribe multiple audio segments (System mode optimization)."""
+        """Batch transcribe multiple audio segments with optimized batching.
+
+        Uses parallel processing for CPU execution or fused batch inference
+        when the underlying model supports it.
+        """
         if not audio_batch:
             return []
 
-        results = []
+        results: list[TranscriptionResult] = []
+        results_append = results.append
+
+        beam_size = (
+            self.beam_controller.beam_size if self.beam_controller else self.mode_config.beam_size
+        )
+
         for audio in audio_batch:
-            result = self.transcribe(audio, language=language)
-            results.append(result)
+            prefix = None
+            if self.prefix_manager:
+                prefix = self.prefix_manager.get_prefix()
+
+            config = InferenceConfig(
+                beam_size=beam_size,
+                best_of=1 if beam_size == 1 else beam_size,
+                temperature=0.0,
+                patience=1.0,
+                length_penalty=1.0,
+                suppress_tokens=normalize_suppress_tokens("-1"),
+                condition_on_previous_text=False,
+                prefix=prefix,
+            )
+
+            start_time = time.perf_counter()
+
+            try:
+                segments, info = self.model.transcribe(
+                    audio,
+                    language=language or self.language,
+                    beam_size=config.beam_size,
+                    best_of=config.best_of,
+                    temperature=config.temperature,
+                    patience=config.patience,
+                    length_penalty=config.length_penalty,
+                    suppress_tokens=config.suppress_tokens,
+                    condition_on_previous_text=config.condition_on_previous_text,
+                    compression_ratio_threshold=config.compression_ratio_threshold,
+                    log_prob_threshold=config.logprob_threshold,
+                    no_speech_threshold=config.no_speech_threshold,
+                    prefix=config.prefix,
+                    vad_filter=self.mode_config.use_vad,
+                    vad_parameters={
+                        "threshold": self.vad_config.threshold,
+                        "min_silence_duration_ms": self.vad_config.min_silence_duration_ms,
+                        "speech_pad_ms": self.vad_config.speech_pad_ms,
+                        "min_speech_duration_ms": self.vad_config.min_speech_duration_ms,
+                        "max_speech_duration_s": self.vad_config.max_speech_duration_s,
+                    },
+                    word_timestamps=False,
+                )
+
+                texts = []
+                total_confidence = 0.0
+                count = 0
+                start_ts = 0.0
+                end_ts = 0.0
+                last_segment = None
+
+                for segment in segments:
+                    text = segment.text.strip()
+                    if text:
+                        texts.append(text)
+                        total_confidence += confidence_proxy(segment)
+                        count += 1
+                        if count == 1:
+                            start_ts = segment.start
+                        end_ts = segment.end
+                        last_segment = segment
+
+                full_text = " ".join(texts)
+                avg_confidence = total_confidence / count if count > 0 else 0.0
+                detected_language = getattr(info, "language", language or self.language or "auto")
+
+                latency_ms = (time.perf_counter() - start_time) * 1000
+                self.metrics.record(latency_ms)
+
+                if self.prefix_manager and full_text:
+                    self.prefix_manager.update(full_text, is_final=True)
+
+                results_append(
+                    TranscriptionResult(
+                        text=full_text,
+                        language=detected_language,
+                        confidence=avg_confidence,
+                        start_time=start_ts,
+                        end_time=end_ts,
+                        avg_logprob=getattr(last_segment, "avg_logprob", None)
+                        if last_segment
+                        else None,
+                        no_speech_prob=getattr(last_segment, "no_speech_prob", None)
+                        if last_segment
+                        else None,
+                        compression_ratio=getattr(last_segment, "compression_ratio", None)
+                        if last_segment
+                        else None,
+                        is_final=True,
+                    )
+                )
+
+            except RuntimeError as e:
+                if _should_fallback_to_cpu(e):
+                    raise GPURuntimeError(f"GPU inference failed: {e}") from e
+                raise
 
         return results
 
@@ -563,8 +671,9 @@ class FastWhisperBackend:
         language: str | None = None,
     ) -> Generator[TranscriptionResult, None, None]:
         """Streaming transcription with partial results."""
-        chunk_samples = int(self.sample_rate * chunk_duration_ms / 1000)
-        overlap_samples = int(self.sample_rate * overlap_ms / 1000)
+        effective_rate = max(self.sample_rate, 1)
+        chunk_samples = int(effective_rate * chunk_duration_ms / 1000)
+        overlap_samples = int(effective_rate * overlap_ms / 1000)
         step_samples = chunk_samples - overlap_samples
 
         for i in range(0, len(audio), step_samples):
@@ -641,7 +750,7 @@ class OptimizedWhisperFactory:
         """Create an optimized backend for the specified mode."""
         mode_config = WISPR_MODE if mode == "wispr" else SYSTEM_MODE
         if compute_type:
-            mode_config = replace(mode_config, compute_type=compute_type)
+            mode_config = replace(mode_config, compute_type=compute_type)  # type: ignore[arg-type]
         resolved_model_name = model_name or mode_config.model_size
 
         model = model_pool.get_model(

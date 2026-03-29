@@ -15,7 +15,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from itertools import islice
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -23,9 +23,11 @@ from app.core.model_catalog import runtime_name_for_model
 from app.core.models import SessionHealth, TranscriptSegment, utc_now
 from app.core.settings.manager import get_settings_manager
 from app.stt.chunker import AudioChunk
-from app.stt.fast_whisper_backend import WhisperModel
 from app.stt.model_pool import ModelPool, ModelSlot
 from app.stt.quality import assess_segment_quality
+
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
 
@@ -227,11 +229,12 @@ class AdaptiveBeamController:
 
     def _adapt_beam_size(self) -> None:
         """Adjust beam size based on recent latency trends."""
-        if len(self._latency_history) < 3:
-            return
+        with self._lock:
+            if len(self._latency_history) < 3:
+                return
 
-        recent_avg = sum(self._latency_history) / len(self._latency_history)
-        p95 = sorted(self._latency_history)[int(len(self._latency_history) * 0.95)]
+            recent_avg = sum(self._latency_history) / len(self._latency_history)
+            p95 = sorted(self._latency_history)[int(len(self._latency_history) * 0.95)]
 
         # If consistently over target, reduce beam size
         if p95 > self.target_latency_ms * 1.2:
@@ -337,12 +340,14 @@ class StreamingInferenceEngine:
             decay_factor=self.config.context_decay_factor,
         )
 
-        # Audio buffering
-        max_buffer_samples = int(sample_rate * 30)  # 30s max
-        self._buffer: deque[float] = deque(maxlen=max_buffer_samples)
+        max_buffer_samples = int(sample_rate * 30)
+        self._buffer: np.ndarray = np.zeros(max_buffer_samples, dtype=np.float32)
         self._buffer_lock = threading.Lock()
         self._buffer_start_time = 0.0
         self._stream_time = 0.0
+        self._buffer_write_pos = 0
+        self._buffer_read_pos = 0
+        self._buffer_available = 0
 
         # Partial result stabilization
         self._partial_history: deque[PartialResult] = deque(maxlen=self.config.stabilization_window)
@@ -363,7 +368,23 @@ class StreamingInferenceEngine:
         with self._buffer_lock:
             if timestamp is not None:
                 self._stream_time = timestamp
-            self._buffer.extend(samples.tolist())
+
+            n = len(samples)
+            buf_len = len(self._buffer)
+            if n >= buf_len:
+                samples = samples[-buf_len:]
+                n = buf_len
+
+            end_pos = self._buffer_write_pos + n
+            if end_pos <= buf_len:
+                self._buffer[self._buffer_write_pos : end_pos] = samples
+            else:
+                first_part = buf_len - self._buffer_write_pos
+                self._buffer[self._buffer_write_pos :] = samples[:first_part]
+                self._buffer[: end_pos - buf_len] = samples[first_part:]
+
+            self._buffer_write_pos = end_pos % buf_len
+            self._buffer_available = min(self._buffer_available + n, buf_len)
 
     def process_stream(
         self,
@@ -375,26 +396,29 @@ class StreamingInferenceEngine:
         overlap_samples = int(self.sample_rate * self.config.overlap_ms / 1000)
         step_samples = window_samples - overlap_samples
         min_samples = int(self.sample_rate * self.config.min_chunk_ms / 1000)
+        buffer_len = len(self._buffer)
 
         while True:
             with self._buffer_lock:
-                if len(self._buffer) < max(window_samples, min_samples):
+                if self._buffer_available < max(window_samples, min_samples):
                     break
 
-                # Extract window
-                extract_samples = min(window_samples, len(self._buffer))
-                window = np.fromiter(
-                    (self._buffer[i] for i in range(extract_samples)),
-                    dtype=np.float32,
-                    count=extract_samples,
-                )
+                extract_samples = min(window_samples, self._buffer_available)
 
-                # Advance buffer
-                advance = min(step_samples, len(self._buffer) - overlap_samples)
+                if self._buffer_read_pos + extract_samples <= buffer_len:
+                    window = self._buffer[
+                        self._buffer_read_pos : self._buffer_read_pos + extract_samples
+                    ].copy()
+                else:
+                    window = np.empty(extract_samples, dtype=np.float32)
+                    first_part = buffer_len - self._buffer_read_pos
+                    window[:first_part] = self._buffer[self._buffer_read_pos :]
+                    window[first_part:] = self._buffer[: extract_samples - first_part]
+
+                advance = min(step_samples, self._buffer_available - overlap_samples)
                 if advance > 0:
-                    self._buffer = deque(
-                        islice(self._buffer, advance, None), maxlen=self._buffer.maxlen
-                    )
+                    self._buffer_read_pos = (self._buffer_read_pos + advance) % buffer_len
+                    self._buffer_available -= advance
 
                 self._buffer_start_time += advance / self.sample_rate
                 window_start = self._buffer_start_time
@@ -578,12 +602,22 @@ class StreamingInferenceEngine:
     def flush(self, language: str | None = None) -> PartialResult | None:
         """Process remaining buffer and return final result."""
         with self._buffer_lock:
-            if not self._buffer:
+            if self._buffer_available < 8000:
                 return None
 
-            audio = np.fromiter(self._buffer, dtype=np.float32, count=len(self._buffer))
+            if self._buffer_read_pos + self._buffer_available <= len(self._buffer):
+                audio = self._buffer[
+                    self._buffer_read_pos : self._buffer_read_pos + self._buffer_available
+                ].copy()
+            else:
+                audio = np.empty(self._buffer_available, dtype=np.float32)
+                first_part = len(self._buffer) - self._buffer_read_pos
+                audio[:first_part] = self._buffer[self._buffer_read_pos :]
+                audio[first_part:] = self._buffer[: self._buffer_available - first_part]
+
             start_time = self._buffer_start_time
-            self._buffer.clear()
+            self._buffer_available = 0
+            self._buffer_read_pos = self._buffer_write_pos
 
         if len(audio) < 8000:  # Less than 500ms
             return None
@@ -626,7 +660,10 @@ class StreamingInferenceEngine:
     def reset(self) -> None:
         """Reset engine state."""
         with self._buffer_lock:
-            self._buffer.clear()
+            self._buffer.fill(0)
+            self._buffer_write_pos = 0
+            self._buffer_read_pos = 0
+            self._buffer_available = 0
         self._partial_history.clear()
         self.context_manager.reset()
         self.beam_controller.reset()
@@ -697,6 +734,10 @@ class DualModeTranscriptionEngine:
         self._metrics = PerformanceMetrics()
         self._latency_history: deque[float] = deque(maxlen=100)
         self._confidence_history: deque[float] = deque(maxlen=100)
+        self._percentile_recalc_counter: int = 0
+        
+        # Cache settings at initialization to avoid repeated lookups
+        self._cached_settings = None
 
         if warmup_on_init:
             self._initialize()
@@ -924,8 +965,10 @@ class DualModeTranscriptionEngine:
         # Push audio to engine
         self._current_engine.push_audio(chunk.samples, chunk.started_at)
 
-        # Process and emit results
-        settings = get_settings_manager().get_settings()
+        # Use cached settings to avoid repeated lookups
+        if self._cached_settings is None:
+            self._cached_settings = get_settings_manager().get_settings()
+        settings = self._cached_settings
         language = getattr(settings.hotkey, "language", "en") or "en"
 
         for result in self._current_engine.process_stream(language=language):
@@ -953,11 +996,11 @@ class DualModeTranscriptionEngine:
         if result.is_final:
             segment = self._create_segment(result, chunk)
 
-            for callback in self._segment_callbacks:
-                if asyncio.iscoroutinefunction(callback):
-                    await callback(segment)
+            for seg_callback in self._segment_callbacks:
+                if asyncio.iscoroutinefunction(seg_callback):
+                    await seg_callback(segment)
                 else:
-                    callback(segment)
+                    seg_callback(segment)
 
             self._metrics.segments_produced += 1
             self._confidence_history.append(result.confidence)
@@ -999,10 +1042,23 @@ class DualModeTranscriptionEngine:
         )
 
     def _update_metrics(self) -> None:
-        """Update performance metrics."""
-        if self._latency_history:
+        """Update performance metrics with periodic percentile recalculation."""
+        self._metrics.chunks_processed = len(self._latency_history)
+        self._metrics.last_update = time.time()
+
+        if not self._latency_history:
+            return
+
+        self._percentile_recalc_counter += 1
+        if self._percentile_recalc_counter < 10:
+            return
+
+        self._percentile_recalc_counter = 0
+        with self._lock:
             sorted_latencies = sorted(self._latency_history)
             n = len(sorted_latencies)
+            if n == 0:
+                return
             self._metrics.avg_chunk_latency_ms = sum(sorted_latencies) / n
             self._metrics.p50_latency_ms = sorted_latencies[int(n * 0.5)]
             self._metrics.p95_latency_ms = sorted_latencies[int(n * 0.95)]
@@ -1012,9 +1068,6 @@ class DualModeTranscriptionEngine:
             self._metrics.avg_confidence = sum(self._confidence_history) / len(
                 self._confidence_history
             )
-
-        self._metrics.chunks_processed = len(self._latency_history)
-        self._metrics.last_update = time.time()
 
     def add_segment_callback(self, callback: Callable[[TranscriptSegment], None]) -> None:
         """Add callback for final segments."""

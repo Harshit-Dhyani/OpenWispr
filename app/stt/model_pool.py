@@ -97,7 +97,10 @@ class GPUMemoryPool:
 
     def _update_stats(self) -> None:
         """Update GPU memory statistics."""
-        if not HAS_TORCH or not torch.cuda.is_available():
+        if not HAS_TORCH:
+            return
+        assert torch is not None
+        if not torch.cuda.is_available():
             return
 
         props = torch.cuda.get_device_properties(0)
@@ -107,7 +110,10 @@ class GPUMemoryPool:
 
     def can_fit_model(self, model_name: str, compute_type: str) -> bool:
         """Check if another model can fit in GPU memory."""
-        if not HAS_TORCH or not torch.cuda.is_available():
+        if not HAS_TORCH:
+            return False
+        assert torch is not None
+        if not torch.cuda.is_available():
             return False
 
         self._update_stats()
@@ -208,6 +214,7 @@ class ModelPool:
         enable_gpu_pool: bool = True,
         warmup_on_load: bool = True,
     ) -> None:
+        self._initialized: bool
         if self._initialized:
             return
 
@@ -460,7 +467,7 @@ class ModelPool:
 
             return model
 
-    def _warmup_model(self, model: WhisperModel, model_name: str) -> bool:
+    def _warmup_model(self, model: Any, model_name: str) -> bool:
         """Warm up a model with dummy inference."""
         try:
             # Use appropriate warmup audio length based on model size
@@ -576,7 +583,7 @@ class ModelPool:
                     "reserved_gb": round(self._gpu_pool.reserved_gb, 2) if self._gpu_pool else 0,
                     "allocated_gb": round(self._gpu_pool.allocated_gb, 2) if self._gpu_pool else 0,
                 }
-                if self._gpu_pool and HAS_TORCH and torch.cuda.is_available()
+                if self._gpu_pool and HAS_TORCH and torch and torch.cuda.is_available()
                 else None,
             }
 

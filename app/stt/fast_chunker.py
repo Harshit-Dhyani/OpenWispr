@@ -133,7 +133,7 @@ class ZeroCopyBuffer:
     reusing internal storage and providing views instead of copies.
     """
 
-    __slots__ = ("_buffer", "_capacity", "_write_pos", "_read_pos", "_size")
+    __slots__ = ("_buffer", "_capacity", "_write_pos", "_read_pos", "_size", "_temp", "_empty")
 
     def __init__(self, capacity: int) -> None:
         """Initialize buffer with given capacity.
@@ -142,10 +142,12 @@ class ZeroCopyBuffer:
             capacity: Maximum number of samples to store
         """
         self._capacity = capacity
-        self._buffer = np.zeros(capacity, dtype=np.float32)
+        self._buffer = np.empty(capacity, dtype=np.float32)
         self._write_pos = 0
         self._read_pos = 0
         self._size = 0
+        self._temp = np.empty(capacity, dtype=np.float32)
+        self._empty = np.array([], dtype=np.float32)
 
     @property
     def capacity(self) -> int:
@@ -165,11 +167,9 @@ class ZeroCopyBuffer:
         """
         n = len(samples)
         if n > self._capacity:
-            # Input larger than buffer - keep only the newest
             samples = samples[-self._capacity :]
             n = self._capacity
 
-        # Handle wrap-around
         end_pos = self._write_pos + n
         if end_pos <= self._capacity:
             self._buffer[self._write_pos : end_pos] = samples
@@ -181,7 +181,6 @@ class ZeroCopyBuffer:
         self._write_pos = end_pos % self._capacity
         self._size = min(self._size + n, self._capacity)
 
-        # If buffer is full, update read position
         if self._size == self._capacity:
             self._read_pos = self._write_pos
 
@@ -192,22 +191,20 @@ class ZeroCopyBuffer:
             count: Number of samples to view
 
         Returns:
-            View into buffer (copy may occur if wrapping)
+            View into buffer (uses temp buffer for wraparound)
         """
         count = min(count, self._size)
         if count == 0:
-            return np.array([], dtype=np.float32)
+            return self._empty
 
         end_pos = self._read_pos + count
         if end_pos <= self._capacity:
             return self._buffer[self._read_pos : end_pos]
-        else:
-            # Wrap-around case - must copy
-            result = np.empty(count, dtype=np.float32)
-            first_part = self._capacity - self._read_pos
-            result[:first_part] = self._buffer[self._read_pos :]
-            result[first_part:] = self._buffer[: end_pos - self._capacity]
-            return result
+
+        first_part = self._capacity - self._read_pos
+        self._temp[:first_part] = self._buffer[self._read_pos :]
+        self._temp[first_part:count] = self._buffer[: end_pos - self._capacity]
+        return self._temp[:count]
 
     def pop(self, count: int) -> np.ndarray:
         """Remove and return samples from buffer.
@@ -245,6 +242,7 @@ class VoiceActivityDetector:
         "_silence_counter",
         "_sample_rate",
         "_last_transition_time",
+        "_log10_scale",
     )
 
     def __init__(
@@ -267,6 +265,7 @@ class VoiceActivityDetector:
         self._speech_counter = 0
         self._silence_counter = 0
         self._last_transition_time = 0.0
+        self._log10_scale = 1.0 / np.log(10)
 
     def compute_energy(self, samples: np.ndarray) -> float:
         """Compute RMS energy in dB.
@@ -277,12 +276,42 @@ class VoiceActivityDetector:
         Returns:
             Energy in dB (negative infinity for silence)
         """
-        if len(samples) == 0:
-            return -np.inf
-        rms = np.sqrt(np.mean(samples.astype(np.float64) ** 2))
-        if rms <= 0:
-            return -np.inf
-        return 20.0 * np.log10(rms + 1e-10)
+        return self._compute_energy_fast(samples)
+
+    def compute_energy_fast(self, samples: np.ndarray) -> float:
+        """Fast energy computation using float32 directly.
+
+        Args:
+            samples: Audio samples (must be float32)
+
+        Returns:
+            Energy in dB (negative infinity for silence)
+        """
+        return self._compute_energy_fast(samples)
+
+    def _compute_energy_fast(self, samples: np.ndarray) -> float:
+        """Ultra-fast energy computation using precomputed log scale."""
+        n = len(samples)
+        if n == 0:
+            return -100.0
+        rms_sq = np.dot(samples, samples) / n
+        if rms_sq <= 1e-10:
+            return -100.0
+        return np.log(rms_sq) * 10.0 * self._log10_scale
+
+    def compute_energy_fast_precheck(self, samples: np.ndarray, rms_sq: float) -> float:
+        """Ultra-fast energy with pre-computed squared sum.
+
+        Args:
+            samples: Audio samples (must be float32)
+            rms_sq: Pre-computed sum(samples^2) / n
+
+        Returns:
+            Energy in dB (negative infinity for silence)
+        """
+        if rms_sq <= 1e-10:
+            return -100.0
+        return np.log(rms_sq) * 10.0 * self._log10_scale
 
     def process(self, samples: np.ndarray, timestamp: float) -> VADState:
         """Process chunk and return current VAD state.
@@ -294,27 +323,34 @@ class VoiceActivityDetector:
         Returns:
             Current VAD state
         """
-        energy = self.compute_energy(samples)
+        n = len(samples)
+        if n == 0:
+            return self._state
+        rms_sq = np.dot(samples, samples) / n
+        if rms_sq <= 1e-10:
+            energy = -100.0
+        else:
+            energy = np.log(rms_sq) * 10.0 * self._log10_scale
         is_speech = energy > self._threshold_db
 
         if self._state == VADState.SILENCE:
             if is_speech:
-                self._speech_counter += len(samples)
+                self._speech_counter += n
                 if self._speech_counter >= self._hysteresis_samples:
                     self._state = VADState.SPEECH
                     self._last_transition_time = timestamp
                     self._speech_counter = 0
             else:
-                self._speech_counter = max(0, self._speech_counter - len(samples) // 2)
+                self._speech_counter = max(0, self._speech_counter - n // 2)
         else:
             if not is_speech:
-                self._silence_counter += len(samples)
+                self._silence_counter += n
                 if self._silence_counter >= self._hysteresis_samples:
                     self._state = VADState.SILENCE
                     self._last_transition_time = timestamp
                     self._silence_counter = 0
             else:
-                self._silence_counter = max(0, self._silence_counter - len(samples) // 2)
+                self._silence_counter = max(0, self._silence_counter - n // 2)
 
         return self._state
 
@@ -361,6 +397,7 @@ class FastChunker:
         "_adaptive_size",
         "_speech_density_window",
         "_initialized",
+        "_chunk_output",
     )
 
     def __init__(
@@ -382,7 +419,6 @@ class FastChunker:
         if config is not None:
             self._config = config
         else:
-            # Build config from keyword arguments for backward compatibility
             base_chunk_ms = (chunk_duration * 1000) if chunk_duration else 200.0
             overlap_ms = base_chunk_ms * overlap_ratio
             effective_sample_rate = sample_rate or 16000
@@ -394,30 +430,28 @@ class FastChunker:
                 overlap_ms=overlap_ms,
             )
 
-        # Primary buffer for incoming audio
-        # Buffer capacity must be >= max_chunk_samples * 1.5 to prevent deadlock
         buffer_capacity = int(self._config.max_samples * 1.5)
         self._buffer = ZeroCopyBuffer(buffer_capacity)
 
-        # Overlap buffer stores trailing samples from previous chunk
-        self._overlap_buffer = np.zeros(self._config.overlap_samples, dtype=np.float32)
+        self._overlap_buffer = np.empty(self._config.overlap_samples, dtype=np.float32)
 
-        # VAD processor
         self._vad = VoiceActivityDetector(
             threshold_db=self._config.vad_threshold_db,
             hysteresis_ms=self._config.vad_hysteresis_ms,
             sample_rate=self._config.sample_rate,
         )
 
-        # Timing state
         self._stream_start_time: float | None = None
         self._next_chunk_time: float = 0.0
 
-        # Adaptive sizing state
         self._adaptive_size = self._config.base_samples
         self._speech_density_window = deque[float](maxlen=10)
 
         self._initialized = False
+
+        self._chunk_output = np.empty(
+            self._config.max_samples + self._config.overlap_samples, dtype=np.float32
+        )
 
     def push(
         self,
@@ -464,75 +498,64 @@ class FastChunker:
     def _process_available(self, timestamp: float) -> list[AudioChunk]:
         """Process available buffered audio into chunks."""
         chunks: list[AudioChunk] = []
-
-        if self._config.sample_rate <= 0:
-            logger.error(f"Invalid sample_rate: {self._config.sample_rate}")
+        sample_rate = self._config.sample_rate
+        if sample_rate <= 0:
+            logger.error("Invalid sample_rate: %s", sample_rate)
             return chunks
 
+        step_size = self._config.base_samples - self._config.overlap_samples
+        overlap_samples = self._config.overlap_samples
+        min_samples = self._config.min_samples
+        vad_compute_energy = self._vad.compute_energy_fast
+
         while self._buffer.available >= self._adaptive_size:
-            # Calculate current chunk size based on speech density
             self._update_adaptive_size()
+            chunk_size = self._adaptive_size
 
-            # Peek at available audio
-            available = self._buffer.peek(self._buffer.available)
-
-            # Determine chunk boundary
-            chunk_size = min(self._adaptive_size, len(available))
-
-            # Run VAD on prospective chunk
-            prospective = available[:chunk_size]
+            prospective = self._buffer.peek(chunk_size)
             vad_state = self._vad.process(prospective, timestamp)
 
-            # Check for early emission conditions
-            emit_early = (
-                vad_state == VADState.SPEECH and len(prospective) >= self._config.min_samples
-            )
+            emit_early = vad_state == VADState.SPEECH and len(prospective) >= min_samples
 
             if emit_early or len(prospective) >= self._adaptive_size:
-                # Pop and emit chunk
                 chunk_samples = self._buffer.pop(chunk_size)
 
-                # Prepend overlap from previous chunk
-                if len(self._overlap_buffer) > 0:
-                    chunk_samples = np.concatenate([self._overlap_buffer, chunk_samples])
+                if overlap_samples > 0 and len(self._overlap_buffer) > 0:
+                    chunk_output_len = len(self._chunk_output)
+                    copy_len = min(overlap_samples, chunk_output_len)
+                    self._chunk_output[:copy_len] = self._overlap_buffer[:copy_len]
+                    remaining = chunk_output_len - copy_len
+                    if remaining > 0:
+                        self._chunk_output[copy_len : copy_len + len(chunk_samples)] = (
+                            chunk_samples[:remaining]
+                        )
+                    actual_size = copy_len + min(len(chunk_samples), remaining)
+                    final_samples = self._chunk_output[:actual_size].copy()
+                    if len(prospective) >= overlap_samples:
+                        self._overlap_buffer[:] = prospective[-overlap_samples:]
+                else:
+                    final_samples = chunk_samples
 
-                # Calculate timing
                 chunk_start = self._next_chunk_time
-                if self._config.sample_rate <= 0:
-                    raise ValueError(f"Invalid sample_rate: {self._config.sample_rate}")
-                chunk_duration = len(chunk_samples) / self._config.sample_rate
+                chunk_duration = len(final_samples) / sample_rate
                 chunk_end = chunk_start + chunk_duration
 
-                # Create chunk
                 chunk = AudioChunk(
-                    samples=chunk_samples,
+                    samples=final_samples,
                     start_time=chunk_start,
                     end_time=chunk_end,
                     vad_state=vad_state,
-                    energy_db=self._vad.compute_energy(prospective),
+                    energy_db=vad_compute_energy(prospective),
                     is_early_emission=emit_early,
-                    overlap_samples=len(self._overlap_buffer),
+                    overlap_samples=overlap_samples
+                    if overlap_samples > 0 and len(self._overlap_buffer) > 0
+                    else 0,
                 )
                 chunks.append(chunk)
 
-                # Update overlap buffer with trailing samples
-                if len(prospective) >= self._config.overlap_samples:
-                    self._overlap_buffer = prospective[-self._config.overlap_samples :].astype(
-                        np.float32
-                    )
-                else:
-                    self._overlap_buffer = np.zeros(self._config.overlap_samples, dtype=np.float32)
-
-                # Update timing
-                step_duration = (
-                    chunk_size - self._config.overlap_samples
-                ) / self._config.sample_rate
-                self._next_chunk_time += step_duration
-
-                # Track speech density
+                self._next_chunk_time += step_size / sample_rate
                 self._speech_density_window.append(1.0 if vad_state == VADState.SPEECH else 0.0)
             else:
-                # Not enough samples and no speech - wait for more
                 break
 
         return chunks
