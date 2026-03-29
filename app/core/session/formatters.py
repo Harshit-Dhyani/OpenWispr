@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from enum import Enum
+from io import StringIO
 
 
 class ExportFormat(Enum):
@@ -31,7 +32,7 @@ class SrtFormatter:
         """Convert seconds to SRT time format (HH:MM:SS,mmm)."""
         td = timedelta(seconds=seconds)
         hours, remainder = divmod(td.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        minutes, secs = divmod(remainder, 60)
         milliseconds = int(td.microseconds / 1000)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
@@ -45,11 +46,23 @@ class SrtFormatter:
 
     @staticmethod
     def format_transcript(segments: list[dict]) -> str:
-        """Format entire transcript as SRT."""
-        output = []
+        """Format entire transcript as SRT using efficient string building."""
+        if not segments:
+            return ""
+        buf = StringIO()
         for i, seg in enumerate(segments, 1):
-            output.append(SrtFormatter.format_segment(seg, i))
-        return "\n".join(output)
+            start = SrtFormatter.format_time(seg.get("start", 0))
+            end = SrtFormatter.format_time(seg.get("end", 0))
+            text = seg.get("text", "").strip()
+            buf.write(str(i))
+            buf.write("\n")
+            buf.write(start)
+            buf.write(" --> ")
+            buf.write(end)
+            buf.write("\n")
+            buf.write(text)
+            buf.write("\n\n")
+        return buf.getvalue()
 
 
 class MarkdownFormatter:
@@ -57,7 +70,7 @@ class MarkdownFormatter:
 
     @staticmethod
     def format_time(seconds: float) -> str:
-        """Convert seconds to readable timestamp."""
+        """Format seconds as readable timestamp."""
         mins, secs = divmod(int(seconds), 60)
         hours, mins = divmod(mins, 60)
         if hours > 0:
@@ -77,11 +90,22 @@ class MarkdownFormatter:
         title: str = "Transcript",
         include_timestamps: bool = True,
     ) -> str:
-        """Format entire transcript as Markdown."""
-        lines = [f"# {title}\n"]
-        for seg in segments:
-            if include_timestamps:
-                lines.append(MarkdownFormatter.format_segment(seg))
-            else:
-                lines.append(seg.get("text", "").strip())
-        return "\n".join(lines)
+        """Format entire transcript as Markdown using efficient string building."""
+        buf = StringIO()
+        buf.write("# ")
+        buf.write(title)
+        buf.write("\n\n")
+
+        if include_timestamps:
+            for seg in segments:
+                buf.write("[")
+                buf.write(MarkdownFormatter.format_time(seg.get("start", 0)))
+                buf.write("] ")
+                buf.write(seg.get("text", "").strip())
+                buf.write("\n")
+        else:
+            for seg in segments:
+                buf.write(seg.get("text", "").strip())
+                buf.write("\n")
+
+        return buf.getvalue()

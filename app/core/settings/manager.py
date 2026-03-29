@@ -14,7 +14,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app.config.coach_prompts import get_default_coach_templates
 from app.config.settings import (
@@ -518,14 +518,12 @@ class SettingsManager:
             settings_dir: Directory to store settings file. Defaults to user data directory.
         """
         if settings_dir is None:
-            # Use platform-appropriate user data directory
             if sys.platform == "win32":
                 base = Path(os.getenv("APPDATA") or (Path.home() / "AppData" / "Roaming"))
             elif sys.platform == "darwin":
                 base = Path.home() / "Library" / "Application Support"
             else:
                 base = Path(os.getenv("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
-            # Use OpenWispr subdirectory
             settings_dir = base / "OpenWispr"
 
         settings_dir = Path(settings_dir)
@@ -536,13 +534,16 @@ class SettingsManager:
         self._mode_container: SettingsContainer = create_default_mode_configs()
         self._validator = SettingsValidator(strict=False)
         self._lock = threading.RLock()
-        self._sync_callbacks: list[callable] = []
+        self._sync_callbacks: list[Callable[[str, dict[str, Any]], None]] = []
         self._last_sync: float = 0.0
+        self._settings_dict_cache: dict[str, Any] | None = None
 
         self._load()
 
     def _load(self) -> None:
         """Load settings from disk or create with defaults."""
+        self._settings_dict_cache = None
+        self._dirty = False
         if not self.settings_path.exists():
             logger.info("Settings file not found, creating with defaults: %s", self.settings_path)
             self._settings = DEFAULT_SETTINGS_STATE
@@ -651,6 +652,8 @@ class SettingsManager:
 
             with open(self.settings_path, "w", encoding="utf-8") as f:
                 json.dump(asdict(self._settings), f, indent=2)
+            self._settings_dict_cache = None
+            self._dirty = False
             logger.debug("Settings saved to %s", self.settings_path)
         except (OSError, TypeError) as exc:
             logger.error("Failed to save settings: %s", exc)
@@ -792,7 +795,7 @@ class SettingsManager:
     # ============================================
     # WebSocket Sync Support
     # ============================================
-    def register_sync_callback(self, callback: callable) -> None:
+    def register_sync_callback(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """Register a callback for settings synchronization.
 
         Args:
@@ -800,13 +803,15 @@ class SettingsManager:
                      Signature: callback(event_type: str, data: dict) -> None
         """
         self._sync_callbacks.append(callback)
-        logger.debug("Registered sync callback: %s", callback.__name__)
+        logger.debug("Registered sync callback: %s", getattr(callback, "__name__", repr(callback)))
 
-    def unregister_sync_callback(self, callback: callable) -> None:
+    def unregister_sync_callback(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """Unregister a sync callback."""
         if callback in self._sync_callbacks:
             self._sync_callbacks.remove(callback)
-            logger.debug("Unregistered sync callback: %s", callback.__name__)
+            logger.debug(
+                "Unregistered sync callback: %s", getattr(callback, "__name__", repr(callback))
+            )
 
     def _notify_sync(self, event_type: str, data: dict[str, Any]) -> None:
         """Notify all sync callbacks of a settings change."""
@@ -874,9 +879,11 @@ class SettingsManager:
     # Legacy Compatibility
     # ============================================
     def get_settings_dict(self) -> dict[str, Any]:
-        """Get settings as a dictionary for API responses."""
+        """Get settings as a dictionary for API responses (cached)."""
         with self._lock:
-            return asdict(self._settings)
+            if self._settings_dict_cache is None:
+                self._settings_dict_cache = asdict(self._settings)
+            return self._settings_dict_cache
 
     def validate(self) -> ValidationResult:
         """Validate current settings."""

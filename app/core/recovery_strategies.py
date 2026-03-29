@@ -345,6 +345,9 @@ class AudioDeviceRecoveryStrategy(RecoveryStrategy):
     def recover(
         self, error: OpenWisprError, context: dict[str, Any] | None = None
     ) -> RecoveryResult:
+        if not isinstance(error, AudioError):
+            return self._failed(error.error_id, "Incompatible error type for this strategy")
+
         ctx = context or {}
         available_devices = ctx.get("available_devices", [])
 
@@ -937,7 +940,12 @@ class RecoveryManager:
                 )
 
             except Exception as e:
-                logger.error(f"Recovery strategy {strategy.name} threw exception: {e}")
+                logger.error(
+                    f"Recovery strategy {strategy.name} threw exception: [{error.error_id}] "
+                    f"{type(e).__name__}: {e}",
+                    extra={"error_id": error.error_id, "strategy": strategy.name},
+                    exc_info=True,
+                )
                 continue
 
         # All strategies exhausted
@@ -961,7 +969,11 @@ class RecoveryManager:
             try:
                 self._on_recovery(result)
             except Exception as e:
-                logger.error(f"Recovery callback failed: {e}")
+                logger.error(
+                    f"Recovery callback failed: [{result.error_id}] {type(e).__name__}: {e}",
+                    extra={"error_id": result.error_id, "result": result.to_dict()},
+                    exc_info=True,
+                )
 
     def get_fallback_chain(self, name: str) -> FallbackChain | None:
         """Get a registered fallback chain by name."""
@@ -971,7 +983,7 @@ class RecoveryManager:
         """Get recovery statistics."""
         strategy_stats = [s.get_stats() for s in self._strategies]
 
-        history_by_status = {}
+        history_by_status: dict[str, int] = {}
         for r in self._recovery_history:
             status = r.status.value
             history_by_status[status] = history_by_status.get(status, 0) + 1

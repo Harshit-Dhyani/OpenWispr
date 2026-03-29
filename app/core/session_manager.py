@@ -74,7 +74,7 @@ class SessionManager:
         self.audio_source: LoopbackAudioSource | None = None
         self.chunker: FastChunker | None = None
         self.transcriber: FastTranscriber | None = None
-        self.logger = None
+        self.logger: logging.Logger | None = None
         self.meter = MeterSmoother(decay=settings.meter_decay)
         self._audio_thread: threading.Thread | None = None
         self._processing_executor: ThreadPoolExecutor | None = None
@@ -249,6 +249,7 @@ class SessionManager:
         )
         self.writer = SessionWriter(self.session)
         self.logger = configure_logging(output_dir / "logs", self.settings.log_level)
+        assert self.logger is not None
 
         self.logger.debug(
             "session_start_init",
@@ -506,13 +507,13 @@ class SessionManager:
                 )
 
         if self._audio_thread:
-            joined = self._audio_thread.join(timeout=3)
+            self._audio_thread.join(timeout=3)
             if self.logger:
                 self.logger.debug(
                     "audio_thread_joined",
                     extra={
                         "session_id": session_slug,
-                        "joined": joined is not None,
+                        "joined": True,
                         "alive": self._audio_thread.is_alive() if self._audio_thread else None,
                     },
                 )
@@ -562,7 +563,7 @@ class SessionManager:
             if samples is None:
                 continue
 
-            stream_time += len(samples) / self.settings.sample_rate
+            stream_time += len(samples) / max(self.settings.sample_rate, 1)
             chunks = self.chunker.push(samples, stream_time)
             chunk_count = len(chunks)
             self._chunks_processed += chunk_count
@@ -641,7 +642,7 @@ class SessionManager:
             if samples is None:
                 continue
 
-            stream_time += len(samples) / self.settings.sample_rate
+            stream_time += len(samples) / max(self.settings.sample_rate, 1)
             chunks = self.chunker.push(samples, stream_time)
             chunk_count = len(chunks)
             self._chunks_processed += chunk_count
@@ -824,20 +825,15 @@ class SessionManager:
             self._rebuild_outputs(force=True)
             return
 
-        new_segments = []
-        for i, segment in enumerate(self.session.segments):
-            if i > self._last_processed_segment_index and not segment.suppressed:
-                new_segments.append(segment)
+        last_idx = self._last_processed_segment_index
+        segments = self.session.segments
+        new_segments = [s for s in segments[last_idx + 1 :] if not s.suppressed]
 
         if not new_segments:
             return
 
         bundle = self.note_processor.build_incremental(
-            existing_segments=[
-                s
-                for s in self.session.segments[: self._last_processed_segment_index + 1]
-                if not s.suppressed
-            ],
+            existing_segments=[s for s in segments[: last_idx + 1] if not s.suppressed],
             new_segments=new_segments,
             existing_formulas=self.session.formulas,
             existing_needs_review=self.session.needs_review,
@@ -852,7 +848,7 @@ class SessionManager:
         )
         self._last_rebuild_at = time.monotonic()
         self._outputs_dirty = False
-        self._last_processed_segment_index = len(self.session.segments) - 1
+        self._last_processed_segment_index = len(segments) - 1
 
     def _maybe_rebuild_outputs(self) -> None:
         if not self._outputs_dirty:

@@ -118,6 +118,9 @@ class HotkeySessionConfig:
     language_mode: str = "auto"
     compute_type: str = "int8"
     device: str = "cpu"
+    download_root: Path = field(
+        default_factory=lambda: Path.home() / ".cache" / "openwispr" / "models"
+    )
 
     # Storage settings (only used if save_sessions=True)
     output_dir: Path | None = None
@@ -378,7 +381,8 @@ class CircularAudioBuffer:
         self.sample_rate = sample_rate
         self.max_duration_seconds = max_duration_seconds
         self.max_samples = int(sample_rate * max_duration_seconds)
-        self._buffer: deque[float] = deque(maxlen=self.max_samples)
+        self._buffer: np.ndarray = np.empty(self.max_samples, dtype=np.float32)
+        self._write_pos = 0
         self._lock = threading.Lock()
         self._start_time: float | None = None
         self._sample_count = 0
@@ -389,20 +393,39 @@ class CircularAudioBuffer:
             if self._start_time is None:
                 self._start_time = time.monotonic()
 
-            samples_list = samples.tolist() if isinstance(samples, np.ndarray) else list(samples)
-            self._buffer.extend(samples_list)
-            self._sample_count += len(samples_list)
-            return len(samples_list)
+            n = len(samples)
+            if n == 0:
+                return 0
+
+            end_pos = self._write_pos + n
+            if end_pos <= self.max_samples:
+                self._buffer[self._write_pos : end_pos] = samples
+            else:
+                first_part = self.max_samples - self._write_pos
+                self._buffer[self._write_pos :] = samples[:first_part]
+                self._buffer[: end_pos - self.max_samples] = samples[first_part:]
+
+            self._write_pos = end_pos % self.max_samples
+            self._sample_count = min(self._sample_count + n, self.max_samples)
+            return n
 
     def get_all(self) -> np.ndarray:
         """Get all audio data as numpy array."""
         with self._lock:
-            return np.array(self._buffer, dtype=np.float32)
+            if self._sample_count == 0:
+                return np.array([], dtype=np.float32)
+            if self._write_pos >= self._sample_count:
+                return self._buffer[: self._sample_count].copy()
+            result = np.empty(self._sample_count, dtype=np.float32)
+            first_part = self.max_samples - self._write_pos
+            result[:first_part] = self._buffer[self._write_pos :]
+            result[first_part:] = self._buffer[: self._sample_count - first_part]
+            return result
 
     def clear(self) -> None:
         """Clear the buffer."""
         with self._lock:
-            self._buffer.clear()
+            self._write_pos = 0
             self._start_time = None
             self._sample_count = 0
 
@@ -410,19 +433,21 @@ class CircularAudioBuffer:
     def duration_seconds(self) -> float:
         """Current buffer duration in seconds."""
         with self._lock:
-            return len(self._buffer) / self.sample_rate
+            if self.sample_rate <= 0:
+                return 0.0
+            return self._sample_count / self.sample_rate
 
     @property
     def is_full(self) -> bool:
         """Check if buffer has reached capacity."""
         with self._lock:
-            return len(self._buffer) >= self.max_samples
+            return self._sample_count >= self.max_samples
 
     @property
     def sample_count(self) -> int:
         """Total number of samples stored."""
         with self._lock:
-            return len(self._buffer)
+            return self._sample_count
 
 
 class HotkeySession:
@@ -757,7 +782,7 @@ class HotkeySession:
                     "Audio too short, skipping transcription",
                     extra={
                         "session_id": self._session_id,
-                        "duration": len(audio_data) / self.config.sample_rate,
+                        "duration": len(audio_data) / max(self.config.sample_rate, 1),
                     },
                 )
                 self._transcription_result = ""
@@ -809,6 +834,7 @@ class HotkeySession:
 
         return FastTranscriber(
             model_name=self.config.model_name,
+            download_root=str(self.config.download_root),
             device=self.config.device,
             compute_type=self.config.compute_type,
             beam_size=self.config.beam_size,
@@ -1021,10 +1047,12 @@ class HotkeySessionPool:
 
             transcriber = FastTranscriber(
                 model_name=self.config.model_name,
+                download_root=str(self.config.download_root),
                 device=self.config.device,
                 compute_type=self.config.compute_type,
                 beam_size=self.config.beam_size,
                 language_mode=self.config.language_mode,
+                execution_mode="fast",
             )
 
             start_time = time.perf_counter()

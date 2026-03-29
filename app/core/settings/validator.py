@@ -77,6 +77,7 @@ class SettingsValidator:
             strict: If True, warnings are treated as errors
         """
         self.strict = strict
+        self._valid_categories: frozenset[str] = get_all_categories()
 
     def validate(
         self,
@@ -99,13 +100,10 @@ class SettingsValidator:
         unknown_settings: list[str] = []
         missing_settings: list[str] = []
 
-        # Get valid categories
-        valid_categories = get_all_categories()
-
         # 1. Check unknown settings and validate known ones
         for category, cat_settings in settings.items():
             # Skip non-category keys (like 'version')
-            if category not in valid_categories:
+            if category not in self._valid_categories:
                 if check_unknown and category != "version":
                     unknown_settings.append(category)
                     errors.append(
@@ -375,11 +373,10 @@ class SettingsValidator:
             Sanitized settings dictionary
         """
         result: dict[str, Any] = {}
-        valid_categories = get_all_categories()
 
         for category, cat_settings in settings.items():
             # Preserve non-category keys (like 'version')
-            if category not in valid_categories:
+            if category not in self._valid_categories:
                 result[category] = cat_settings
                 continue
 
