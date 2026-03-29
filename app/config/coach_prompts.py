@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import TypedDict
 
 DEFAULT_COACH_TEMPLATE_ID = "default_english_coach"
 
@@ -23,6 +24,14 @@ You must preserve the speakers meaning and tone.
 You must NOT add new facts.
 Prefer minimal edits.
 Output MUST be valid JSON only, matching the schema exactly."""
+
+
+class CompiledCoachPrompt(TypedDict):
+    system_prompt: str
+    user_prompt: str
+    variables: dict[str, str]
+    resolved_template_id: str
+    resolved_template_version: int
 
 
 DEFAULT_COACH_USER_TEMPLATE = """Language mode: {language_mode}
@@ -92,7 +101,7 @@ def compile_coach_prompt(
     detail_level: str,
     overrides: dict[str, object],
     custom_user_template: str = "",
-) -> dict[str, object]:
+) -> CompiledCoachPrompt:
     """Compiles a coach prompt with user overrides and template variables.
 
     Args:
@@ -122,6 +131,6 @@ def compile_coach_prompt(
         "system_prompt": resolved_system,
         "user_prompt": resolved_user_template.format(**variables),
         "variables": variables,
-        "resolved_template_id": template.get("id", DEFAULT_COACH_TEMPLATE_ID),
+        "resolved_template_id": str(template.get("id", DEFAULT_COACH_TEMPLATE_ID)),
         "resolved_template_version": int(template.get("version", 1) or 1),
     }

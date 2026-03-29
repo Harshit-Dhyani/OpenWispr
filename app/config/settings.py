@@ -1027,8 +1027,22 @@ SETTINGS_REGISTRY: dict[str, SettingDefinition] = {
 
 
 # ============================================
-# Registry Access Functions
+# Registry Access Functions (with caching)
 # ============================================
+_CATEGORY_CACHE: dict[str, dict[str, SettingDefinition]] | None = None
+_ALL_CATEGORIES: frozenset[str] | None = None
+
+
+def _build_category_cache() -> dict[str, dict[str, SettingDefinition]]:
+    """Build category-to-settings cache (computed once)."""
+    cache: dict[str, dict[str, SettingDefinition]] = {}
+    for name, defn in SETTINGS_REGISTRY.items():
+        if defn.category not in cache:
+            cache[defn.category] = {}
+        cache[defn.category][name] = defn
+    return cache
+
+
 def get_setting(name: str) -> SettingDefinition:
     """Get setting definition by name.
 
@@ -1055,12 +1069,18 @@ def get_settings_by_category(category: str) -> dict[str, SettingDefinition]:
     Returns:
         Dictionary of setting names to definitions
     """
-    return {name: defn for name, defn in SETTINGS_REGISTRY.items() if defn.category == category}
+    global _CATEGORY_CACHE
+    if _CATEGORY_CACHE is None:
+        _CATEGORY_CACHE = _build_category_cache()
+    return _CATEGORY_CACHE.get(category, {})
 
 
-def get_all_categories() -> set[str]:
+def get_all_categories() -> frozenset[str]:
     """Get all unique category names."""
-    return {defn.category for defn in SETTINGS_REGISTRY.values()}
+    global _ALL_CATEGORIES
+    if _ALL_CATEGORIES is None:
+        _ALL_CATEGORIES = frozenset(defn.category for defn in SETTINGS_REGISTRY.values())
+    return _ALL_CATEGORIES
 
 
 def get_fake_settings() -> dict[str, list[str]]:
