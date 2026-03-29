@@ -1,19 +1,21 @@
 """Transcript history service for session persistence and analytics.
 
 Provides TranscriptHistoryService for managing transcript session history
-including ingestion, retrieval, listing, analytics, retry pipelines, and
-retention cleanup. Integrates with dictionary, snippet, and style services
-for retry processing.
+including ingestion, retrieval, listing, analytics, retry pipelines, retention
+cleanup, and batch exports. Integrates with dictionary, snippet, and style
+services for retry processing.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import zipfile
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,17 @@ from app.api.services.style_service import StyleService
 from app.storage.history_db import HistoryDatabase
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_session_id(session_id: str) -> str:
+    """Validate and sanitize session_id format."""
+    if not session_id or not isinstance(session_id, str):
+        raise ValueError("session_id is required and must be a string")
+    if len(session_id) > 128:
+        raise ValueError("session_id exceeds maximum length")
+    if not session_id.replace("-", "").replace("_", "").replace(".", "").isalnum():
+        raise ValueError("session_id contains invalid characters")
+    return session_id
 
 
 def _utc_now_iso() -> str:
@@ -94,6 +107,7 @@ class TranscriptHistoryService:
         session_id = str(payload.get("session_id", "")).strip()
         if not session_id:
             raise ValueError("session_id is required")
+        session_id = _validate_session_id(session_id)
 
         source_workflow = str(payload.get("source_workflow") or "session")
         capture_source = str(payload.get("capture_source") or "microphone")
@@ -300,6 +314,7 @@ class TranscriptHistoryService:
         return [self._serialize_session_row(row) for row in rows]
 
     def get_session(self, session_id: str) -> dict[str, Any] | None:
+        validated_id = _validate_session_id(session_id)
         row = self._db.query_one(
             """
             SELECT session_id, source_workflow, capture_source, title, transcription_mode, started_at, ended_at,
@@ -310,7 +325,7 @@ class TranscriptHistoryService:
             FROM transcript_sessions
             WHERE session_id = ?
             """,
-            (session_id,),
+            (validated_id,),
         )
         if row is None:
             return None
@@ -322,7 +337,7 @@ class TranscriptHistoryService:
             WHERE session_id = ?
             ORDER BY revision_index ASC
             """,
-            (session_id,),
+            (validated_id,),
         )
         try:
             payload["settings_snapshot"] = json.loads(payload.get("settings_snapshot_json") or "{}")
@@ -399,9 +414,10 @@ class TranscriptHistoryService:
         }
 
     def undo_ai_edit(self, session_id: str) -> dict[str, Any]:
-        session = self.get_session(session_id)
+        validated_id = _validate_session_id(session_id)
+        session = self.get_session(validated_id)
         if session is None:
-            raise KeyError(session_id)
+            raise KeyError(validated_id)
 
         fallback_order = [
             ("postprocessed_text", session.get("postprocessed_text")),
@@ -446,9 +462,10 @@ class TranscriptHistoryService:
         return updated
 
     def retry_transcript(self, session_id: str) -> dict[str, Any]:
-        session = self.get_session(session_id)
+        validated_id = _validate_session_id(session_id)
+        session = self.get_session(validated_id)
         if session is None:
-            raise KeyError(session_id)
+            raise KeyError(validated_id)
         self._db.execute(
             """
             UPDATE transcript_sessions
@@ -526,6 +543,7 @@ class TranscriptHistoryService:
             )
 
     def delete_session(self, session_id: str) -> bool:
+        validated_id = _validate_session_id(session_id)
         cursor = self._db.execute(
             """
             UPDATE transcript_sessions
@@ -533,14 +551,15 @@ class TranscriptHistoryService:
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             WHERE session_id = ? AND deleted_at IS NULL
             """,
-            (session_id,),
+            (validated_id,),
         )
         return bool(cursor.rowcount)
 
     def build_download_asset(self, session_id: str, asset: str) -> DownloadAsset:
-        session = self.get_session(session_id)
+        validated_id = _validate_session_id(session_id)
+        session = self.get_session(validated_id)
         if session is None:
-            raise KeyError(session_id)
+            raise KeyError(validated_id)
 
         if asset == "audio":
             audio_path = Path(str(session.get("audio_path") or ""))
@@ -575,6 +594,111 @@ class TranscriptHistoryService:
             )
 
         raise ValueError("asset must be one of: audio, transcript, bundle")
+
+    def batch_export(
+        self,
+        session_ids: list[str],
+        format: str = "jsonl",
+        include_audio: bool = False,
+    ) -> tuple[bytes, str]:
+        """Export multiple sessions as a ZIP archive.
+
+        Args:
+            session_ids: List of session IDs to export.
+            format: Export format ('jsonl' for newline-delimited JSON, 'txt' for plain text).
+            include_audio: Whether to include audio files in the export.
+
+        Returns:
+            Tuple of (ZIP archive bytes, suggested filename).
+
+        Raises:
+            KeyError: If a session is not found.
+        """
+        if not session_ids:
+            raise ValueError("session_ids cannot be empty")
+
+        buffer = BytesIO()
+        max_workers = min(len(session_ids), 8)
+
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+
+            def export_session(sid: str) -> tuple[str, str, str | None]:
+                session = self.get_session(sid)
+                if session is None:
+                    raise KeyError(sid)
+
+                content: str
+                if format == "txt":
+                    content = self._session_to_text(session)
+                    ext = "txt"
+                else:
+                    content = json.dumps(session, ensure_ascii=False) + "\n"
+                    ext = "jsonl"
+
+                audio_path: str | None = None
+                if include_audio:
+                    audio = session.get("audio_path")
+                    if audio:
+                        audio_path = str(audio)
+
+                return sid, f"sessions/{sid}.{ext}", content, audio_path
+
+            with ThreadPoolExecutor(
+                max_workers=max_workers, thread_name_prefix="batch-export"
+            ) as executor:
+                futures = {executor.submit(export_session, sid): sid for sid in session_ids}
+                for future in as_completed(futures):
+                    sid = futures[future]
+                    try:
+                        _, filename, content, audio_path = future.result()
+                        zf.writestr(filename, content.encode("utf-8"))
+                        if audio_path and Path(audio_path).exists():
+                            audio_filename = f"sessions/{Path(audio_path).name}"
+                            zf.write(audio_path, arcname=audio_filename)
+                    except Exception as e:
+                        logger.warning(f"Failed to export session {sid}: {e}")
+
+            manifest = {
+                "exported_at": _utc_now_iso(),
+                "session_count": len(session_ids),
+                "format": format,
+                "includes_audio": include_audio,
+                "sessions": session_ids,
+            }
+            zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
+        buffer.seek(0)
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        filename = f"openwispr_export_{timestamp}.zip"
+
+        return buffer.read(), filename
+
+    def _session_to_text(self, session: dict[str, Any]) -> str:
+        """Convert session to plain text format."""
+        buf = StringIO()
+        title = session.get("title") or "Untitled Session"
+        started = session.get("started_at", "Unknown")
+        duration_ms = int(session.get("duration_ms") or 0)
+        duration_str = f"{duration_ms // 60000}m {duration_ms % 60000 // 1000}s"
+
+        buf.write(f"{'=' * 60}\n")
+        buf.write(f"{title}\n")
+        buf.write(f"{'=' * 60}\n\n")
+        buf.write(f"Session ID: {session.get('session_id', 'N/A')}\n")
+        buf.write(f"Started: {started}\n")
+        buf.write(f"Duration: {duration_str}\n")
+        buf.write(f"Model: {session.get('model_name', 'N/A')}\n")
+        buf.write(f"Language: {session.get('language_mode', 'N/A')}\n\n")
+
+        text = session.get("active_text") or session.get("aggregated_clean_text") or ""
+        if text:
+            buf.write("Transcript:\n")
+            buf.write("-" * 40)
+            buf.write("\n\n")
+            buf.write(text)
+            buf.write("\n")
+
+        return buf.getvalue()
 
     def cleanup_retention(self, retention_days: int) -> int:
         if retention_days <= 0:

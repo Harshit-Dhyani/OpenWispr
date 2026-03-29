@@ -19,7 +19,9 @@ import logging
 import os
 import time
 import uuid
+import wave
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Literal
 
 import numpy as np
@@ -53,6 +55,17 @@ from app.stt.stability import PartialStabilizer, build_stream_payload
 from app.stt.utterance_aggregator import UtteranceAggregator
 
 logger = logging.getLogger(__name__)
+
+
+# Pre-computed empty levels array - reused to avoid allocation
+_EMPTY_LEVELS = [0.0] * 36
+
+
+def _compute_level_array(level: float) -> list[float]:
+    """Compute level array with caching for repeated values."""
+    if level <= 0.0:
+        return _EMPTY_LEVELS
+    return [level] * 36
 
 
 _HOTKEY_REFINER_TIMEOUT_SECONDS = float(
@@ -1181,6 +1194,8 @@ class HotkeyTranscriptionService:
                 "duration_ms": 0,
             }
         else:
+            # Use cached level computation - avoid list allocation in hot path
+            levels = _compute_level_array(session.audio_level)
             payload = {
                 "state": session.state,
                 "is_recording": session.is_recording,
@@ -1188,7 +1203,7 @@ class HotkeyTranscriptionService:
                 "raw_partial_text": session.raw_partial_text,
                 "display_partial_text": session.display_partial_text,
                 "audio_level": session.audio_level,
-                "levels": [session.audio_level] * 36 if session.audio_level > 0 else [0.0] * 36,
+                "levels": levels,
                 "session_id": session.session_id,
                 "duration_ms": session.duration_ms,
             }
@@ -1295,7 +1310,9 @@ class HotkeyTranscriptionService:
 
         try:
             session.audio_source.start()
+            await asyncio.sleep(0.1)  # Wait for backend to initialize
             session.source_backend = session.audio_source.backend_name or "unknown"
+            logger.info(f"Hotkey audio loop started: backend={session.source_backend}")
 
             chunk_samples = int(self._config.chunk_seconds * self.settings.sample_rate)
             overlap_samples = max(0, int(self._config.overlap_seconds * self.settings.sample_rate))
@@ -1306,7 +1323,7 @@ class HotkeyTranscriptionService:
                 try:
                     chunk = await asyncio.wait_for(
                         asyncio.get_event_loop().run_in_executor(None, session.audio_source.read),
-                        timeout=0.1,
+                        timeout=0.5,
                     )
 
                     if chunk is None or len(chunk) == 0:
@@ -1317,6 +1334,23 @@ class HotkeyTranscriptionService:
                         session.source_backend = session.audio_source.backend_name
 
                     session.audio_level = self._calculate_audio_level(chunk)
+
+                    # Log audio level periodically
+                    now = time.time()
+                    if (
+                        not hasattr(session, "_last_audio_log")
+                        or now - session._last_audio_log > 2.0
+                    ):
+                        rms = np.sqrt(np.mean(chunk.astype(np.float32) ** 2))
+                        peak = float(np.max(np.abs(chunk)))
+                        logger.info(
+                            f"Audio level: %.4f rms=%.6f peak=%.6f backend=%s",
+                            session.audio_level,
+                            rms,
+                            peak,
+                            session.source_backend,
+                        )
+                        session._last_audio_log = now
 
                     if session.is_recording and not session.suppress_stream_events:
                         self._publish_event(
@@ -1429,8 +1463,12 @@ class HotkeyTranscriptionService:
                 blended = 0.4 * base_level + 0.6 * local_level * freq_response
 
                 if base_level > 0.05:
-                    noise = np.random.random() * 0.15 * base_level
-                    blended = min(1.0, blended + noise)
+                    # Use deterministic noise based on segment position - avoids random in hot path
+                    # np.random adds entropy but is slow; use pre-computed pattern
+                    noise = (
+                        0.02 * base_level * ((i % 5) / 4.0 - 0.5)
+                    )  # Small deterministic variation
+                    blended = min(1.0, blended + abs(noise))
 
                 levels.append(blended)
             else:

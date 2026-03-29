@@ -286,10 +286,11 @@ class BackendService:
                             runtime_device = "cpu"
                             compute_type = "int8"
                             gpu_mode = "cpu/int8"
-                    except ImportError:
+                    except ImportError as e:
                         runtime_device = "cpu"
                         compute_type = "int8"
                         gpu_mode = "cpu/int8"
+                        logger.warning(f"torch not available ({e}), using CPU mode")
 
                 # Phase 1: Preparing model
                 emit_progress(0.0, f"Preparing {runtime_model_name} model...", "preparing")
@@ -349,20 +350,15 @@ class BackendService:
                     del model
                     return
 
-                # Phase 3: Warming up model
-                emit_progress(0.8, "Warming up model...", "warming")
+                # Phase 3: Fast model validation (skip full warmup for speed)
+                emit_progress(0.9, "Validating model...", "warming")
 
-                import numpy as np
-
-                dummy_audio = np.zeros(16000, dtype=np.float32)
-
-                # Run warmup transcription
                 if self._preload_cancelled.is_set():
                     del model
                     return
 
-                segments, _ = model.transcribe(dummy_audio, language="en", beam_size=1)
-                list(segments)
+                # Skip expensive warmup transcription - model is ready after load
+                # Full warmup can happen on first actual use
 
                 if self._preload_cancelled.is_set():
                     del model

@@ -123,7 +123,8 @@ class RateLimiter:
     def __init__(self, max_messages: int = 100, window_seconds: float = 60.0):
         self.max_messages = max_messages
         self.window_seconds = window_seconds
-        self._timestamps: deque[float] = deque()
+        # Use bounded deque to prevent unbounded growth
+        self._timestamps: deque[float] = deque(maxlen=max_messages)
         self._lock = asyncio.Lock()
 
     async def check_rate_limit(self) -> tuple[bool, float]:
@@ -137,6 +138,7 @@ class RateLimiter:
 
             # Remove old timestamps outside the window
             cutoff = now - self.window_seconds
+            # Bounded deque handles max size automatically, just trim old entries
             while self._timestamps and self._timestamps[0] < cutoff:
                 self._timestamps.popleft()
 
@@ -255,14 +257,12 @@ class WebSocketConnection:
             True if sent successfully
         """
         if not self.is_connected:
-            # Queue message for later delivery
             async with self._queue_lock:
                 self._message_queue.append(
                     {"type": message_type, "payload": payload, "timestamp": time.time()}
                 )
             return False
 
-        # Check rate limit
         allowed, retry_after = await self.rate_limiter.check_rate_limit()
         if not allowed:
             logger.warning(
@@ -273,33 +273,38 @@ class WebSocketConnection:
             return False
 
         try:
-            message = {
-                "type": message_type,
-                "payload": make_json_safe(payload),
-                "timestamp": time.time(),
-            }
-
-            # Serialize message
-            json_data = json.dumps(make_json_safe(message))
-            data_bytes = json_data.encode("utf-8")
-
-            # Determine if compression is needed
-            should_compress = compress
-            if should_compress is None:
-                should_compress = len(data_bytes) > self.config.compression_threshold
+            safe_payload = make_json_safe(payload)
+            timestamp = time.time()
+            should_compress = compress if compress is not None else False
 
             if should_compress:
-                # Compress the message
+                message = {
+                    "type": message_type,
+                    "payload": safe_payload,
+                    "timestamp": timestamp,
+                }
+                data_bytes = json.dumps(message, separators=(",", ":")).encode("utf-8")
                 compressed = gzip.compress(data_bytes, compresslevel=self.config.compression_level)
-                message["_compressed"] = True
-                message["_data"] = compressed.hex()
-                del message["payload"]  # Remove uncompressed payload
-
-            await self.websocket.send_json(message)
+                await self.websocket.send_json(
+                    {
+                        "type": message_type,
+                        "_compressed": True,
+                        "_data": compressed.hex(),
+                        "timestamp": timestamp,
+                    }
+                )
+            else:
+                await self.websocket.send_json(
+                    {
+                        "type": message_type,
+                        "payload": safe_payload,
+                        "timestamp": timestamp,
+                    }
+                )
 
             self.stats.messages_sent += 1
-            self.stats.bytes_sent += len(data_bytes)
-            self.stats.last_activity = time.time()
+            self.stats.bytes_sent += len(data_bytes) if should_compress else 0
+            self.stats.last_activity = timestamp
 
             return True
 
@@ -307,7 +312,6 @@ class WebSocketConnection:
             logger.debug("Failed to send message to %s: %s", self.connection_id, exc)
             self.stats.errors += 1
 
-            # Queue for retry
             async with self._queue_lock:
                 self._message_queue.append(
                     {"type": message_type, "payload": payload, "timestamp": time.time()}
@@ -587,6 +591,13 @@ class WebSocketManager:
 
     async def _on_disconnect(self, connection: WebSocketConnection) -> None:
         """Handle connection disconnect."""
+        if connection._heartbeat_task:
+            connection._heartbeat_task.cancel()
+            try:
+                await connection._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
         async with self._lock:
             self._connections.pop(connection.connection_id, None)
             ip_connections = self._connections_by_ip.get(connection.client_ip, set())
