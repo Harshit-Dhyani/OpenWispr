@@ -1,7 +1,16 @@
 import React from 'react';
 import type { Segment } from '../types/api';
 
-export const MemoTranscriptSegment = React.memo(TranscriptSegment);
+export const MemoTranscriptSegment = React.memo(TranscriptSegment, (prevProps, nextProps) => {
+  return (
+    prevProps.segment.id === nextProps.segment.id &&
+    prevProps.segment.display_text === nextProps.segment.display_text &&
+    prevProps.segment.text === nextProps.segment.text &&
+    prevProps.segment.is_partial === nextProps.segment.is_partial &&
+    prevProps.segment.suppressed === nextProps.segment.suppressed &&
+    prevProps.isLatest === nextProps.isLatest
+  );
+});
 
 export function TranscriptSegment({ segment, isLatest }: { segment: Segment; isLatest: boolean }) {
   const displayText = segment.display_text || segment.text;
@@ -93,7 +102,7 @@ export function TranscriptSegment({ segment, isLatest }: { segment: Segment; isL
   );
 }
 
-export function WordToken({
+export const WordToken = React.memo(function WordToken({
   word,
   isLatest,
   wordIndex,
@@ -113,9 +122,9 @@ export function WordToken({
       {word.text}
     </span>
   );
-}
+});
 
-export function StatCard({
+export const StatCard = React.memo(function StatCard({
   label,
   value,
   danger,
@@ -141,9 +150,9 @@ export function StatCard({
       <div className="text-lg font-black leading-tight">{value}</div>
     </div>
   );
-}
+});
 
-export function StatusBadge({ status }: { status: string }) {
+export const StatusBadge = React.memo(function StatusBadge({ status }: { status: string }) {
   const styles =
     status === 'running' || status === 'transcribing'
       ? 'bg-theme-success text-lawn-bg border-theme-success'
@@ -154,7 +163,7 @@ export function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   );
-}
+});
 
 function getConfidenceColor(confidence: number): string {
   if (confidence >= 0.85) return 'bg-theme-success';

@@ -61,7 +61,7 @@ export const ModelConstants = {
   MIN_SEGMENT_LENGTH: 0.5,
 } as const;
 
-export const VALID_MODEL_NAMES = ["turbo", "small", "medium", "base", "large-v3", "tiny"] as const;
+export const VALID_MODEL_NAMES = ["turbo", "tiny", "medium", "large-v3", "small", "base"] as const;
 export const VALID_COMPUTE_TYPES = ['float16', 'int8', 'int8_float16'] as const;
 
 export const MODEL_CATALOG_MAPPING = {"tiny": "whisper-tiny", "base": "whisper-tiny", "small": "whisper-small", "medium": "whisper-medium", "large-v3": "whisper-large-v3", "turbo": "whisper-turbo"} as const;

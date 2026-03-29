@@ -6,13 +6,14 @@
  * 
  * @component
  */
+import React from 'react';
 import { AlertCircle, Filter, Sigma, Sparkles, TriangleAlert } from 'lucide-react';
 import type { CoachResult, Formula, Segment, SessionSummary } from '../types/api';
 import { RENDERER_STRINGS } from '../strings/en';
 
 const MAIN_CONTENT_STRINGS = RENDERER_STRINGS.mainContent;
 
-export function CombinedTimelineCard({ combinedText }: { combinedText: string }) {
+export const CombinedTimelineCard = React.memo(function CombinedTimelineCard({ combinedText }: { combinedText: string }) {
   return (
     <article className="border-2 border-lawn-border bg-lawn-dark/90 p-3 text-lawn-bg">
       <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-lawn-accent">
@@ -23,9 +24,9 @@ export function CombinedTimelineCard({ combinedText }: { combinedText: string })
       </p>
     </article>
   );
-}
+});
 
-export function CombinedPanel({ combinedText }: { combinedText: string }) {
+export const CombinedPanel = React.memo(function CombinedPanel({ combinedText }: { combinedText: string }) {
   if (!combinedText) {
     return (
       <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
@@ -43,9 +44,9 @@ export function CombinedPanel({ combinedText }: { combinedText: string }) {
       <p className="text-sm font-bold leading-6 text-lawn-border">{combinedText}</p>
     </article>
   );
-}
+});
 
-export function CoachPanel({
+export const CoachPanel = React.memo(function CoachPanel({
   coachResult,
   coachStatus,
   coachDisplaySource,
@@ -170,9 +171,9 @@ export function CoachPanel({
       ) : null}
     </div>
   );
-}
+});
 
-export function ReviewPanel({ segments }: { segments: Segment[] }) {
+export const ReviewPanel = React.memo(function ReviewPanel({ segments }: { segments: Segment[] }) {
   if (segments.length === 0) {
     return (
       <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
@@ -202,9 +203,9 @@ export function ReviewPanel({ segments }: { segments: Segment[] }) {
       ))}
     </div>
   );
-}
+});
 
-export function FormulasPanel({ formulas }: { formulas: Formula[] }) {
+export const FormulasPanel = React.memo(function FormulasPanel({ formulas }: { formulas: Formula[] }) {
   if (formulas.length === 0) {
     return (
       <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
@@ -232,9 +233,9 @@ export function FormulasPanel({ formulas }: { formulas: Formula[] }) {
       ))}
     </div>
   );
-}
+});
 
-export function SuppressedPanel({ segments }: { segments: Segment[] }) {
+export const SuppressedPanel = React.memo(function SuppressedPanel({ segments }: { segments: Segment[] }) {
   if (segments.length === 0) {
     return (
       <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
@@ -264,9 +265,9 @@ export function SuppressedPanel({ segments }: { segments: Segment[] }) {
       ))}
     </div>
   );
-}
+});
 
-export function ErrorsPanel({ error, warning }: { error: string | null; warning: string | null }) {
+export const ErrorsPanel = React.memo(function ErrorsPanel({ error, warning }: { error: string | null; warning: string | null }) {
   if (!error && !warning) {
     return (
       <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
@@ -298,9 +299,9 @@ export function ErrorsPanel({ error, warning }: { error: string | null; warning:
       )}
     </div>
   );
-}
+});
 
-export function SessionPanel({
+export const SessionPanel = React.memo(function SessionPanel({
   session,
   acceptedCount,
   reviewCount,
@@ -332,22 +333,22 @@ export function SessionPanel({
       <InspectorCard label="Last Transcript" value={lastTranscriptAt || 'Waiting for transcript'} />
     </div>
   );
-}
+});
 
-export function InspectorCard({ label, value }: { label: string; value: string }) {
+export const InspectorCard = React.memo(function InspectorCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-2 border-lawn-border bg-lawn-bg p-3">
       <div className="text-[9px] font-black uppercase tracking-widest text-lawn-muted">{label}</div>
       <div className="mt-1 text-sm font-bold leading-5 text-lawn-border break-words">{value}</div>
     </div>
   );
-}
+});
 
-export function EmptyState({ title, body }: { title: string; body: string }) {
+export const EmptyState = React.memo(function EmptyState({ title, body }: { title: string; body: string }) {
   return (
     <div className="border-2 border-dashed border-lawn-border bg-lawn-bg/50 p-6 text-center">
       <p className="text-sm font-black text-lawn-border">{title}</p>
       <p className="mt-2 text-xs font-bold leading-5 text-lawn-muted">{body}</p>
     </div>
   );
-}
+});

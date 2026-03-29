@@ -148,13 +148,13 @@ export function ModelCatalogBlock({
                             : 'Calculating…'}
                         </span>
                       </div>
-                      <div className="h-2 border border-lawn-border bg-lawn-bg overflow-hidden">
+                      <div className="h-2 border border-lawn-border bg-lawn-bg overflow-hidden relative">
                         <div
-                          className="h-full bg-lawn-accent transition-all"
-                          style={{
-                            width: hasKnownTotal ? `${progressPercent}%` : '100%',
-                            opacity: hasKnownTotal ? 1 : 0.35,
-                          }}
+                          className={cn(
+                            'h-full bg-lawn-accent transition-all',
+                            !hasKnownTotal && 'opacity-60'
+                          )}
+                          style={{ width: `${progressPercent}%` }}
                         />
                       </div>
                       <div className="mt-1 text-[10px] text-stone-500">

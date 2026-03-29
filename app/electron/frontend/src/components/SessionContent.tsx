@@ -6,7 +6,7 @@
  * 
  * @component
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Waves } from 'lucide-react';
 import type { Formula, Segment, SessionSummary } from '../types/api';
 import {
@@ -60,7 +60,7 @@ type SessionContentProps = {
   }>;
 };
 
-export function SessionContent({
+export const SessionContent = React.memo(function SessionContent({
   snapshot,
   liveLatency,
   workspaceLabel = 'Workspace',
@@ -114,13 +114,13 @@ export function SessionContent({
     }
   }, [autoScroll, snapshot.transcript]);
 
-  function handleScroll() {
+  const handleScroll = useCallback(() => {
     if (!scrollRef.current) {
       return;
     }
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 60);
-  }
+  }, []);
 
   const latencyValue =
     liveLatency !== null && liveLatency !== undefined && liveLatency > 0
@@ -283,4 +283,4 @@ export function SessionContent({
       </div>
     </main>
   );
-}
+});
